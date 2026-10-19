@@ -48,3 +48,16 @@ describe("login", () => {
     expect(await screen.findByRole("heading", { name: "My Cards" })).toBeInTheDocument();
   });
 });
+
+describe("expired session", () => {
+  it("returns to the sign-in screen when an API call gets 401", async () => {
+    mockApi({
+      "GET /api/auth/me": () => ({ id: 3, username: "mb", fullName: "Meinrad", accessLevel: "manager", roles: [] }),
+      "GET /api/dockets": () => Response.json({ error: "Not signed in" }, { status: 401 }),
+      "GET /api/account-managers": () => [],
+      "GET /api/sync/status": () => Response.json({ error: "Not signed in" }, { status: 401 }),
+    });
+    renderApp("/dashboard");
+    expect(await screen.findByLabelText("Username")).toBeInTheDocument();
+  });
+});

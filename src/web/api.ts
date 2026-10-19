@@ -5,6 +5,15 @@ export class ApiError extends Error {
   }
 }
 
+let onUnauthorized: (() => void) | null = null;
+
+/** The auth provider registers this so any 401 (expired or revoked session) signs the user out. */
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  onUnauthorized = fn;
+}
+
+const AUTH_PATHS = ["/api/auth/me", "/api/auth/login", "/api/auth/logout"];
+
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, ...rest } = init;
   const headers = new Headers(rest.headers);
@@ -16,6 +25,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   });
   const body = (await res.json().catch(() => ({}))) as { error?: string };
+  if (res.status === 401 && !AUTH_PATHS.includes(path)) onUnauthorized?.();
   if (!res.ok) throw new ApiError(res.status, body.error ?? `Request failed (${res.status})`);
   return body as T;
 }

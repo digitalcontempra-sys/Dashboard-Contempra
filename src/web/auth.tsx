@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createContext, useCallback, useContext, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import type { AccessLevel, SessionUser } from "../shared/types";
-import { api, ApiError } from "./api";
+import { api, ApiError, setUnauthorizedHandler } from "./api";
 
 type AuthValue = {
   user: SessionUser | null;
@@ -37,6 +37,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [qc],
   );
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => qc.setQueryData(ME, null));
+    return () => setUnauthorizedHandler(null);
+  }, [qc]);
 
   const logout = useCallback(async () => {
     await api("/api/auth/logout", { method: "POST" }).catch(() => undefined);
