@@ -29,21 +29,20 @@ authRoutes.post("/auth/login", async (c) => {
   const username = (b.username ?? "").trim();
   const db = c.env.DB;
   const since = new Date(Date.now() - LOCK_MINUTES * 60_000).toISOString();
-  const fails = await db
-    .prepare("SELECT count(*) AS n FROM login_attempts WHERE username = ? AND attempted_at > ?")
-    .bind(username, since)
-    .first<{ n: number }>();
-  if (fails!.n >= MAX_FAILURES) return c.json({ error: "Too many attempts. Try again in 15 minutes." }, 429);
+  // Record the attempt BEFORE counting, so parallel requests cannot all see a low count.
+  // A successful login clears the rows below.
+  const [, counted] = await db.batch([
+    db.prepare("INSERT INTO login_attempts (username, attempted_at) VALUES (?, ?)").bind(username, new Date().toISOString()),
+    db.prepare("SELECT count(*) AS n FROM login_attempts WHERE username = ? AND attempted_at > ?").bind(username, since),
+  ]);
+  const attempts = Number((counted.results[0] as { n: number }).n);
+  if (attempts > MAX_FAILURES) return c.json({ error: "Too many attempts. Try again in 15 minutes." }, 429);
 
   const u = await db
     .prepare("SELECT id, password_hash FROM users WHERE username = ? AND active = 1")
     .bind(username)
     .first<{ id: number; password_hash: string }>();
   if (!u || !(await verifyPassword(b.password ?? "", u.password_hash))) {
-    await db
-      .prepare("INSERT INTO login_attempts (username, attempted_at) VALUES (?, ?)")
-      .bind(username, new Date().toISOString())
-      .run();
     return c.json({ error: "Invalid username or password" }, 401);
   }
   await db.prepare("DELETE FROM login_attempts WHERE username = ?").bind(username).run();

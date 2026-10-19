@@ -91,3 +91,16 @@ describe("login", () => {
     expect(await res.json()).toEqual({ error: "Not signed in" });
   });
 });
+
+describe("lockout under concurrency", () => {
+  it("parallel wrong guesses still trigger the lockout", async () => {
+    await createUser("jeff", "staff");
+    const results = await Promise.all(
+      Array.from({ length: 12 }, () =>
+        api("/api/auth/login", { method: "POST", json: { username: "jeff", password: "bad-pass!" } }).then((r) => r.status),
+      ),
+    );
+    expect(results.filter((s) => s === 401).length).toBeLessThanOrEqual(5);
+    expect(results.filter((s) => s === 429).length).toBeGreaterThanOrEqual(7);
+  });
+});
