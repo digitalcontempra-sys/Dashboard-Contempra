@@ -128,4 +128,11 @@ describe("Main Dashboard", () => {
     renderApp("/dashboard");
     expect(await screen.findByText("Sync problem — showing last saved data")).toBeInTheDocument();
   });
+
+  it("keeps showing data age while sync is failing", async () => {
+    setup({ lastError: "Google Sheets read failed (503)", lastSuccessAt: new Date(Date.now() - 12 * 60_000).toISOString() });
+    renderApp("/dashboard");
+    expect(await screen.findByText("Last synced 12 min ago")).toBeInTheDocument();
+    expect(screen.getByText("Sync problem — showing last saved data")).toBeInTheDocument();
+  });
 });

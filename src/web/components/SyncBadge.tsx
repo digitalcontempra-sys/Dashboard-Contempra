@@ -31,7 +31,13 @@ export function SyncBadge() {
       title={data.lastError ?? undefined}
     >
       <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
-      {data.lastError ? <span>Sync problem — showing last saved data</span> : <span>{syncedLabel(mins)}</span>}
+      <span>{syncedLabel(mins)}</span>
+      {data.lastError && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span>Sync problem — showing last saved data</span>
+        </>
+      )}
     </div>
   );
 }
