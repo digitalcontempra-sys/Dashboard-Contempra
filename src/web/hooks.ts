@@ -13,21 +13,32 @@ export function useDebounced<T>(value: T, ms = 250): T {
   return v;
 }
 
-/** Reads/writes one URL query param; empty values are removed. */
-export function useParam(key: string): [string, (v: string | null) => void] {
-  const [params, setParams] = useSearchParams();
-  const value = params.get(key) ?? "";
-  const set = (v: string | null) =>
+/**
+ * Updates several URL query params in ONE navigation; empty values are removed.
+ * React Router's setSearchParams does not queue updates, so two calls in one
+ * handler would make the second overwrite the first.
+ */
+export function useSetParams(): (updates: Record<string, string | null>) => void {
+  const [, setParams] = useSearchParams();
+  return (updates) =>
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (v) next.set(key, v);
-        else next.delete(key);
+        for (const [k, v] of Object.entries(updates)) {
+          if (v) next.set(k, v);
+          else next.delete(k);
+        }
         return next;
       },
       { replace: true },
     );
-  return [value, set];
+}
+
+/** Reads/writes one URL query param; empty values are removed. */
+export function useParam(key: string): [string, (v: string | null) => void] {
+  const [params] = useSearchParams();
+  const setMany = useSetParams();
+  return [params.get(key) ?? "", (v) => setMany({ [key]: v })];
 }
 
 export function useAccountManagers() {

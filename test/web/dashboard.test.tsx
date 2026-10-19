@@ -82,6 +82,24 @@ describe("Main Dashboard", () => {
     );
   });
 
+  it("switching to On Hold and History requests those views", async () => {
+    const { calls } = setup();
+    renderApp("/dashboard?bucket=this_week");
+    await userEvent.click(await screen.findByRole("tab", { name: "On Hold" }));
+    await waitFor(() =>
+      expect(calls.some((c) => c.url.pathname === "/api/dockets" && c.url.searchParams.get("view") === "on_hold")).toBe(true),
+    );
+    const onHold = calls.filter((c) => c.url.searchParams.get("view") === "on_hold");
+    expect(onHold.every((c) => !c.url.searchParams.has("bucket"))).toBe(true);
+    await userEvent.click(screen.getByRole("tab", { name: "History" }));
+    await userEvent.click(await screen.findByRole("tab", { name: "Cancelled" }));
+    await waitFor(() =>
+      expect(
+        calls.some((c) => c.url.searchParams.get("view") === "history" && c.url.searchParams.get("history") === "cancelled"),
+      ).toBe(true),
+    );
+  });
+
   it("shows raw due text when the due date is not a date", async () => {
     setup();
     renderApp("/dashboard");

@@ -9,7 +9,7 @@ import { DocketList, EmptyState, ListSkeleton } from "../components/DocketList";
 import { AccountManagerSelect, SearchBox, Tabs } from "../components/Filters";
 import { PageHeader } from "../components/Layout";
 import { SyncBadge } from "../components/SyncBadge";
-import { useParam } from "../hooks";
+import { useParam, useSetParams } from "../hooks";
 
 const VIEWS: { id: DocketView; label: string }[] = [
   { id: "active", label: "Active" },
@@ -23,11 +23,12 @@ const HISTORY: { id: HistoryFilter; label: string }[] = [
 ];
 
 export function Dashboard() {
-  const [view, setView] = useParam("view");
+  const [view] = useParam("view");
   const [history, setHistory] = useParam("history");
   const [bucket, setBucket] = useParam("bucket");
   const [am, setAm] = useParam("am");
   const [q, setQ] = useParam("q");
+  const setParams = useSetParams();
   const [open, setOpen] = useState<string | null>(null);
 
   const v = (view || "active") as DocketView;
@@ -55,10 +56,7 @@ export function Dashboard() {
             label="View"
             tabs={VIEWS}
             value={v}
-            onChange={(id) => {
-              setView(id === "active" ? null : id);
-              setBucket(null);
-            }}
+            onChange={(id) => setParams({ view: id === "active" ? null : id, bucket: null, history: null })}
           />
         </div>
         {isHistory ? (
