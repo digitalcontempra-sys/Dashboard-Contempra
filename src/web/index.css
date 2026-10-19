@@ -108,20 +108,18 @@ body {
   outline-offset: 2px;
 }
 
-@layer components {
-  .btn {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors disabled:opacity-50;
-  }
-  .btn-primary {
-    @apply btn bg-accent text-accent-ink hover:brightness-110;
-  }
-  .btn-ghost {
-    @apply btn border border-border bg-surface text-text hover:bg-surface-2;
-  }
-  .field {
-    @apply min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-base text-text placeholder:text-text-3;
-  }
-  .card {
-    @apply rounded-xl border border-border bg-surface shadow-card;
-  }
+@utility btn {
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors disabled:opacity-50 bg-accent text-accent-ink hover:brightness-110;
+}
+@utility btn-ghost {
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors disabled:opacity-50 border border-border bg-surface text-text hover:bg-surface-2;
+}
+@utility field {
+  @apply min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-base text-text placeholder:text-text-3;
+}
+@utility card {
+  @apply rounded-xl border border-border bg-surface shadow-card;
 }
