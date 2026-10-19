@@ -73,4 +73,17 @@ describe("runSync", () => {
     expect(await count()).toBe(1);
     expect((await state())?.last_success_at).toBe(okState?.last_success_at);
   });
+
+  it("records a database failure during the write phase", async () => {
+    const failingDb = new Proxy(env.DB, {
+      get(target, prop) {
+        if (prop === "batch") return async () => { throw new Error("D1 overloaded"); };
+        const v = Reflect.get(target, prop);
+        return typeof v === "function" ? v.bind(target) : v;
+      },
+    });
+    const r = await runSync({ ...env, DB: failingDb }, [HEADER, row(1)]);
+    expect(r).toMatchObject({ ok: false, error: "D1 overloaded" });
+    expect((await state())?.last_error).toBe("D1 overloaded");
+  });
 });

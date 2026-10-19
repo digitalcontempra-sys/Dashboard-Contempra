@@ -52,8 +52,24 @@ export async function runSync(env: Env, values?: unknown[][]): Promise<SyncResul
   } catch (e) {
     return recordFailure(db, now, (e as Error).message || String(e));
   }
-  const { dockets, review } = mapped;
+  try {
+    return await writeSync(db, now, mapped);
+  } catch (e) {
+    return recordFailure(db, now, (e as Error).message || String(e)).catch(() => ({
+      ok: false,
+      rowsSeen: 0,
+      rowsChanged: 0,
+      rowsDeleted: 0,
+      error: (e as Error).message || String(e),
+    }));
+  }
+}
 
+async function writeSync(
+  db: D1Database,
+  now: string,
+  { dockets, review }: Awaited<ReturnType<typeof mapSheet>>,
+): Promise<SyncResult> {
   const { results: existing } = await db
     .prepare("SELECT work_order, row_hash FROM dockets")
     .all<{ work_order: string; row_hash: string }>();
@@ -74,23 +90,24 @@ export async function runSync(env: Env, values?: unknown[][]): Promise<SyncResul
   const gone = existing.filter((r) => !seen.has(r.work_order));
   for (const r of gone) stmts.push(db.prepare("DELETE FROM dockets WHERE work_order = ?").bind(r.work_order));
 
-  stmts.push(db.prepare("DELETE FROM review_items"));
-  for (const r of review) {
-    stmts.push(
+  await runBatches(db, stmts);
+
+  // Review items are replaced in one atomic batch so Needs Review is never left half-empty.
+  // The success marker goes in the same batch, after every docket write committed.
+  await db.batch([
+    db.prepare("DELETE FROM review_items"),
+    ...review.map((r) =>
       db
         .prepare("INSERT INTO review_items (kind, work_order, sheet_row, raw_json, detected_at) VALUES (?,?,?,?,?)")
         .bind(r.kind, r.workOrder, r.sheetRow, r.rawJson, now),
-    );
-  }
-  stmts.push(
+    ),
     db
       .prepare(
         `UPDATE sync_state SET last_run_at = ?, last_success_at = ?, last_error = NULL,
          rows_seen = ?, rows_changed = ?, rows_deleted = ? WHERE id = 1`,
       )
       .bind(now, now, dockets.length, rowsChanged, gone.length),
-  );
-  await runBatches(db, stmts);
+  ]);
 
   return { ok: true, rowsSeen: dockets.length, rowsChanged, rowsDeleted: gone.length, error: null };
 }
