@@ -15,6 +15,7 @@ export default defineConfig({
                 SETUP_TOKEN: "test-setup-token",
                 SHEET_ID: "test-sheet",
                 GOOGLE_SA_JSON: "{}",
+                ENVIRONMENT: "development",
               },
             },
           })),

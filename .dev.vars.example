@@ -1,3 +1,4 @@
+ENVIRONMENT=development
 SETUP_TOKEN=change-me
 SHEET_ID=your-backup-sheet-id
 GOOGLE_SA_JSON={"client_email":"...","private_key":"..."}

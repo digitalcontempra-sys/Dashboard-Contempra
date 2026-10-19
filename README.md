@@ -19,7 +19,7 @@ Cloudflare Worker (Hono API + React SPA) with a D1 mirror of the sheet, synced e
 ## Local development
 
 1. `npm install`
-2. Copy `.dev.vars.example` to `.dev.vars`. Set a random `SETUP_TOKEN` and add
+2. Copy `.dev.vars.example` to `.dev.vars` (it sets `ENVIRONMENT=development`; deploys use `production` from `wrangler.jsonc`). Set a random `SETUP_TOKEN` and add
    `DEV_ADMIN_USER` / `DEV_ADMIN_PASSWORD` for your local admin. Never commit `.dev.vars`.
 3. `npx wrangler d1 migrations apply dashboard-contempra --local`
 4. `npm run dev`

@@ -17,5 +17,5 @@
     }
   ],
   "triggers": { "crons": ["* * * * *"] },
-  "vars": { "ENVIRONMENT": "development" }
+  "vars": { "ENVIRONMENT": "production" }
 }
