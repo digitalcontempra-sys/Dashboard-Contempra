@@ -11,6 +11,17 @@ export type SyncStatus = {
 
 export type AccessLevel = "admin" | "manager" | "staff";
 
+export type RoleDTO = { id: string; label: string };
+
+export type UserDTO = {
+  id: number;
+  username: string;
+  fullName: string;
+  accessLevel: AccessLevel;
+  roles: string[];
+  active: boolean;
+};
+
 export type SessionUser = {
   id: number;
   username: string;
