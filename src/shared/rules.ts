@@ -32,8 +32,9 @@ function parseDateText(s: string): string | null {
 export function parseSheetDate(v: unknown): { iso: string | null; raw: string | null } {
   if (typeof v === "number" && Number.isFinite(v)) {
     const dt = new Date(Math.round((v - SERIAL_UNIX_EPOCH) * DAY_MS));
-    const iso = toIso(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
-    return { iso, raw: null };
+    const iso = Number.isNaN(dt.getTime()) ? null : toIso(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+    // An unusable serial is almost always a typo in the sheet: keep it visible instead of hiding it.
+    return { iso, raw: iso ? null : String(v) };
   }
   if (typeof v !== "string") return { iso: null, raw: null };
   const raw = v.trim();

@@ -24,8 +24,8 @@ describe("parseSheetDate", () => {
   it("keeps non-date text as raw", () => {
     expect(parseSheetDate("in production")).toEqual({ iso: null, raw: "in production" });
   });
-  it("rejects an out-of-range serial", () => {
-    expect(parseSheetDate(6697092)).toEqual({ iso: null, raw: null });
+  it("keeps an out-of-range serial visible as raw text", () => {
+    expect(parseSheetDate(6697092)).toEqual({ iso: null, raw: "6697092" });
   });
   it("treats empty input as no date", () => {
     expect(parseSheetDate("")).toEqual({ iso: null, raw: null });
