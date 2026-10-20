@@ -57,6 +57,8 @@ export type SyncStatus = {
   rowsSeen: number;
   rowsChanged: number;
   rowsDeleted: number;
+  /** False until a Google Sheet id and service account are set on the Worker. */
+  configured: boolean;
 };
 
 export type AccessLevel = "admin" | "manager" | "staff";

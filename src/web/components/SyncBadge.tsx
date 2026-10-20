@@ -16,6 +16,19 @@ export function useSyncStatus() {
 export function SyncBadge() {
   const { data } = useSyncStatus();
   if (!data) return null;
+  if (data.configured === false) {
+    return (
+      <div
+        role="status"
+        data-tone="neutral"
+        className="inline-flex items-center gap-2 rounded-full bg-nodate-soft px-3 py-1 text-xs font-medium text-nodate"
+        title="Data was loaded from an export. Live sync starts once the Google Sheet is connected."
+      >
+        <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+        <span>Google Sheet not connected</span>
+      </div>
+    );
+  }
   const mins = minutesSince(data.lastSuccessAt);
   const tone = data.lastError ? "danger" : mins == null || mins > STALE_MINUTES ? "warn" : "ok";
   const styles = {

@@ -42,6 +42,7 @@ function setup(syncOver: Record<string, unknown> = {}) {
       rowsSeen: 2,
       rowsChanged: 0,
       rowsDeleted: 0,
+      configured: true,
       ...syncOver,
     }),
     "GET /api/dockets/91487": () => ({
@@ -127,6 +128,13 @@ describe("Main Dashboard", () => {
     setup({ lastError: "Header mismatch: G" });
     renderApp("/dashboard");
     expect(await screen.findByText("Sync problem — showing last saved data")).toBeInTheDocument();
+  });
+
+  it("shows a neutral badge when no Google Sheet is connected", async () => {
+    setup({ configured: false, lastSuccessAt: null, lastError: "Google Sheet is not connected yet" });
+    renderApp("/dashboard");
+    const badge = await screen.findByText("Google Sheet not connected");
+    expect(badge.closest("[data-tone]")).toHaveAttribute("data-tone", "neutral");
   });
 
   it("keeps showing data age while sync is failing", async () => {

@@ -86,4 +86,9 @@ describe("runSync", () => {
     expect(r).toMatchObject({ ok: false, error: "D1 overloaded" });
     expect((await state())?.last_error).toBe("D1 overloaded");
   });
+
+  it("explains that the Google Sheet is not connected yet", async () => {
+    const r = await runSync({ ...env, SHEET_ID: "", GOOGLE_SA_JSON: undefined as unknown as string });
+    expect(r).toMatchObject({ ok: false, error: "Google Sheet is not connected yet" });
+  });
 });

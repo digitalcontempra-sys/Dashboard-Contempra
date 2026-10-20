@@ -5,7 +5,7 @@ import { authRoutes } from "./routes/auth";
 import { docketRoutes } from "./routes/dockets";
 import { syncRoutes } from "./routes/sync";
 import { userRoutes } from "./routes/users";
-import { runSync } from "./sync/syncDockets";
+import { isSheetConfigured, runSync } from "./sync/syncDockets";
 
 export const app = new Hono<AppEnv>().basePath("/api");
 
@@ -19,7 +19,7 @@ export default {
   fetch: app.fetch,
   async scheduled(_controller, env, ctx) {
     // No sheet configured yet (e.g. a trial deploy loaded from an export): nothing to sync.
-    if (!env.SHEET_ID?.trim()) return;
+    if (!isSheetConfigured(env)) return;
     ctx.waitUntil(runSync(env));
   },
 } satisfies ExportedHandler<Env>;

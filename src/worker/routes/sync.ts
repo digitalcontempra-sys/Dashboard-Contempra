@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { SyncStatus } from "../../shared/types";
 import type { AppEnv } from "../app";
 import { requireAuth, requireLevel } from "../auth/sessions";
-import { runSync } from "../sync/syncDockets";
+import { isSheetConfigured, runSync } from "../sync/syncDockets";
 
 export const syncRoutes = new Hono<AppEnv>();
 
@@ -25,6 +25,7 @@ syncRoutes.get("/sync/status", requireLevel("admin", "manager"), async (c) => {
     rowsSeen: Number(s?.rows_seen ?? 0),
     rowsChanged: Number(s?.rows_changed ?? 0),
     rowsDeleted: Number(s?.rows_deleted ?? 0),
+    configured: isSheetConfigured(c.env),
   };
   return c.json(status);
 });

@@ -11,6 +11,10 @@ export type SyncResult = {
 };
 
 const CHUNK = 100;
+
+export function isSheetConfigured(env: Pick<Env, "SHEET_ID" | "GOOGLE_SA_JSON">): boolean {
+  return Boolean(env.SHEET_ID?.trim() && env.GOOGLE_SA_JSON?.trim());
+}
 /** Below this many stored dockets the shrink guard is skipped (fresh or tiny sheets). */
 const SHRINK_GUARD_MIN = 100;
 
@@ -46,6 +50,7 @@ async function recordFailure(db: D1Database, now: string, error: string): Promis
 export async function runSync(env: Env, values?: unknown[][]): Promise<SyncResult> {
   const db = env.DB;
   const now = new Date().toISOString();
+  if (!values && !isSheetConfigured(env)) return recordFailure(db, now, "Google Sheet is not connected yet");
   let mapped: Awaited<ReturnType<typeof mapSheet>>;
   try {
     mapped = await mapSheet(values ?? (await fetchContempraValues(env)));
