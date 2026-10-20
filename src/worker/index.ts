@@ -18,6 +18,8 @@ app.route("/", docketRoutes);
 export default {
   fetch: app.fetch,
   async scheduled(_controller, env, ctx) {
+    // No sheet configured yet (e.g. a trial deploy loaded from an export): nothing to sync.
+    if (!env.SHEET_ID?.trim()) return;
     ctx.waitUntil(runSync(env));
   },
 } satisfies ExportedHandler<Env>;
