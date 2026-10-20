@@ -12,7 +12,7 @@
     {
       "binding": "DB",
       "database_name": "dashboard-contempra",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "fecb7963-b1d0-4519-8760-75b3bd214e91",
       "migrations_dir": "migrations"
     }
   ],

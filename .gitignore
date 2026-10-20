@@ -13,3 +13,4 @@ Thumbs.db
 .wrangler/
 .dev.vars
 fixtures/local/
+.prod.vars
