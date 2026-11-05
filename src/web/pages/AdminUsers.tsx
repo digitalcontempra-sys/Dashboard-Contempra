@@ -7,6 +7,7 @@ import { EmptyState, ListSkeleton } from "../components/DocketList";
 import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/Layout";
 import { SyncBadge } from "../components/SyncBadge";
+import { GoogleConnection } from "./GoogleConnection";
 
 const LEVELS: { id: AccessLevel; label: string; hint: string }[] = [
   { id: "staff", label: "Staff", hint: "Sees only their own cards" },
@@ -236,6 +237,7 @@ export function AdminUsers() {
         }
       />
       <div className="space-y-4 px-4 md:px-6">
+        <GoogleConnection />
         <SyncPanel />
         {users.isPending ? (
           <ListSkeleton />

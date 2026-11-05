@@ -16,6 +16,7 @@ function setup(postResponse?: Response) {
   return mockApi({
     "GET /api/auth/me": () => adminUser,
     "GET /api/roles": () => roles,
+    "GET /api/google/status": () => ({ connected: true, email: "owner@gmail.com", sheetUrl: null }),
     "GET /api/users": () => [
       { id: 1, username: "boss", fullName: "Jeff Baumer", accessLevel: "admin", roles: [], active: true },
       { id: 2, username: "ana", fullName: "Ana Lopez", accessLevel: "staff", roles: ["printer_roll"], active: true },
