@@ -1,6 +1,18 @@
 import type { Billing, DocketStatus, TimeBucket } from "./rules";
 export type { Billing, DocketStatus, TimeBucket };
 
+export type VirtualDocketDTO = {
+  workOrder: string;
+  form: import("./docketForm").DocketForm;
+  jobs: import("./docketForm").ProductionJob[];
+  version: number;
+  source: "virtual" | "sheet";
+  pdf: { stored: boolean; driveLink: string | null; driveStatus: string };
+  deletedAt: string | null;
+};
+
+export type TrashItem = { workOrder: string; forName: string; deletedAt: string; deletedBy: string | null; daysLeft: number };
+
 export type DocketView = "active" | "on_hold" | "history";
 export type HistoryFilter = "all" | "completed" | "cancelled";
 export type NonBilledTab = "ready" | "open";

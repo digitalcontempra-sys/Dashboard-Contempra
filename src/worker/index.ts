@@ -6,6 +6,8 @@ import { docketRoutes } from "./routes/dockets";
 import { googleRoutes } from "./routes/google";
 import { syncRoutes } from "./routes/sync";
 import { userRoutes } from "./routes/users";
+import { virtualDocketRoutes } from "./routes/virtualDockets";
+import { purgeTrash } from "./dockets/service";
 import { runIncrementalSync } from "./sync/incremental";
 import { runNightlyReconcile } from "./sync/nightly";
 import { isSheetConfigured } from "./sync/syncDockets";
@@ -21,11 +23,13 @@ app.route("/", syncRoutes);
 app.route("/", userRoutes);
 app.route("/", docketRoutes);
 app.route("/", googleRoutes);
+app.route("/", virtualDocketRoutes);
 
 export default {
   fetch: app.fetch,
   async scheduled(controller, env, ctx) {
     // No sheet configured yet (e.g. a trial deploy loaded from an export): nothing to sync.
+    if (controller.cron === NIGHTLY_CRON) ctx.waitUntil(purgeTrash(env));
     if (!(await isSheetConfigured(env))) return;
     ctx.waitUntil(controller.cron === NIGHTLY_CRON ? runNightlyReconcile(env) : runIncrementalSync(env));
   },
