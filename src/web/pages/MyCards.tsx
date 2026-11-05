@@ -5,7 +5,7 @@ export function MyCards() {
   return (
     <>
       <PageHeader title="My Cards" />
-      <div className="px-4 md:px-8">
+      <div className="px-4 md:px-6">
         <div className="card flex flex-col items-center gap-3 px-6 py-14 text-center">
           <span className="grid size-12 place-items-center rounded-full bg-accent-soft text-accent">
             <Icon name="cards" className="size-6" />

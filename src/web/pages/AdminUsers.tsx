@@ -235,7 +235,7 @@ export function AdminUsers() {
           </button>
         }
       />
-      <div className="space-y-4 px-4 md:px-8">
+      <div className="space-y-4 px-4 md:px-6">
         <SyncPanel />
         {users.isPending ? (
           <ListSkeleton />

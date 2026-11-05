@@ -39,7 +39,7 @@ export function NonBilled() {
   return (
     <>
       <PageHeader title="Non Billed Jobs" subtitle="Work orders with no invoice yet" />
-      <div className="space-y-3 px-4 md:px-8">
+      <div className="space-y-3 px-4 md:px-6">
         <div className="max-w-md">
           <Tabs
             label="Billing"

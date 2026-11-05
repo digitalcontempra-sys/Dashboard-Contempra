@@ -13,6 +13,16 @@ const NAV: NavItem[] = [
   { to: "/admin/users", label: "Admin", short: "Admin", icon: "users", levels: ["admin"] },
 ];
 
+function Logo({ size = "size-9" }: { size?: string }) {
+  return (
+    <span
+      className={`grid ${size} place-items-center rounded-[11px] bg-gradient-to-br from-[#ff8a3d] to-[#e8590c] text-sm font-black text-white shadow-[0_4px_12px_-2px_rgb(232_89_12/0.5)]`}
+    >
+      C
+    </span>
+  );
+}
+
 export function Layout() {
   const { user, logout } = useAuth();
   if (!user) return null;
@@ -25,59 +35,69 @@ export function Layout() {
     .toUpperCase();
 
   return (
-    <div className="min-h-dvh md:flex">
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-surface md:flex">
-        <div className="flex items-center gap-2 px-5 py-5">
-          <span className="grid size-8 place-items-center rounded-lg bg-accent text-sm font-black text-accent-ink">C</span>
-          <span className="text-sm font-bold tracking-tight">Contempra</span>
+    <div className="min-h-dvh md:flex md:gap-2 md:p-3">
+      <aside className="glass sticky top-3 hidden h-[calc(100dvh-1.5rem)] w-64 shrink-0 flex-col rounded-[var(--radius-panel)] md:flex">
+        <div className="flex items-center gap-3 px-5 pt-5 pb-6">
+          <Logo />
+          <div className="leading-tight">
+            <p className="text-[15px] font-bold tracking-tight">Contempra</p>
+            <p className="text-xs text-text-3">Production Dashboard</p>
+          </div>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 px-3" aria-label="Main">
+        <nav className="flex flex-1 flex-col gap-0.5 px-3" aria-label="Main">
           {items.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
               className={({ isActive }) =>
-                `flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium ${
-                  isActive ? "bg-accent-soft text-accent" : "text-text-2 hover:bg-surface-2 hover:text-text"
+                `flex min-h-10 items-center gap-3 rounded-xl px-3 text-[14px] font-medium transition-colors ${
+                  isActive ? "bg-surface-strong text-accent shadow-card" : "text-text-2 hover:bg-surface-2 hover:text-text"
                 }`
               }
             >
-              <Icon name={n.icon} />
+              <Icon name={n.icon} className="size-[18px]" />
               {n.label}
             </NavLink>
           ))}
         </nav>
-        <div className="flex items-center gap-3 border-t border-border p-4">
-          <span className="grid size-9 place-items-center rounded-full bg-surface-2 text-xs font-bold">{initials}</span>
+        <div className="m-3 flex items-center gap-3 rounded-2xl bg-surface-2 p-3">
+          <span className="grid size-9 place-items-center rounded-full bg-surface-strong text-xs font-bold shadow-card">
+            {initials}
+          </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{user.fullName}</p>
             <p className="text-xs capitalize text-text-3">{user.accessLevel}</p>
           </div>
-          <button className="btn-ghost px-2" onClick={logout} aria-label="Sign out" title="Sign out">
-            <Icon name="logout" />
+          <button
+            className="grid size-9 place-items-center rounded-full text-text-2 transition hover:bg-surface-strong hover:text-text"
+            onClick={logout}
+            aria-label="Sign out"
+            title="Sign out"
+          >
+            <Icon name="logout" className="size-[18px]" />
           </button>
         </div>
       </aside>
 
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface/95 px-4 py-3 backdrop-blur md:hidden">
+      <header className="glass sticky top-0 z-20 flex items-center justify-between rounded-none border-x-0 border-t-0 px-4 py-3 md:hidden">
         <div className="flex items-center gap-2">
-          <span className="grid size-7 place-items-center rounded-md bg-accent text-xs font-black text-accent-ink">C</span>
-          <span className="text-sm font-bold">Contempra</span>
+          <Logo size="size-8" />
+          <span className="text-[15px] font-bold tracking-tight">Contempra</span>
         </div>
         <button className="flex items-center gap-2 text-sm text-text-2" onClick={logout} aria-label="Sign out">
-          <span className="grid size-8 place-items-center rounded-full bg-surface-2 text-xs font-bold text-text">
+          <span className="grid size-8 place-items-center rounded-full bg-surface-strong text-xs font-bold text-text shadow-card">
             {initials}
           </span>
           <Icon name="logout" className="size-4" />
         </button>
       </header>
 
-      <main className="min-w-0 flex-1 pb-24 md:pb-8">
+      <main className="min-w-0 flex-1 pb-28 md:pb-8">
         <Outlet />
       </main>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-20 flex border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        className="glass-strong fixed inset-x-3 bottom-3 z-20 flex rounded-[22px] pb-[env(safe-area-inset-bottom)] md:hidden"
         aria-label="Main"
       >
         {items.map((n) => (
@@ -86,7 +106,7 @@ export function Layout() {
             to={n.to}
             aria-label={n.label}
             className={({ isActive }) =>
-              `flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${
+              `flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[10.5px] font-medium ${
                 isActive ? "text-accent" : "text-text-3"
               }`
             }
@@ -102,9 +122,9 @@ export function Layout() {
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3 px-4 pt-5 pb-3 md:px-8 md:pt-8">
+    <div className="flex flex-wrap items-end justify-between gap-3 px-4 pt-6 pb-4 md:px-6 md:pt-5">
       <div className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+        <h1 className="text-[28px] leading-tight font-bold tracking-tight">{title}</h1>
         {subtitle && <p className="mt-0.5 text-sm text-text-2">{subtitle}</p>}
       </div>
       {actions}

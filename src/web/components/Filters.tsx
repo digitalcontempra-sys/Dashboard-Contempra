@@ -53,7 +53,7 @@ export function Tabs<T extends string>({
   label: string;
 }) {
   return (
-    <div role="tablist" aria-label={label} className="flex gap-1 rounded-xl bg-surface-2 p-1">
+    <div role="tablist" aria-label={label} className="glass flex gap-1 rounded-[16px] p-1">
       {tabs.map((t) => (
         <button
           key={t.id}
@@ -61,8 +61,8 @@ export function Tabs<T extends string>({
           type="button"
           aria-selected={value === t.id}
           onClick={() => onChange(t.id)}
-          className={`flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-semibold whitespace-nowrap ${
-            value === t.id ? "bg-surface text-text shadow-card" : "text-text-2 hover:text-text"
+          className={`flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-[12px] px-3 text-sm font-semibold whitespace-nowrap transition-all duration-200 ${
+            value === t.id ? "bg-surface-strong text-text shadow-card" : "text-text-2 hover:text-text"
           }`}
         >
           {t.label}

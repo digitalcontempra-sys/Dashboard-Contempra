@@ -29,7 +29,7 @@ export function NeedsReview() {
   return (
     <>
       <PageHeader title="Needs Review" subtitle="Rows in the sheet that need a person to fix them" />
-      <div className="space-y-3 px-4 md:px-8">
+      <div className="space-y-3 px-4 md:px-6">
         {isPending ? (
           <ListSkeleton />
         ) : error ? (

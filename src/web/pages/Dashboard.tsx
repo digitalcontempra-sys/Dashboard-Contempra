@@ -50,7 +50,7 @@ export function Dashboard() {
   return (
     <>
       <PageHeader title="Main Dashboard" subtitle={first ? `${first.total} work orders` : undefined} actions={<SyncBadge />} />
-      <div className="space-y-3 px-4 md:px-8">
+      <div className="space-y-3 px-4 md:px-6">
         <div className="max-w-md">
           <Tabs
             label="View"

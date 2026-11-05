@@ -1,69 +1,108 @@
 @import "tailwindcss";
 
-/* Design tokens. Light by default; dark follows the OS. */
+/*
+ * Contempra design tokens — "light glass" (Apple-style translucent surfaces).
+ * Layer 1: primitives (raw values). Layer 2: semantic aliases. Layer 3: component tokens.
+ * Components use only semantic/component tokens. Dark mode follows the OS.
+ */
+
+/* ---------- Layer 1: primitives ---------- */
 :root {
-  --bg: #f4f5f7;
-  --surface: #ffffff;
-  --surface-2: #eef0f3;
-  --border: #dde1e6;
-  --text: #14171c;
-  --text-2: #5b6470;
-  --text-3: #8a929c;
-  --accent: #e8590c;
-  --accent-ink: #ffffff;
-  --accent-soft: #fde8dc;
-  --rush: #d6336c;
-  --rush-soft: #fde4ec;
-  --week: #b8860b;
-  --week-soft: #fbf1d6;
-  --coming: #1971c2;
-  --coming-soft: #dceafa;
-  --nodate: #6b7280;
-  --nodate-soft: #eceef1;
-  --ok: #2b8a3e;
-  --ok-soft: #dcf3e1;
-  --warn: #c25b00;
-  --warn-soft: #fff0dc;
-  --danger: #c92a2a;
-  --danger-soft: #fde3e3;
-  --shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 3px rgb(16 24 40 / 0.08);
+  --p-white: 255 255 255;
+  --p-ink-950: 11 15 25;
+  --p-ink-700: 61 70 86;
+  --p-ink-500: 108 117 133;
+  --p-ink-300: 168 175 188;
+  --p-mist-50: 246 247 251;
+  --p-mist-100: 238 241 247;
+  --p-orange-500: 255 106 19;
+  --p-orange-600: 232 89 12;
+  --p-rose-500: 230 46 109;
+  --p-amber-600: 194 120 3;
+  --p-blue-500: 10 132 255;
+  --p-slate-500: 120 128 142;
+  --p-green-600: 36 160 75;
+  --p-red-500: 255 59 48;
+}
+
+/* ---------- Layer 2: semantic ---------- */
+:root {
+  --bg: rgb(var(--p-mist-50));
+  --bg-tint-1: rgb(var(--p-orange-500) / 0.1);
+  --bg-tint-2: rgb(var(--p-blue-500) / 0.08);
+  --surface: rgb(var(--p-white) / 0.62);
+  --surface-strong: rgb(var(--p-white) / 0.82);
+  --surface-2: rgb(var(--p-ink-950) / 0.04);
+  --border: rgb(var(--p-ink-950) / 0.08);
+  --glass-edge: rgb(var(--p-white) / 0.75);
+  --text: rgb(var(--p-ink-950));
+  --text-2: rgb(var(--p-ink-700));
+  --text-3: rgb(var(--p-ink-500));
+  --accent: rgb(var(--p-orange-600));
+  --accent-ink: rgb(var(--p-white));
+  --accent-soft: rgb(var(--p-orange-500) / 0.12);
+  --rush: rgb(var(--p-rose-500));
+  --rush-soft: rgb(var(--p-rose-500) / 0.12);
+  --week: rgb(var(--p-amber-600));
+  --week-soft: rgb(var(--p-amber-600) / 0.13);
+  --coming: rgb(var(--p-blue-500));
+  --coming-soft: rgb(var(--p-blue-500) / 0.11);
+  --nodate: rgb(var(--p-slate-500));
+  --nodate-soft: rgb(var(--p-slate-500) / 0.12);
+  --ok: rgb(var(--p-green-600));
+  --ok-soft: rgb(var(--p-green-600) / 0.12);
+  --warn: rgb(var(--p-amber-600));
+  --warn-soft: rgb(var(--p-amber-600) / 0.13);
+  --danger: rgb(var(--p-red-500));
+  --danger-soft: rgb(var(--p-red-500) / 0.11);
+  --shadow: 0 1px 1px rgb(var(--p-ink-950) / 0.03), 0 8px 24px -8px rgb(var(--p-ink-950) / 0.12);
+  --shadow-lift: 0 2px 4px rgb(var(--p-ink-950) / 0.04), 0 22px 44px -14px rgb(var(--p-ink-950) / 0.24);
+  --blur: 22px;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f1216;
-    --surface: #171b21;
-    --surface-2: #1f242c;
-    --border: #2b313a;
-    --text: #eef1f4;
-    --text-2: #a7b0bb;
-    --text-3: #747d88;
-    --accent: #ff7a2f;
-    --accent-ink: #1a0d05;
-    --accent-soft: #3a2014;
-    --rush: #ff6b9a;
-    --rush-soft: #3b1724;
-    --week: #f0b93b;
-    --week-soft: #3a2e10;
-    --coming: #5aa9f5;
-    --coming-soft: #13283f;
-    --nodate: #9aa3ad;
-    --nodate-soft: #252a31;
-    --ok: #51cf66;
-    --ok-soft: #14301c;
-    --warn: #ffa94d;
-    --warn-soft: #3a2610;
-    --danger: #ff6b6b;
-    --danger-soft: #3b1616;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+    --bg: rgb(13 15 20);
+    --bg-tint-1: rgb(var(--p-orange-500) / 0.12);
+    --bg-tint-2: rgb(var(--p-blue-500) / 0.1);
+    --surface: rgb(30 33 41 / 0.6);
+    --surface-strong: rgb(34 38 47 / 0.86);
+    --surface-2: rgb(var(--p-white) / 0.06);
+    --border: rgb(var(--p-white) / 0.09);
+    --glass-edge: rgb(var(--p-white) / 0.08);
+    --text: rgb(243 245 248);
+    --text-2: rgb(196 202 212);
+    --text-3: rgb(136 144 158);
+    --accent: rgb(255 128 56);
+    --accent-ink: rgb(26 12 4);
+    --accent-soft: rgb(var(--p-orange-500) / 0.18);
+    --rush: rgb(255 107 154);
+    --week: rgb(245 190 70);
+    --coming: rgb(100 170 255);
+    --nodate: rgb(160 168 180);
+    --ok: rgb(80 210 120);
+    --warn: rgb(255 175 80);
+    --danger: rgb(255 105 97);
+    --shadow: 0 1px 1px rgb(0 0 0 / 0.3), 0 10px 28px -10px rgb(0 0 0 / 0.6);
+    --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.35), 0 24px 48px -14px rgb(0 0 0 / 0.75);
     color-scheme: dark;
   }
+}
+
+/* ---------- Layer 3: component tokens ---------- */
+:root {
+  --radius-tile: 22px;
+  --radius-panel: 26px;
+  --radius-control: 14px;
+  --tile-hover-scale: 1.035;
+  --ease-spring: cubic-bezier(0.22, 1.2, 0.36, 1);
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
   --color-surface-2: var(--surface-2);
   --color-border: var(--border);
   --color-text: var(--text);
@@ -87,12 +126,13 @@
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --shadow-card: var(--shadow);
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --shadow-lift: var(--shadow-lift);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI Variable", "Segoe UI", Roboto,
+    sans-serif;
 }
 
 html,
 body {
-  background: var(--bg);
   color: var(--text);
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
@@ -101,6 +141,14 @@ body {
 body {
   font-family: var(--font-sans);
   font-feature-settings: "tnum" 1, "cv11" 1;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.006em;
+  background:
+    radial-gradient(1200px 700px at 8% -10%, var(--bg-tint-1), transparent 60%),
+    radial-gradient(900px 600px at 100% 0%, var(--bg-tint-2), transparent 55%),
+    var(--bg);
+  background-attachment: fixed;
+  min-height: 100dvh;
 }
 
 :focus-visible {
@@ -108,18 +156,84 @@ body {
   outline-offset: 2px;
 }
 
+/* Translucent surface used by panels, bars, tiles and dialogs. */
+@utility glass {
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow);
+}
+@utility glass-strong {
+  background: var(--surface-strong);
+  backdrop-filter: blur(calc(var(--blur) * 1.4)) saturate(190%);
+  -webkit-backdrop-filter: blur(calc(var(--blur) * 1.4)) saturate(190%);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow-lift);
+}
+
 @utility btn {
-  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors disabled:opacity-50;
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] px-4 text-sm font-semibold transition-all duration-200 disabled:opacity-50 active:scale-[0.98];
 }
 @utility btn-primary {
-  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors disabled:opacity-50 bg-accent text-accent-ink hover:brightness-110;
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] px-4 text-sm font-semibold transition-all duration-200 disabled:opacity-50 active:scale-[0.98] bg-accent text-accent-ink shadow-card hover:brightness-110;
 }
 @utility btn-ghost {
-  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors disabled:opacity-50 border border-border bg-surface text-text hover:bg-surface-2;
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] px-4 text-sm font-semibold transition-all duration-200 disabled:opacity-50 active:scale-[0.98] glass text-text hover:bg-surface-strong;
 }
 @utility field {
-  @apply min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-base text-text placeholder:text-text-3;
+  @apply min-h-11 w-full rounded-[var(--radius-control)] glass px-3 text-base text-text placeholder:text-text-3 transition-shadow focus:outline-none focus:ring-2 focus:ring-accent/40;
 }
 @utility card {
-  @apply rounded-xl border border-border bg-surface shadow-card;
+  @apply glass rounded-[var(--radius-panel)];
+}
+
+/* Square work-order tile: lifts and scales on hover/focus so you always see where you are. */
+@utility tile {
+  @apply glass relative flex aspect-square w-full flex-col overflow-hidden rounded-[var(--radius-tile)] p-4 text-left;
+  transition:
+    transform 260ms var(--ease-spring),
+    box-shadow 260ms ease,
+    background-color 200ms ease;
+  &:hover,
+  &:focus-visible {
+    transform: translateY(-3px) scale(var(--tile-hover-scale));
+    box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow-lift);
+    background: var(--surface-strong);
+    z-index: 1;
+  }
+  &:active {
+    transform: scale(0.99);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@utility animate-sheet-in {
+  animation: sheet-in 280ms var(--ease-spring) both;
+}
+@utility animate-fade-in {
+  animation: fade-in 200ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
 }
