@@ -16,6 +16,11 @@ import { GoogleDisconnectedError } from "../google/oauth";
 import type { RowCells } from "../google/sheets";
 import { EXPECTED_HEADERS, mapSheet } from "../sheet/mapRows";
 import { UPSERT_SQL, upsertParams } from "../sync/syncDockets";
+import { ServiceError } from "./errors";
+import { withLock } from "./lock";
+
+/** All app writes to the sheet go through this lease. */
+export const SHEET_LOCK = "sheet";
 
 export const TRASH_DAYS = 30;
 const DAY_MS = 86_400_000;
@@ -25,12 +30,7 @@ export const SAVE_FAILED = "Could not save to Google Sheet. Nothing was saved. T
 const UPDATE_FAILED = "Could not update the Google Sheet. Try again.";
 const ROW_GONE = "This work order is no longer in the Google Sheet";
 
-export class ServiceError extends Error {
-  constructor(public status: 400 | 403 | 404 | 409 | 502 | 503, message: string) {
-    super(message);
-    this.name = "ServiceError";
-  }
-}
+export { ServiceError };
 
 type VirtualRow = {
   work_order: string;
@@ -41,6 +41,7 @@ type VirtualRow = {
   drive_file_id: string | null;
   drive_link: string | null;
   drive_status: string;
+  pdf_version: number | null;
   updated_by: number | null;
   deleted_at: string | null;
   deleted_row_json: string | null;
@@ -131,7 +132,12 @@ function toDto(row: VirtualRow, jobs: ProductionJob[], actor: SessionUser): Virt
     jobs,
     version: row.version,
     source: "virtual",
-    pdf: { stored: Boolean(row.pdf_key), driveLink: row.drive_link, driveStatus: row.drive_status },
+    pdf: {
+      stored: Boolean(row.pdf_key) && row.pdf_version === row.version,
+      // The Drive copy includes prices, so Staff never get its link.
+      driveLink: actor.accessLevel === "staff" ? null : row.drive_link,
+      driveStatus: row.drive_status,
+    },
     deletedAt: row.deleted_at,
   };
 }
@@ -175,8 +181,17 @@ export async function createDocket(
   if (!wo) throw new ServiceError(409, "Could not reserve a work order number. Try again.");
 
   const cells = toSheetCells(form, wo, "create");
+  const sheet = getGateways(env).sheet;
   try {
-    await getGateways(env).sheet.insertTopRow(cells);
+    await withLock(db, SHEET_LOCK, async () => {
+      try {
+        await sheet.insertTopRow(cells);
+      } catch (e) {
+        // The response may be lost after Google applied the insert: if the row exists, the save went through.
+        const landed = await sheet.findRow(wo).catch(() => null);
+        if (landed === null) throw e;
+      }
+    });
   } catch (e) {
     await db.prepare("DELETE FROM virtual_dockets WHERE work_order = ? AND state = 'saving'").bind(wo).run();
     throw googleError(e, SAVE_FAILED);
@@ -195,7 +210,7 @@ export async function getVirtualDocket(env: Env, actor: SessionUser, wo: string)
   if (row && row.state === "saved") return toDto(row, await loadJobs(db, wo), actor);
   const detail = await getDocket(db, wo, new Date());
   if (!detail) throw new ServiceError(404, "Work order not found");
-  const form = formFromDocket(detail, actor.fullName);
+  const form = formFromDocket(detail);
   return {
     workOrder: wo,
     form: actor.accessLevel === "staff" ? stripPrices(form) : form,
@@ -207,15 +222,28 @@ export async function getVirtualDocket(env: Env, actor: SessionUser, wo: string)
   };
 }
 
-async function requireRow(env: Env, wo: string): Promise<number> {
-  let row: number | null;
+/**
+ * Finds the docket's row and re-reads it right before a write, so a row inserted by hand in the
+ * meantime cannot redirect the write to another docket. Call inside the sheet lock.
+ */
+async function locateRow(env: Env, wo: string): Promise<{ row: number; values: unknown[] }> {
   try {
-    row = await getGateways(env).sheet.findRow(wo);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const row = await getGateways(env).sheet.findRow(wo);
+      if (row === null) throw new ServiceError(409, ROW_GONE);
+      const values = await readRow(env, row);
+      if (String(values[2] ?? "").trim() === wo) return { row, values };
+    }
   } catch (e) {
     throw googleError(e, UPDATE_FAILED);
   }
-  if (row === null) throw new ServiceError(409, ROW_GONE);
-  return row;
+  throw new ServiceError(409, "The Google Sheet is changing right now. Try again.");
+}
+
+/** Only the cells that differ from what the docket held before (its last save, or the sheet for sheet-born dockets). */
+function changedCells(next: RowCells, base: RowCells | null): RowCells {
+  if (!base) return next;
+  return Object.fromEntries(Object.entries(next).filter(([k, v]) => String(v ?? "") !== String(base[k] ?? "")));
 }
 
 export async function updateDocket(
@@ -227,64 +255,77 @@ export async function updateDocket(
   const db = env.DB;
   const form = validateForm(input.form);
   const jobs = await validateJobs(db, input.jobs);
-  const existing = await loadVirtual(db, wo);
-  if (existing?.deleted_at) throw new ServiceError(409, "This docket is in the Trash");
-  const current = existing?.version ?? 0;
-  if ((input.version ?? 0) !== current) {
-    const who = existing?.updated_by
-      ? await db.prepare("SELECT full_name FROM users WHERE id = ?").bind(existing.updated_by).first<{ full_name: string }>()
-      : null;
-    throw new ServiceError(409, `This docket was changed by ${who?.full_name ?? "someone else"}. Reload to see the latest version.`);
-  }
-  const row = await requireRow(env, wo);
-  try {
-    await getGateways(env).sheet.updateCells(row, toSheetCells(form, wo, "edit"));
-  } catch (e) {
-    throw googleError(e, UPDATE_FAILED);
-  }
-  const now = new Date().toISOString();
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO virtual_dockets (work_order, state, form_json, version, created_by, created_at, updated_by, updated_at)
-         VALUES (?, 'saved', ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (work_order) DO UPDATE SET form_json = excluded.form_json, version = excluded.version,
-           updated_by = excluded.updated_by, updated_at = excluded.updated_at, state = 'saved'`,
-      )
-      .bind(wo, JSON.stringify(form), current + 1, actor.id, now, actor.id, now),
-    ...jobStatements(db, wo, jobs),
-  ]);
-  await upsertMirror(db, await readRow(env, row), row).catch(() => undefined);
-  return toDto((await loadVirtual(db, wo))!, jobs, actor);
+  return withLock(db, SHEET_LOCK, async () => {
+    // Inside the lock, read-check-write is atomic for the app's own saves.
+    const existing = await loadVirtual(db, wo);
+    if (existing?.deleted_at) throw new ServiceError(409, "This docket is in the Trash");
+    const current = existing?.version ?? 0;
+    if ((input.version ?? 0) !== current) {
+      const who = existing?.updated_by
+        ? await db.prepare("SELECT full_name FROM users WHERE id = ?").bind(existing.updated_by).first<{ full_name: string }>()
+        : null;
+      throw new ServiceError(409, `This docket was changed by ${who?.full_name ?? "someone else"}. Reload to see the latest version.`);
+    }
+    let baseline: DocketForm | null = existing ? (JSON.parse(existing.form_json) as DocketForm) : null;
+    if (!baseline) {
+      const detail = await getDocket(db, wo, new Date());
+      baseline = detail ? formFromDocket(detail) : null;
+    }
+    const { row } = await locateRow(env, wo);
+    const cells = changedCells(toSheetCells(form, wo, "edit"), baseline ? toSheetCells(baseline, wo, "edit") : null);
+    try {
+      await getGateways(env).sheet.updateCells(row, cells);
+    } catch (e) {
+      throw googleError(e, UPDATE_FAILED);
+    }
+    const now = new Date().toISOString();
+    await db.batch([
+      db
+        .prepare(
+          `INSERT INTO virtual_dockets (work_order, state, form_json, version, created_by, created_at, updated_by, updated_at)
+           VALUES (?, 'saved', ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (work_order) DO UPDATE SET form_json = excluded.form_json, version = excluded.version,
+             updated_by = excluded.updated_by, updated_at = excluded.updated_at, state = 'saved'`,
+        )
+        .bind(wo, JSON.stringify(form), current + 1, actor.id, now, actor.id, now),
+      ...jobStatements(db, wo, jobs),
+    ]);
+    await upsertMirror(db, await readRow(env, row), row).catch(() => undefined);
+    return toDto((await loadVirtual(db, wo))!, jobs, actor);
+  });
 }
 
 export async function cancelDocket(env: Env, wo: string, now = new Date()): Promise<void> {
-  const row = await requireRow(env, wo);
-  try {
-    await getGateways(env).sheet.updateCells(row, { M: cancelStamp(now) });
-  } catch (e) {
-    throw googleError(e, UPDATE_FAILED);
-  }
-  await upsertMirror(env.DB, await readRow(env, row), row).catch(() => undefined);
+  await withLock(env.DB, SHEET_LOCK, async () => {
+    const { row } = await locateRow(env, wo);
+    try {
+      await getGateways(env).sheet.updateCells(row, { M: cancelStamp(now) });
+    } catch (e) {
+      throw googleError(e, UPDATE_FAILED);
+    }
+    await upsertMirror(env.DB, await readRow(env, row), row).catch(() => undefined);
+  });
 }
 
 export async function deleteDocket(env: Env, actor: SessionUser, wo: string, confirm: unknown): Promise<void> {
   if (confirm !== wo) throw new ServiceError(400, "Type the work order number to confirm");
   const db = env.DB;
-  const row = await requireRow(env, wo);
-  const values = await readRow(env, row);
-  try {
-    await getGateways(env).sheet.deleteRow(row);
-  } catch (e) {
-    throw googleError(e, UPDATE_FAILED);
-  }
+  const values = await withLock(db, SHEET_LOCK, async () => {
+    const located = await locateRow(env, wo);
+    try {
+      await getGateways(env).sheet.deleteRow(located.row);
+    } catch (e) {
+      throw googleError(e, UPDATE_FAILED);
+    }
+    return located.values;
+  });
   const now = new Date().toISOString();
   const existing = await loadVirtual(db, wo);
   // A docket born in the sheet gets a virtual row now, so the Trash can hold its copy.
   let formJson = existing?.form_json;
   if (!formJson) {
     const detail = await getDocket(db, wo, new Date());
-    const form = detail ? formFromDocket(detail, actor.fullName) : { ...emptyForm(now.slice(0, 10), actor.fullName), forName: String(values[6] ?? "") };
+    const form = detail ? formFromDocket(detail) : { ...emptyForm(now.slice(0, 10), actor.fullName), forName: String(values[6] ?? "") };
     formJson = JSON.stringify(form);
   }
   await db.batch([
@@ -306,11 +347,15 @@ export async function restoreDocket(env: Env, wo: string): Promise<void> {
   const row = await loadVirtual(db, wo);
   if (!row?.deleted_at || !row.deleted_row_json) throw new ServiceError(404, "This docket is not in the Trash");
   const values = JSON.parse(row.deleted_row_json) as unknown[];
-  try {
-    await getGateways(env).sheet.insertTopRow(toCells(values));
-  } catch (e) {
-    throw googleError(e, UPDATE_FAILED);
-  }
+  await withLock(db, SHEET_LOCK, async () => {
+    const sheet = getGateways(env).sheet;
+    try {
+      // Idempotent: a double click (or a lost response) must not insert the row twice.
+      if ((await sheet.findRow(wo)) === null) await sheet.insertTopRow(toCells(values));
+    } catch (e) {
+      if ((await sheet.findRow(wo).catch(() => null)) === null) throw googleError(e, UPDATE_FAILED);
+    }
+  });
   await db
     .prepare("UPDATE virtual_dockets SET deleted_at = NULL, deleted_by = NULL, deleted_row_json = NULL WHERE work_order = ?")
     .bind(wo)

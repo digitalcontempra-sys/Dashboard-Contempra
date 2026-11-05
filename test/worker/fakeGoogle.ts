@@ -9,6 +9,17 @@ type SheetOp = "readRange" | "findRow" | "insertTopRow" | "updateCells" | "delet
 export class FakeSheet implements SheetGateway {
   rows: unknown[][] = [[...HEADER]];
   private failing = new Set<SheetOp>();
+  private applyThenFailing = new Set<SheetOp>();
+  /** Runs once right after the next findRow (simulates someone inserting rows meanwhile). */
+  afterFind: (() => void) | null = null;
+
+  /** The next `op` is applied by Google but the response is lost (timeout / 5xx after commit). */
+  applyThenFail(op: SheetOp) {
+    this.applyThenFailing.add(op);
+  }
+  private lost(op: SheetOp) {
+    if (this.applyThenFailing.delete(op)) throw new Error("Google request failed: timeout");
+  }
 
   failNext(op: SheetOp) {
     this.failing.add(op);
@@ -32,12 +43,16 @@ export class FakeSheet implements SheetGateway {
   async findRow(wo: string) {
     this.check("findRow");
     const i = this.rows.findIndex((r, idx) => idx > 0 && String(r[2] ?? "") === wo);
+    const hook = this.afterFind;
+    this.afterFind = null;
+    hook?.();
     return i < 0 ? null : i + 1;
   }
   async insertTopRow(cells: RowCells) {
     this.check("insertTopRow");
     const row = Array.from({ length: 16 }, (_, i) => cells[String.fromCharCode(65 + i)] ?? "");
     this.rows.splice(1, 0, row);
+    this.lost("insertTopRow");
   }
   async updateCells(row: number, cells: RowCells) {
     this.check("updateCells");

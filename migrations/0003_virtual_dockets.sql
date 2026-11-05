@@ -28,6 +28,11 @@ CREATE TABLE virtual_dockets (
   drive_link TEXT,
   drive_status TEXT NOT NULL DEFAULT 'none' CHECK (drive_status IN ('none', 'pending', 'syncing', 'done', 'failed')),
   drive_claimed_at TEXT,
+  drive_attempts INTEGER NOT NULL DEFAULT 0,
+  -- Docket version the stored PDF was rendered from, and a counter bumped on every PDF upload.
+  pdf_version INTEGER,
+  pdf_generation INTEGER NOT NULL DEFAULT 0,
+  drive_generation INTEGER,
   created_by INTEGER,
   created_at TEXT NOT NULL,
   updated_by INTEGER,
@@ -54,4 +59,11 @@ CREATE TABLE job_steps (
   role_id TEXT NOT NULL REFERENCES roles (id),
   assignee_ids TEXT NOT NULL DEFAULT '[]',
   PRIMARY KEY (job_id, step)
+);
+
+-- Short leases that serialize the app's own Google writes (sheet rows shift when rows are inserted).
+CREATE TABLE locks (
+  name TEXT PRIMARY KEY,
+  holder TEXT NOT NULL,
+  expires_at TEXT NOT NULL
 );

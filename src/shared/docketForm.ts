@@ -174,8 +174,24 @@ export function stripPrices(f: DocketForm): DocketForm {
 }
 
 /** A form prefilled from a docket that was created directly in the sheet. */
-export function formFromDocket(d: DocketDetail, orderTakenBy: string): DocketForm {
-  const f = emptyForm(d.dateIso ?? new Date().toISOString().slice(0, 10), orderTakenBy);
+/** Splits column N ("Q 1234 / PO 5678", as toSheetCells writes it) back into quote and PO; other text goes to PO. */
+export function parseQuotePo(raw: string | null): { quoteNo: string; poNo: string } {
+  const s = (raw ?? "").trim();
+  const part = (tag: string) =>
+    s
+      .split("/")
+      .map((p) => p.trim())
+      .find((p) => p.toUpperCase().startsWith(`${tag} `))
+      ?.slice(tag.length)
+      .trim() ?? "";
+  const quoteNo = part("Q");
+  const poNo = part("PO");
+  return quoteNo || poNo ? { quoteNo, poNo } : { quoteNo: "", poNo: s };
+}
+
+/** A form prefilled from a docket created directly in the sheet. ORDER TAKEN BY stays blank: nobody knows who took it. */
+export function formFromDocket(d: DocketDetail): DocketForm {
+  const f = emptyForm(d.dateIso ?? new Date().toISOString().slice(0, 10), "");
   const rushText = REQUIRED_TEXTS.find((t) => d.dueRaw?.trim().toUpperCase().startsWith(t));
   return {
     ...f,
@@ -188,7 +204,7 @@ export function formFromDocket(d: DocketDetail, orderTakenBy: string): DocketFor
     address: d.address ?? "",
     salesperson: d.accountManager ?? "",
     body: d.project ?? "",
-    poNo: d.quotePo ?? "",
+    ...parseQuotePo(d.quotePo),
     invoiceNo: d.status === "cancelled" ? "" : (d.invDateRaw ?? ""),
   };
 }

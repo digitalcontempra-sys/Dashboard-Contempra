@@ -136,7 +136,6 @@ describe("formFromDocket", () => {
         address: "Portage Ave", roleNote: null, inv: false, invDateRaw: null, quotePo: "PO 30451", notes: null,
         link: null, syncedAt: "",
       },
-      "Ana",
     );
     expect(f).toMatchObject({
       forName: "Encore Lounge",
@@ -144,7 +143,8 @@ describe("formFromDocket", () => {
       date: "2026-10-13",
       salesperson: "JB",
       body: "4x exterior letters",
-      poNo: "PO 30451",
+      poNo: "30451",
+      orderTakenBy: "",
       required: { kind: "text", text: "RUSH" },
     });
   });

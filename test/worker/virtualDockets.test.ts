@@ -207,3 +207,67 @@ describe("cancel, delete, restore, purge", () => {
     expect(g.drive.files.get("file-9")?.trashed).toBe(true);
   });
 });
+
+describe("final review fixes: sheet races and edits", () => {
+  it("an edit lands on the right row even if a row is inserted between find and write", async () => {
+    await create(manager);
+    g.sheet.afterFind = () => g.sheet.rows.splice(1, 0, row(99001, { 6: "Someone Else" }));
+    const res = await api("/api/virtual-dockets/91488", {
+      method: "PUT",
+      cookie: manager,
+      json: { form: form({ forName: "Right Row" }), jobs, version: 1 },
+    });
+    expect(res.status).toBe(200);
+    expect(g.sheet.rowOf("91488")?.[6]).toBe("Right Row");
+    expect(g.sheet.rowOf("99001")?.[6]).toBe("Someone Else");
+  });
+
+  it("delete removes the right docket even if a row is inserted between find and delete", async () => {
+    await create(manager);
+    g.sheet.afterFind = () => g.sheet.rows.splice(1, 0, row(99002, { 6: "Keep Me" }));
+    await api("/api/virtual-dockets/91488", { method: "DELETE", cookie: admin, json: { confirm: "91488" } });
+    expect(g.sheet.rowOf("91488")).toBeUndefined();
+    expect(g.sheet.rowOf("99002")?.[6]).toBe("Keep Me");
+    const trashed = await env.DB.prepare("SELECT deleted_row_json FROM virtual_dockets WHERE work_order = '91488'").first<{ deleted_row_json: string }>();
+    expect(JSON.parse(trashed!.deleted_row_json)[2]).toBe(91488);
+  });
+
+  it("two simultaneous edits of the same version: one wins, the other gets the conflict message", async () => {
+    await create(manager);
+    const [a, b] = await Promise.all([
+      api("/api/virtual-dockets/91488", { method: "PUT", cookie: manager, json: { form: form({ forName: "A" }), jobs, version: 1 } }),
+      api("/api/virtual-dockets/91488", { method: "PUT", cookie: admin, json: { form: form({ forName: "B" }), jobs, version: 1 } }),
+    ]);
+    expect([a.status, b.status].sort()).toEqual([200, 409]);
+  });
+
+  it("finishes the save when Google applied the row but the response was lost", async () => {
+    g.sheet.applyThenFail("insertTopRow");
+    const res = await create(manager);
+    expect(res.status).toBe(200);
+    expect(g.sheet.rows.filter((r) => String(r[2]) === "91488")).toHaveLength(1);
+    const v = await env.DB.prepare("SELECT state FROM virtual_dockets WHERE work_order = '91488'").first();
+    expect(v).toEqual({ state: "saved" });
+  });
+
+  it("saving a sheet-born docket unchanged does not rewrite its sheet cells", async () => {
+    const sheetRow = row(91487, { 0: "??", 1: "WED", 6: "Tartan Towing", 7: "Decals", 13: "Q 1234 / PO 5678" });
+    g.sheet.rows = [g.sheet.rows[0], sheetRow];
+    await env.DB.prepare(
+      "INSERT INTO dockets (work_order, sheet_row, customer, project, quote_po, due_raw, date_raw, comp, hold, inv, due_rush, status, billing, row_hash, synced_at) VALUES ('91487', 2, 'Tartan Towing', 'Decals', 'Q 1234 / PO 5678', 'WED', '??', 0, 0, 0, 0, 'active', 'not_billed', 'h', 't')",
+    ).run();
+    const before = [...sheetRow];
+    const dto = (await (await api("/api/virtual-dockets/91487", { cookie: manager })).json()) as { form: DocketForm; version: number };
+    expect(dto.form).toMatchObject({ quoteNo: "1234", poNo: "5678", orderTakenBy: "" });
+    const res = await api("/api/virtual-dockets/91487", { method: "PUT", cookie: manager, json: { form: dto.form, jobs, version: 0 } });
+    expect(res.status).toBe(200);
+    expect(g.sheet.rowOf("91487")).toEqual(before);
+  });
+
+  it("never gives staff the Drive link of the priced PDF", async () => {
+    await create(manager);
+    await env.DB.prepare("UPDATE virtual_dockets SET drive_link = 'https://drive/x'").run();
+    const s = (await (await api("/api/virtual-dockets/91488", { cookie: staff })).json()) as { pdf: { driveLink: string | null } };
+    expect(s.pdf.driveLink).toBeNull();
+  });
+});
