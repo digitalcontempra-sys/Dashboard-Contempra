@@ -97,3 +97,20 @@ describe("users API", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("assignees", () => {
+  it("lists active users with roles for managers, not for staff", async () => {
+    await createUser("ana", "staff");
+    await api("/api/users", {
+      method: "POST",
+      cookie: admin,
+      json: { username: "luis", fullName: "Luis", accessLevel: "staff", roles: ["printer_roll"], password: "password123" },
+    });
+    await createUser("mgr", "manager");
+    const res = await api("/api/assignees", { cookie: await login("mgr") });
+    expect(res.status).toBe(200);
+    const list = (await res.json()) as { id: number; fullName: string; roles: string[] }[];
+    expect(list.find((u) => u.fullName === "Luis")).toMatchObject({ roles: ["printer_roll"] });
+    expect((await api("/api/assignees", { cookie: await login("ana") })).status).toBe(403);
+  });
+});

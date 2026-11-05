@@ -75,6 +75,8 @@ export type SyncStatus = {
 
 export type AccessLevel = "admin" | "manager" | "staff";
 
+export type AssigneeDTO = { id: number; fullName: string; roles: string[] };
+
 export type RoleDTO = { id: string; label: string };
 
 export type UserDTO = {

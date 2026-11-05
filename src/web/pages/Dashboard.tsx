@@ -1,5 +1,7 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Icon } from "../components/Icon";
 import type { TimeBucket } from "../../shared/rules";
 import type { DocketListResponse, DocketView, HistoryFilter } from "../../shared/types";
 import { api, withQuery } from "../api";
@@ -49,7 +51,16 @@ export function Dashboard() {
 
   return (
     <>
-      <PageHeader title="Main Dashboard" subtitle={first ? `${first.total} work orders` : undefined} actions={<SyncBadge />} />
+      <PageHeader title="Main Dashboard" subtitle={first ? `${first.total} work orders` : undefined} actions={
+          <div className="flex items-center gap-3">
+            <SyncBadge />
+            <Link to="/dockets/new" className="btn-primary">
+              <Icon name="plus" className="size-4" />
+              New Docket
+            </Link>
+          </div>
+        }
+      />
       <div className="space-y-3 px-4 md:px-6">
         <div className="max-w-md">
           <Tabs

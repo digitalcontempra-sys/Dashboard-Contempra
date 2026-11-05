@@ -3,6 +3,7 @@ import { FullScreenSpinner, homeFor, RequireLevel, useAuth } from "./auth";
 import { Layout } from "./components/Layout";
 import { AdminUsers } from "./pages/AdminUsers";
 import { Dashboard } from "./pages/Dashboard";
+import { DocketEditor } from "./pages/DocketEditor";
 import { Login } from "./pages/Login";
 import { MyCards } from "./pages/MyCards";
 import { NeedsReview } from "./pages/NeedsReview";
@@ -30,6 +31,15 @@ export function AppRoutes() {
         }
       >
         <Route path="/my-cards" element={<MyCards />} />
+        <Route
+          path="/dockets/new"
+          element={
+            <RequireLevel levels={[...MANAGERS]}>
+              <DocketEditor key="new" />
+            </RequireLevel>
+          }
+        />
+        <Route path="/dockets/:wo" element={<DocketEditor />} />
         <Route
           path="/dashboard"
           element={

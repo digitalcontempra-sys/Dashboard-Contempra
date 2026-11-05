@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { AccessLevel, RoleDTO, UserDTO } from "../../shared/types";
+import type { AccessLevel, AssigneeDTO, RoleDTO, UserDTO } from "../../shared/types";
 import type { AppEnv } from "../app";
 import { hashPassword, isValidPassword, PASSWORD_ERROR } from "../auth/password";
 import { deleteUserSessions, requireAuth, requireLevel } from "../auth/sessions";
@@ -8,6 +8,7 @@ const LEVELS: AccessLevel[] = ["admin", "manager", "staff"];
 
 export const userRoutes = new Hono<AppEnv>();
 userRoutes.use("/roles", requireAuth);
+userRoutes.use("/assignees", requireAuth, requireLevel("admin", "manager"));
 userRoutes.use("/users", requireAuth, requireLevel("admin"));
 userRoutes.use("/users/*", requireAuth, requireLevel("admin"));
 
@@ -130,4 +131,15 @@ userRoutes.post("/users/:id/reset-password", async (c) => {
   await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(await hashPassword(password), id).run();
   await deleteUserSessions(db, id);
   return c.json({ ok: true });
+});
+
+/** Active people and their production roles, for assigning docket jobs (admin + manager). */
+userRoutes.get("/assignees", async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT u.id, u.full_name, group_concat(ur.role_id) AS roles FROM users u
+     LEFT JOIN user_roles ur ON ur.user_id = u.id WHERE u.active = 1
+     GROUP BY u.id ORDER BY u.full_name COLLATE NOCASE`,
+  ).all<{ id: number; full_name: string; roles: string | null }>();
+  const list: AssigneeDTO[] = results.map((r) => ({ id: r.id, fullName: r.full_name, roles: r.roles ? r.roles.split(",") : [] }));
+  return c.json(list);
 });
