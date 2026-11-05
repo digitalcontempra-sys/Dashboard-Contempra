@@ -8,6 +8,7 @@ import { syncRoutes } from "./routes/sync";
 import { userRoutes } from "./routes/users";
 import { virtualDocketRoutes } from "./routes/virtualDockets";
 import { purgeTrash } from "./dockets/service";
+import { retryPendingDrive } from "./dockets/pdf";
 import { runIncrementalSync } from "./sync/incremental";
 import { runNightlyReconcile } from "./sync/nightly";
 import { isSheetConfigured } from "./sync/syncDockets";
@@ -31,6 +32,10 @@ export default {
     // No sheet configured yet (e.g. a trial deploy loaded from an export): nothing to sync.
     if (controller.cron === NIGHTLY_CRON) ctx.waitUntil(purgeTrash(env));
     if (!(await isSheetConfigured(env))) return;
-    ctx.waitUntil(controller.cron === NIGHTLY_CRON ? runNightlyReconcile(env) : runIncrementalSync(env));
+    ctx.waitUntil(
+      controller.cron === NIGHTLY_CRON
+        ? runNightlyReconcile(env)
+        : runIncrementalSync(env).then(() => retryPendingDrive(env)),
+    );
   },
 } satisfies ExportedHandler<Env>;

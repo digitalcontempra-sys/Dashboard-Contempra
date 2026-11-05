@@ -12,6 +12,7 @@ import {
   ServiceError,
   updateDocket,
 } from "../dockets/service";
+import { MAX_PDF_BYTES, pdfKey, storeDocketPdf, syncDocketPdfToDrive } from "../dockets/pdf";
 
 type Body = { form?: DocketForm; jobs?: ProductionJob[]; version?: number; confirm?: string };
 
@@ -55,3 +56,25 @@ virtualDocketRoutes.post("/virtual-dockets/:wo/restore", admins, async (c) => {
 });
 
 virtualDocketRoutes.get("/trash", async (c) => c.json(await listTrash(c.env)));
+
+virtualDocketRoutes.put("/virtual-dockets/:wo/pdf", editors, async (c) => {
+  const wo = c.req.param("wo");
+  const exists = await c.env.DB.prepare("SELECT 1 FROM virtual_dockets WHERE work_order = ? AND state = 'saved'").bind(wo).first();
+  if (!exists) return c.json({ error: "Work order not found" }, 404);
+  const declared = Number(c.req.header("content-length") ?? 0);
+  if (declared > MAX_PDF_BYTES) return c.json({ error: "PDF is too large (max 5 MB)" }, 413);
+  const bytes = await c.req.arrayBuffer();
+  if (bytes.byteLength > MAX_PDF_BYTES) return c.json({ error: "PDF is too large (max 5 MB)" }, 413);
+  await storeDocketPdf(c.env, wo, bytes);
+  c.executionCtx.waitUntil(syncDocketPdfToDrive(c.env, wo));
+  return c.json({ ok: true });
+});
+
+// The stored PDF includes prices, so Staff render their own price-free copy in the browser.
+virtualDocketRoutes.get("/virtual-dockets/:wo/pdf", editors, async (c) => {
+  const obj = await c.env.DOCKETS_BUCKET.get(pdfKey(c.req.param("wo")));
+  if (!obj) return c.json({ error: "PDF not found" }, 404);
+  return new Response(obj.body, {
+    headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="${c.req.param("wo")}.pdf"` },
+  });
+});
