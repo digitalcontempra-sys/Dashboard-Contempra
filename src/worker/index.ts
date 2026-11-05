@@ -5,7 +5,12 @@ import { authRoutes } from "./routes/auth";
 import { docketRoutes } from "./routes/dockets";
 import { syncRoutes } from "./routes/sync";
 import { userRoutes } from "./routes/users";
-import { isSheetConfigured, runSync } from "./sync/syncDockets";
+import { runIncrementalSync } from "./sync/incremental";
+import { runNightlyReconcile } from "./sync/nightly";
+import { isSheetConfigured } from "./sync/syncDockets";
+
+/** 08:00 UTC = 3 AM Winnipeg (CDT). Must match wrangler.jsonc triggers. */
+export const NIGHTLY_CRON = "0 8 * * *";
 
 export const app = new Hono<AppEnv>().basePath("/api");
 
@@ -17,9 +22,9 @@ app.route("/", docketRoutes);
 
 export default {
   fetch: app.fetch,
-  async scheduled(_controller, env, ctx) {
+  async scheduled(controller, env, ctx) {
     // No sheet configured yet (e.g. a trial deploy loaded from an export): nothing to sync.
     if (!isSheetConfigured(env)) return;
-    ctx.waitUntil(runSync(env));
+    ctx.waitUntil(controller.cron === NIGHTLY_CRON ? runNightlyReconcile(env) : runIncrementalSync(env));
   },
 } satisfies ExportedHandler<Env>;

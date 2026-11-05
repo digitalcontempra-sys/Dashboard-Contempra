@@ -71,7 +71,7 @@ function isEmptyRow(r: unknown[]): boolean {
   return r.every((v) => v == null || v === false || (typeof v === "string" && v.trim() === ""));
 }
 
-function parseWorkOrder(v: unknown): string | null {
+export function parseWorkOrder(v: unknown): string | null {
   if (typeof v === "number" && Number.isInteger(v) && v > 0) return String(v);
   if (typeof v === "string" && /^\d+$/.test(v.trim()) && Number(v) > 0) return String(Number(v));
   return null;
@@ -90,7 +90,14 @@ function checkHeaders(header: unknown[] | undefined): void {
   }
 }
 
-export async function mapSheet(values: unknown[][]): Promise<{ dockets: DocketRecord[]; review: ReviewItem[] }> {
+/**
+ * values[0] is the header row; values[1..] are data rows starting at sheet row `firstSheetRow`
+ * (2 for a full read, or the first row of a partial range).
+ */
+export async function mapSheet(
+  values: unknown[][],
+  firstSheetRow = 2,
+): Promise<{ dockets: DocketRecord[]; review: ReviewItem[] }> {
   checkHeaders(values[0]);
   const byWo = new Map<string, DocketRecord[]>();
   const review: ReviewItem[] = [];
@@ -99,7 +106,7 @@ export async function mapSheet(values: unknown[][]): Promise<{ dockets: DocketRe
     const r = [...(values[i] ?? [])];
     while (r.length < WIDTH) r.push("");
     if (isEmptyRow(r.slice(0, WIDTH))) continue;
-    const sheetRow = i + 1;
+    const sheetRow = firstSheetRow + i - 1;
     const rawJson = JSON.stringify(r.slice(0, WIDTH));
 
     const workOrder = parseWorkOrder(r[2]);
@@ -151,7 +158,7 @@ export async function mapSheet(values: unknown[][]): Promise<{ dockets: DocketRe
           kind: "duplicate_work_order",
           workOrder: wo,
           sheetRow: d.sheetRow,
-          rawJson: JSON.stringify(values[d.sheetRow - 1]?.slice(0, WIDTH) ?? []),
+          rawJson: JSON.stringify(values[d.sheetRow - firstSheetRow + 1]?.slice(0, WIDTH) ?? []),
         });
       }
     }

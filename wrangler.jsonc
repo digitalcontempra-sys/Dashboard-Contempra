@@ -16,6 +16,6 @@
       "migrations_dir": "migrations"
     }
   ],
-  "triggers": { "crons": ["* * * * *"] },
+  "triggers": { "crons": ["*/5 * * * *", "0 8 * * *"] },
   "vars": { "ENVIRONMENT": "production" }
 }

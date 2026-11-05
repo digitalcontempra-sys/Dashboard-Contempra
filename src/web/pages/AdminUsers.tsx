@@ -168,7 +168,7 @@ function SyncPanel() {
     <section className="card flex flex-wrap items-center gap-3 p-4">
       <div className="min-w-0 flex-1">
         <h2 className="font-semibold">Google Sheet sync</h2>
-        <p className="text-sm text-text-2">Runs every minute. Use this to pull changes right now.</p>
+        <p className="text-sm text-text-2">New and recent work orders update every 5 minutes; older rows within the hour. Use this to pull changes right now.</p>
         {run.data && (
           <p className={`mt-1 text-sm ${run.data.ok ? "text-ok" : "text-danger"}`}>
             {run.data.ok ? `Synced ${run.data.rowsSeen} work orders, ${run.data.rowsChanged} changed.` : run.data.error}

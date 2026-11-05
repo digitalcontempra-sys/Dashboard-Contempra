@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { SyncStatus } from "../../shared/types";
 import type { AppEnv } from "../app";
 import { requireAuth, requireLevel } from "../auth/sessions";
+import { runIncrementalSync } from "../sync/incremental";
 import { isSheetConfigured, runSync } from "../sync/syncDockets";
 
 export const syncRoutes = new Hono<AppEnv>();
@@ -30,4 +31,4 @@ syncRoutes.get("/sync/status", requireLevel("admin", "manager"), async (c) => {
   return c.json(status);
 });
 
-syncRoutes.post("/sync/run", requireLevel("admin"), async (c) => c.json(await runSync(c.env)));
+syncRoutes.post("/sync/run", requireLevel("admin"), async (c) => c.json(await runIncrementalSync(c.env)));

@@ -16,9 +16,9 @@ export function isSheetConfigured(env: Pick<Env, "SHEET_ID" | "GOOGLE_SA_JSON">)
   return Boolean(env.SHEET_ID?.trim() && env.GOOGLE_SA_JSON?.trim());
 }
 /** Below this many stored dockets the shrink guard is skipped (fresh or tiny sheets). */
-const SHRINK_GUARD_MIN = 100;
+export const SHRINK_GUARD_MIN = 100;
 
-const UPSERT_SQL = `INSERT INTO dockets (
+export const UPSERT_SQL = `INSERT INTO dockets (
   work_order, sheet_row, date_iso, date_raw, due_iso, due_raw, due_rush, comp, hold, seq, customer, project,
   address, account_manager, role_note, inv, inv_date_raw, quote_po, notes, link, status, billing, row_hash, synced_at
 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -30,7 +30,7 @@ ON CONFLICT (work_order) DO UPDATE SET
   inv_date_raw=excluded.inv_date_raw, quote_po=excluded.quote_po, notes=excluded.notes, link=excluded.link,
   status=excluded.status, billing=excluded.billing, row_hash=excluded.row_hash, synced_at=excluded.synced_at`;
 
-function upsertParams(d: DocketRecord, now: string): unknown[] {
+export function upsertParams(d: DocketRecord, now: string): unknown[] {
   return [
     d.workOrder, d.sheetRow, d.dateIso, d.dateRaw, d.dueIso, d.dueRaw, d.dueRush ? 1 : 0, d.comp ? 1 : 0,
     d.hold ? 1 : 0, d.seq, d.customer, d.project, d.address, d.accountManager, d.roleNote, d.inv ? 1 : 0,
@@ -38,11 +38,11 @@ function upsertParams(d: DocketRecord, now: string): unknown[] {
   ];
 }
 
-async function runBatches(db: D1Database, stmts: D1PreparedStatement[]): Promise<void> {
+export async function runBatches(db: D1Database, stmts: D1PreparedStatement[]): Promise<void> {
   for (let i = 0; i < stmts.length; i += CHUNK) await db.batch(stmts.slice(i, i + CHUNK));
 }
 
-async function recordFailure(db: D1Database, now: string, error: string): Promise<SyncResult> {
+export async function recordFailure(db: D1Database, now: string, error: string): Promise<SyncResult> {
   await db.prepare("UPDATE sync_state SET last_run_at = ?, last_error = ? WHERE id = 1").bind(now, error).run();
   return { ok: false, rowsSeen: 0, rowsChanged: 0, rowsDeleted: 0, error };
 }

@@ -66,9 +66,18 @@ export async function fetchContempraValues(
   env: Pick<Env, "GOOGLE_SA_JSON" | "SHEET_ID">,
   fetchImpl: typeof fetch = fetch,
 ): Promise<unknown[][]> {
+  return readSheetRange(env, "Contempra!A1:P", fetchImpl);
+}
+
+/** Reads one A1 range (e.g. `Contempra!A1:P601`) as unformatted values with date serials. */
+export async function readSheetRange(
+  env: Pick<Env, "GOOGLE_SA_JSON" | "SHEET_ID">,
+  range: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<unknown[][]> {
   const token = await getAccessToken(env.GOOGLE_SA_JSON, fetchImpl);
   const url =
-    `https://sheets.googleapis.com/v4/spreadsheets/${env.SHEET_ID}/values/Contempra!A1:P` +
+    `https://sheets.googleapis.com/v4/spreadsheets/${env.SHEET_ID}/values/${range}` +
     `?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=SERIAL_NUMBER`;
   const res = await withTimeout(fetchImpl, url, { headers: { authorization: `Bearer ${token}` } });
   if (!res.ok) throw new SheetFetchError(`Google Sheets read failed (${res.status})`, res.status);
