@@ -1,4 +1,4 @@
-import type { DriveGateway } from "../../src/worker/google/drive";
+import { DriveFileNotFoundError, type DriveGateway } from "../../src/worker/google/drive";
 import type { Gateways } from "../../src/worker/google/gateways";
 import type { RowCells, SheetGateway } from "../../src/worker/google/sheets";
 import { HEADER } from "./fixtures";
@@ -68,6 +68,11 @@ export class FakeDrive implements DriveGateway {
   files = new Map<string, { name: string; bytes: number; trashed: boolean }>();
   private fail = false;
   private n = 0;
+  uploads = 0;
+  active = 0;
+  maxActive = 0;
+  /** When set, uploads wait on it (lets a test hold an upload "in flight"). */
+  gate: Promise<void> | null = null;
   failNext() {
     this.fail = true;
   }
@@ -75,10 +80,19 @@ export class FakeDrive implements DriveGateway {
     return "root";
   }
   async upload(wo: string, title: string, _year: number, pdf: ArrayBuffer, existingId?: string | null) {
+    this.uploads++;
+    this.active++;
+    this.maxActive = Math.max(this.maxActive, this.active);
+    try {
+      if (this.gate) await this.gate;
+    } finally {
+      this.active--;
+    }
     if (this.fail) {
       this.fail = false;
       throw new Error("Google Drive request failed (503)");
     }
+    if (existingId && !this.files.has(existingId)) throw new DriveFileNotFoundError(existingId);
     const id = existingId ?? `file-${++this.n}`;
     this.files.set(id, { name: `${wo} - ${title}.pdf`, bytes: pdf.byteLength, trashed: false });
     return { id, link: `https://drive.google.com/file/d/${id}/view` };

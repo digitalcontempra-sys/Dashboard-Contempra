@@ -65,7 +65,8 @@ virtualDocketRoutes.put("/virtual-dockets/:wo/pdf", editors, async (c) => {
   if (declared > MAX_PDF_BYTES) return c.json({ error: "PDF is too large (max 5 MB)" }, 413);
   const bytes = await c.req.arrayBuffer();
   if (bytes.byteLength > MAX_PDF_BYTES) return c.json({ error: "PDF is too large (max 5 MB)" }, 413);
-  await storeDocketPdf(c.env, wo, bytes);
+  const version = Number(c.req.query("version"));
+  await storeDocketPdf(c.env, wo, bytes, Number.isInteger(version) && version > 0 ? version : null);
   c.executionCtx.waitUntil(syncDocketPdfToDrive(c.env, wo));
   return c.json({ ok: true });
 });

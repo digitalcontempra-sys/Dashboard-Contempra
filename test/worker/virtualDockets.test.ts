@@ -192,9 +192,9 @@ describe("cancel, delete, restore, purge", () => {
 
   it("purges trash older than 30 days only", async () => {
     await create(manager);
-    await env.DB.prepare("UPDATE virtual_dockets SET pdf_key = 'dockets/91488.pdf', drive_file_id = 'file-9'").run();
+    const file = await g.drive.upload("91488", "x", 2026, new ArrayBuffer(1), null);
+    await env.DB.prepare("UPDATE virtual_dockets SET pdf_key = 'dockets/91488.pdf', drive_file_id = ?").bind(file.id).run();
     await env.DOCKETS_BUCKET.put("dockets/91488.pdf", "pdf");
-    await g.drive.upload("91488", "x", 2026, new ArrayBuffer(1), "file-9");
     await api("/api/virtual-dockets/91488", { method: "DELETE", cookie: admin, json: { confirm: "91488" } });
     const deletedAt = Date.parse(
       (await env.DB.prepare("SELECT deleted_at FROM virtual_dockets").first<{ deleted_at: string }>())!.deleted_at,
@@ -204,7 +204,7 @@ describe("cancel, delete, restore, purge", () => {
     await purgeTrash(env, new Date(deletedAt + 31 * 86_400_000));
     expect(await env.DB.prepare("SELECT 1 FROM virtual_dockets").first()).toBeNull();
     expect(await env.DOCKETS_BUCKET.get("dockets/91488.pdf")).toBeNull();
-    expect(g.drive.files.get("file-9")?.trashed).toBe(true);
+    expect(g.drive.files.get(file.id)?.trashed).toBe(true);
   });
 });
 

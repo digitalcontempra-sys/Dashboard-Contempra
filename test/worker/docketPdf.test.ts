@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { emptyForm } from "../../src/shared/docketForm";
-import { retryPendingDrive, syncDocketPdfToDrive } from "../../src/worker/dockets/pdf";
+import { retryPendingDrive, storeDocketPdf, syncDocketPdfToDrive } from "../../src/worker/dockets/pdf";
 import { __setTestGateways } from "../../src/worker/google/gateways";
 import { fakeGateways } from "./fakeGoogle";
 import { row } from "./fixtures";
@@ -99,5 +99,65 @@ describe("docket PDF", () => {
 
   it("404s a PDF for an unknown docket", async () => {
     expect((await putPdf("1", PDF)).status).toBe(404);
+  });
+
+  it("an upload during an in-flight Drive copy ends with one file holding the newest PDF", async () => {
+    let release!: () => void;
+    g.drive.gate = new Promise<void>((r) => (release = r));
+    await storeDocketPdf(env, "91488", PDF.buffer, 1);
+    const first = syncDocketPdfToDrive(env, "91488"); // held at the Drive upload
+    await new Promise((r) => setTimeout(r, 20));
+    await storeDocketPdf(env, "91488", PDF.buffer, 1); // a second save renders a newer PDF
+    expect((await state("91488"))?.drive_status).toBe("syncing");
+    release();
+    await first;
+    expect((await state("91488"))?.drive_status).toBe("pending"); // newer bytes still need copying
+    g.drive.gate = null;
+    await syncDocketPdfToDrive(env, "91488");
+    expect((await state("91488"))?.drive_status).toBe("done");
+    expect(g.drive.files.size).toBe(1);
+  });
+
+  it("reports the PDF as stored only for the docket version it was rendered from", async () => {
+    await SELF.fetch(`${BASE}/api/virtual-dockets/91488/pdf?version=1`, {
+      method: "PUT",
+      headers: { cookie: manager, "content-type": "application/pdf" },
+      body: PDF,
+    });
+    const dto = async () => ((await (await api("/api/virtual-dockets/91488", { cookie: manager })).json()) as { pdf: { stored: boolean } }).pdf;
+    expect((await dto()).stored).toBe(true);
+    await env.DB.prepare("UPDATE virtual_dockets SET version = 2").run();
+    expect((await dto()).stored).toBe(false);
+  });
+
+  it("stops retrying a Drive copy after 10 failed attempts", async () => {
+    await env.DOCKETS_BUCKET.put("dockets/91488.pdf", PDF);
+    await env.DB.prepare("UPDATE virtual_dockets SET pdf_key = 'dockets/91488.pdf', drive_status = 'failed', drive_attempts = 10").run();
+    const before = g.drive.uploads;
+    await retryPendingDrive(env);
+    expect(g.drive.uploads).toBe(before);
+  });
+
+  it("creates a new Drive file when the old one was deleted in Drive", async () => {
+    await env.DOCKETS_BUCKET.put("dockets/91488.pdf", PDF);
+    await env.DB.prepare("UPDATE virtual_dockets SET pdf_key = 'dockets/91488.pdf', drive_status = 'pending', drive_file_id = 'gone'").run();
+    await syncDocketPdfToDrive(env, "91488");
+    const s = await state("91488");
+    expect(s?.drive_status).toBe("done");
+    expect(s?.drive_file_id).not.toBe("gone");
+  });
+
+  it("copies one PDF to Drive at a time (no duplicate folders on the first upload)", async () => {
+    const f = { ...emptyForm("2026-11-05", "Mgr"), forName: "Second Co" };
+    await api("/api/virtual-dockets", { method: "POST", cookie: manager, json: { form: f, jobs: [] } });
+    for (const wo of ["91488", "91489"]) await storeDocketPdf(env, wo, PDF.buffer, 1);
+    let release!: () => void;
+    g.drive.gate = new Promise<void>((r) => (release = r));
+    const both = Promise.all([syncDocketPdfToDrive(env, "91488"), syncDocketPdfToDrive(env, "91489")]);
+    await new Promise((r) => setTimeout(r, 300));
+    release();
+    await both;
+    expect(g.drive.maxActive).toBe(1);
+    expect(g.drive.uploads).toBe(2);
   });
 });

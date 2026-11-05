@@ -8,6 +8,14 @@ export interface DriveGateway {
   trash(fileId: string): Promise<void>;
 }
 
+/** The Drive file this docket pointed to no longer exists (deleted by hand). */
+export class DriveFileNotFoundError extends Error {
+  constructor(public fileId: string) {
+    super(`Drive file ${fileId} not found`);
+    this.name = "DriveFileNotFoundError";
+  }
+}
+
 const ROOT_NAME = "Contempra Dockets";
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 const API = "https://www.googleapis.com/drive/v3/files";
@@ -16,11 +24,12 @@ const UPLOAD = "https://www.googleapis.com/upload/drive/v3/files";
 const safeName = (s: string) => s.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
 
 export function realDriveGateway(env: GoogleEnv): DriveGateway {
-  async function request(url: string, init: RequestInit = {}): Promise<Record<string, unknown>> {
+  async function request(url: string, init: RequestInit = {}, notFoundId?: string): Promise<Record<string, unknown>> {
     const token = await getAccessToken(env);
     const headers = new Headers(init.headers);
     headers.set("authorization", `Bearer ${token}`);
     const res = await googleFetch(url, { ...init, headers });
+    if (res.status === 404 && notFoundId) throw new DriveFileNotFoundError(notFoundId);
     if (!res.ok) throw new Error(`Google Drive request failed (${res.status})`);
     return (await res.json().catch(() => ({}))) as Record<string, unknown>;
   }
@@ -61,7 +70,7 @@ export function realDriveGateway(env: GoogleEnv): DriveGateway {
           method: "PATCH",
           headers: { "content-type": "application/pdf" },
           body: pdf,
-        });
+        }, existingId);
         return { id: String(json.id), link: String(json.webViewLink) };
       }
       const parent = await yearFolder(year);
