@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { homeFor, useAuth } from "../auth";
+import { BrandLogo } from "../components/BrandLogo";
 
 export function Login() {
   const { user, login } = useAuth();
@@ -27,12 +28,10 @@ export function Login() {
   return (
     <div className="flex min-h-dvh items-center justify-center px-4">
       <form onSubmit={submit} className="card w-full max-w-sm p-6 sm:p-8" noValidate>
-        <div className="mb-6 flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-accent text-lg font-black text-accent-ink">C</span>
-          <div>
-            <h1 className="text-lg font-bold leading-tight">Contempra Dashboard</h1>
-            <p className="text-sm text-text-2">Sign in to continue</p>
-          </div>
+        <div className="mb-7 flex flex-col items-center text-center">
+          <BrandLogo className="h-auto w-[220px]" />
+          <h1 className="mt-4 text-xl font-bold tracking-tight">Production Dashboard</h1>
+          <p className="text-sm text-text-2">Sign in to continue</p>
         </div>
         <label className="mb-1.5 block text-sm font-medium" htmlFor="username">
           Username

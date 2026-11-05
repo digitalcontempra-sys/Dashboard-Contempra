@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import type { AccessLevel } from "../../shared/types";
 import { useAuth } from "../auth";
+import { BrandLogo } from "./BrandLogo";
 import { Icon, type IconName } from "./Icon";
 
 type NavItem = { to: string; label: string; short: string; icon: IconName; levels: AccessLevel[] };
@@ -12,16 +13,6 @@ const NAV: NavItem[] = [
   { to: "/needs-review", label: "Needs Review", short: "Review", icon: "review", levels: ["admin", "manager"] },
   { to: "/admin/users", label: "Admin", short: "Admin", icon: "users", levels: ["admin"] },
 ];
-
-function Logo({ size = "size-9" }: { size?: string }) {
-  return (
-    <span
-      className={`grid ${size} place-items-center rounded-[11px] bg-gradient-to-br from-[#ff8a3d] to-[#e8590c] text-sm font-black text-white shadow-[0_4px_12px_-2px_rgb(232_89_12/0.5)]`}
-    >
-      C
-    </span>
-  );
-}
 
 export function Layout() {
   const { user, logout } = useAuth();
@@ -37,12 +28,9 @@ export function Layout() {
   return (
     <div className="min-h-dvh md:flex md:gap-2 md:p-3">
       <aside className="glass sticky top-3 hidden h-[calc(100dvh-1.5rem)] w-64 shrink-0 flex-col rounded-[var(--radius-panel)] md:flex">
-        <div className="flex items-center gap-3 px-5 pt-5 pb-6">
-          <Logo />
-          <div className="leading-tight">
-            <p className="text-[15px] font-bold tracking-tight">Contempra</p>
-            <p className="text-xs text-text-3">Production Dashboard</p>
-          </div>
+        <div className="flex flex-col items-center gap-2 px-5 pt-6 pb-6">
+          <BrandLogo className="h-auto w-[168px]" />
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-3">Production Dashboard</p>
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 px-3" aria-label="Main">
           {items.map((n) => (
@@ -80,10 +68,7 @@ export function Layout() {
       </aside>
 
       <header className="glass sticky top-0 z-20 flex items-center justify-between rounded-none border-x-0 border-t-0 px-4 py-3 md:hidden">
-        <div className="flex items-center gap-2">
-          <Logo size="size-8" />
-          <span className="text-[15px] font-bold tracking-tight">Contempra</span>
-        </div>
+        <BrandLogo className="h-10 w-auto" />
         <button className="flex items-center gap-2 text-sm text-text-2" onClick={logout} aria-label="Sign out">
           <span className="grid size-8 place-items-center rounded-full bg-surface-strong text-xs font-bold text-text shadow-card">
             {initials}
