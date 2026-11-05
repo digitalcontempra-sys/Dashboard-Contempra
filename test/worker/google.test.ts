@@ -131,4 +131,21 @@ describe("google routes", () => {
     const res = await api("/api/google/status", { cookie: await login("boss") });
     expect(await res.json()).toMatchObject({ connected: true, email: "owner@gmail.com" });
   });
+
+  it("refuses a connection when the owner unticked Drive or Sheets access", async () => {
+    await env.DB.prepare("INSERT INTO oauth_states (state, user_id, created_at) VALUES ('s1', 1, ?)").bind(new Date().toISOString()).run();
+    const payload = btoa(JSON.stringify({ email: "owner@gmail.com" })).replace(/=+$/, "");
+    __setGoogleFetch(async () =>
+      Response.json({
+        refresh_token: "r",
+        id_token: `x.${payload}.y`,
+        scope: "openid email https://www.googleapis.com/auth/spreadsheets",
+      }),
+    );
+    await clearConnection();
+    const res = await api("/api/google/callback?code=c&state=s1", { redirect: "manual" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/admin/users?google=missing_permissions");
+    expect(await env.DB.prepare("SELECT 1 FROM google_connection").first()).toBeNull();
+  });
 });

@@ -92,6 +92,8 @@ const dollars = (cents: number) => cents / 100;
 
 export function computeTotals(f: DocketForm): {
   total: number;
+  delivery: number;
+  deposit: number;
   subtotal: number;
   gst: number;
   pst: number;
@@ -106,6 +108,8 @@ export function computeTotals(f: DocketForm): {
   const grand = subtotal + gst + pst;
   return {
     total: dollars(total),
+    delivery: dollars(toCents(f.delivery)),
+    deposit: dollars(toCents(f.deposit)),
     subtotal: dollars(subtotal),
     gst: dollars(gst),
     pst: dollars(pst),

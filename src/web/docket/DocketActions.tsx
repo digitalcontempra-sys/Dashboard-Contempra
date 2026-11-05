@@ -109,7 +109,7 @@ export function DocketActions({ workOrder, showOpen = true, onDone }: { workOrde
             <span className="sr-only">Type {workOrder} to confirm</span>
             <input
               aria-label={`Type ${workOrder} to confirm`}
-              className="field min-h-10"
+              className="field min-h-11"
               value={typed}
               placeholder={workOrder}
               inputMode="numeric"
@@ -117,12 +117,12 @@ export function DocketActions({ workOrder, showOpen = true, onDone }: { workOrde
             />
           </label>
           <div className="mt-2 flex gap-2">
-            <button type="button" className="btn-ghost min-h-10" onClick={() => setConfirmDelete(false)}>
+            <button type="button" className="btn-ghost min-h-11" onClick={() => setConfirmDelete(false)}>
               Keep it
             </button>
             <button
               type="button"
-              className="btn-primary min-h-10 bg-danger"
+              className="btn-primary min-h-11 bg-danger"
               disabled={typed.trim() !== workOrder || remove.isPending}
               onClick={() => remove.mutate()}
             >

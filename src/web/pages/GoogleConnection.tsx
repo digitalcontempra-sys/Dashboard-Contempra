@@ -16,7 +16,13 @@ export function GoogleConnection() {
   useEffect(() => {
     const result = params.get("google");
     if (!result) return;
-    setToast(result === "connected" ? "Google connected" : `Google sign-in was not completed (${result})`);
+    setToast(
+      result === "connected"
+        ? "Google connected"
+        : result === "missing_permissions"
+          ? "Google was not connected: allow both Google Sheets and Google Drive access, then try again."
+          : `Google sign-in was not completed (${result})`,
+    );
     const next = new URLSearchParams(params);
     next.delete("google");
     setParams(next, { replace: true });

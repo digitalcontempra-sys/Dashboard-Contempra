@@ -138,11 +138,11 @@ export function DocketPdf({ form, workOrder, showPrices }: { form: DocketForm; w
               <Line label="SAVED AS" value={form.savedAs} />
               {[
                 ["TOTAL", m(t.total)],
-                ["DELIVERY", m(Number.parseFloat(form.delivery) || 0)],
+                ["DELIVERY", m(t.delivery)],
                 ["G.S.T.", m(t.gst)],
                 ["P.S.T.", m(t.pst)],
                 ["SUB-TOTAL", m(t.subtotal)],
-                ["DEPOSIT", m(Number.parseFloat(form.deposit) || 0)],
+                ["DEPOSIT", m(t.deposit)],
               ].map(([label, value]) => (
                 <View key={label} style={[s.row, s.bb, s.cell, { justifyContent: "space-between" }]}>
                   <Text style={{ fontFamily: "Helvetica-Bold" }}>{label}</Text>

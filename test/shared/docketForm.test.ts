@@ -39,6 +39,8 @@ describe("computeTotals", () => {
     f.deposit = "50";
     expect(computeTotals(f)).toEqual({
       total: 150.5,
+      delivery: 10,
+      deposit: 50,
       subtotal: 160.5,
       gst: 8.03,
       pst: 11.24,
@@ -148,4 +150,13 @@ describe("formFromDocket", () => {
       required: { kind: "text", text: "RUSH" },
     });
   });
+
+describe("amounts with $ and commas", () => {
+  it("parses delivery and deposit like costs", () => {
+    const f = base();
+    f.delivery = "$1,200";
+    f.deposit = "1,000.50";
+    expect(computeTotals(f)).toMatchObject({ delivery: 1200, deposit: 1000.5, subtotal: 1200 });
+  });
+});
 });

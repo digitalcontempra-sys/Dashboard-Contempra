@@ -48,7 +48,7 @@ export function DocketEditor() {
     enabled: !isNew,
   });
 
-  const { restore, clear } = useDraft(draftKey(wo), { form, jobs }, canEdit && dirty);
+  const { restore, clear } = useDraft(draftKey(wo), { form, jobs, version }, canEdit && dirty);
 
   useEffect(() => {
     if (existing.data && !loaded) {
@@ -122,7 +122,15 @@ export function DocketEditor() {
         </div>
         {canEdit && (
           <>
-            <button className="btn-ghost" type="button" onClick={() => navigate(-1)}>
+            <button
+              className="btn-ghost"
+              type="button"
+              onClick={() => {
+                if (dirty && !window.confirm("Leave without saving? Your changes will be lost.")) return;
+                clear();
+                navigate(-1);
+              }}
+            >
               Cancel
             </button>
             {isNew && (
@@ -151,6 +159,8 @@ export function DocketEditor() {
             className="btn-ghost min-h-9"
             onClick={() => {
               setForm(draft.form);
+              // Keep the version the draft was written against, so a stale draft still gets the conflict warning.
+              if (typeof draft.version === "number") setVersion(draft.version);
               setJobs(draft.jobs.length ? draft.jobs : DEFAULT_JOBS);
               setDirty(true);
               setDraft(null);

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { DocketForm, ProductionJob } from "../../shared/docketForm";
 
-export type Draft = { form: DocketForm; jobs: ProductionJob[]; savedAt: number };
+export type Draft = { form: DocketForm; jobs: ProductionJob[]; version: number; savedAt: number };
 
 const SAVE_EVERY_MS = 5_000;
 
@@ -18,7 +18,7 @@ function read(key: string): Draft | null {
  * Autosaves the docket being typed to this device every 5 s, so an iPad that sleeps or loses
  * Wi-Fi does not lose the work. Storage failures (private mode) are ignored.
  */
-export function useDraft(key: string, value: { form: DocketForm; jobs: ProductionJob[] }, enabled: boolean) {
+export function useDraft(key: string, value: { form: DocketForm; jobs: ProductionJob[]; version: number }, enabled: boolean) {
   const latest = useRef(value);
   latest.current = value;
 

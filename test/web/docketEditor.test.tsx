@@ -98,4 +98,36 @@ describe("Staff view", () => {
     expect(screen.queryByLabelText("COST 1")).toBeNull();
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
   });
+
+describe("drafts and leaving", () => {
+  it("a restored draft keeps the version it was written against", async () => {
+    localStorage.setItem(
+      "docket-draft:91488",
+      JSON.stringify({ form: { ...emptyForm("2026-11-05", "x"), forName: "Old Draft" }, jobs: [], version: 3, savedAt: Date.now() }),
+    );
+    const { calls } = mockApi({
+      ...lists,
+      "GET /api/auth/me": () => managerUser,
+      "GET /api/virtual-dockets/91488": () => ({ ...saved({ ...emptyForm("2026-11-05", "x"), forName: "Newer" }), version: 4 }),
+      "PUT /api/virtual-dockets/91488": () => Response.json({ error: "This docket was changed by boss. Reload to see the latest version." }, { status: 409 }),
+    });
+    renderApp("/dockets/91488");
+    await userEvent.click(await screen.findByRole("button", { name: "Restore" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(calls.find((c) => c.method === "PUT" && c.url.pathname === "/api/virtual-dockets/91488")?.body).toMatchObject({ version: 3 }),
+    );
+  });
+
+  it("asks before leaving with unsaved changes", async () => {
+    mockApi({ ...lists, "GET /api/auth/me": () => managerUser });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderApp("/dockets/new");
+    await userEvent.type(await screen.findByLabelText("FOR"), "Half typed");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(confirm).toHaveBeenCalledWith("Leave without saving? Your changes will be lost.");
+    expect(screen.getByLabelText("FOR")).toHaveValue("Half typed");
+    confirm.mockRestore();
+  });
+});
 });

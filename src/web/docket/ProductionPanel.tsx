@@ -22,7 +22,7 @@ export function ProductionPanel({ jobs, onChange, roles, assignees, readOnly = f
         {!readOnly && (
           <button
             type="button"
-            className="btn-ghost min-h-9 px-3 text-xs"
+            className="btn-ghost min-h-11 px-3 text-xs"
             onClick={() => onChange?.([...jobs, { name: "", steps: [] }])}
           >
             <Icon name="plus" className="size-4" />
@@ -38,7 +38,7 @@ export function ProductionPanel({ jobs, onChange, roles, assignees, readOnly = f
             <div className="flex items-center gap-2">
               <input
                 aria-label={`Job name ${i + 1}`}
-                className="field min-h-10 bg-surface-strong text-sm font-semibold"
+                className="field bg-surface-strong text-sm font-semibold"
                 value={job.name}
                 placeholder="Job name"
                 readOnly={readOnly}
@@ -96,7 +96,7 @@ export function ProductionPanel({ jobs, onChange, roles, assignees, readOnly = f
                                   ),
                                 })
                               }
-                              className={`min-h-9 rounded-full px-3 text-xs font-semibold transition ${on ? "bg-accent text-accent-ink" : "bg-surface-2 text-text-2 hover:text-text"}`}
+                              className={`min-h-11 rounded-full px-3 text-xs font-semibold transition ${on ? "bg-accent text-accent-ink" : "bg-surface-2 text-text-2 hover:text-text"}`}
                             >
                               {p.fullName}
                             </button>
@@ -117,7 +117,7 @@ export function ProductionPanel({ jobs, onChange, roles, assignees, readOnly = f
                     <button
                       key={r.id}
                       type="button"
-                      className="min-h-9 rounded-full border border-border bg-surface-strong px-3 text-xs font-medium text-text-2 hover:text-text"
+                      className="min-h-11 rounded-full border border-border bg-surface-strong px-3 text-xs font-medium text-text-2 hover:text-text"
                       onClick={() => update(i, { ...job, steps: [...job.steps, { roleId: r.id, assigneeIds: [] }] })}
                     >
                       + {r.label}

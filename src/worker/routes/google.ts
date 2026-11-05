@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../app";
 import { requireAuth, requireLevel } from "../auth/sessions";
 import { encryptSecret } from "../google/crypto";
-import { _resetAccessTokenCache, buildAuthUrl, exchangeCode, fetchSheetTabs, getConnection } from "../google/oauth";
+import { _resetAccessTokenCache, buildAuthUrl, exchangeCode, fetchSheetTabs, getConnection, REQUIRED_SCOPES } from "../google/oauth";
 
 const STATE_TTL_MS = 10 * 60_000;
 const SHEET_TAB = "Contempra";
@@ -33,7 +33,10 @@ googleRoutes.get("/google/callback", async (c) => {
   await db.prepare("DELETE FROM oauth_states WHERE state = ? OR created_at < ?")
     .bind(state, new Date(Date.now() - STATE_TTL_MS).toISOString())
     .run();
-  const { refreshToken, email } = await exchangeCode(c.env, code, callbackUrl(c.req.url));
+  const { refreshToken, email, scopes } = await exchangeCode(c.env, code, callbackUrl(c.req.url));
+  if (!REQUIRED_SCOPES.every((s) => scopes.includes(s))) {
+    return c.redirect("/admin/users?google=missing_permissions", 302);
+  }
   const existing = await getConnection(db);
   await db.prepare(
     `INSERT INTO google_connection (id, email, refresh_token_enc, sheet_id, sheet_gid, drive_folder_id, status, connected_at, connected_by)

@@ -7,6 +7,11 @@ export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/drive.file",
 ];
+/** Both must be granted: Google lets the owner untick either one on the consent screen. */
+export const REQUIRED_SCOPES = [
+  "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/drive.file",
+];
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const DISCONNECTED = "Google is disconnected. Ask an admin to reconnect.";
 
@@ -65,7 +70,7 @@ export async function exchangeCode(
   env: Pick<Env, "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET">,
   code: string,
   redirectUri: string,
-): Promise<{ refreshToken: string; email: string }> {
+): Promise<{ refreshToken: string; email: string; scopes: string[] }> {
   const res = await googleFetch(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -77,9 +82,13 @@ export async function exchangeCode(
       grant_type: "authorization_code",
     }).toString(),
   });
-  const json = (await res.json().catch(() => ({}))) as { refresh_token?: string; id_token?: string; error?: string };
+  const json = (await res.json().catch(() => ({}))) as { refresh_token?: string; id_token?: string; scope?: string; error?: string };
   if (!res.ok || !json.refresh_token) throw new Error(`Google sign-in failed (${json.error ?? res.status})`);
-  return { refreshToken: json.refresh_token, email: json.id_token ? emailFromIdToken(json.id_token) : "" };
+  return {
+    refreshToken: json.refresh_token,
+    email: json.id_token ? emailFromIdToken(json.id_token) : "",
+    scopes: (json.scope ?? "").split(/\s+/).filter(Boolean),
+  };
 }
 
 export async function getConnection(db: D1Database): Promise<GoogleConnection | null> {

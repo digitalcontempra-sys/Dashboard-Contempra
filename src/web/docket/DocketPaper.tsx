@@ -13,7 +13,7 @@ export const formatMoney = (n: number) => money.format(n);
 
 const RULE = "border-[#1b1b1b]";
 const LABEL = "shrink-0 text-[11px] font-bold tracking-wide text-[#1b1b1b] uppercase";
-const INK = "w-full min-w-0 bg-transparent text-[15px] font-medium text-[#1f3fa6] outline-none placeholder:text-[#9aa3b5] read-only:cursor-default focus:bg-[#eef3ff]";
+const INK = "w-full min-w-0 self-stretch min-h-11 bg-transparent text-[15px] font-medium text-[#1f3fa6] outline-none placeholder:text-[#9aa3b5] read-only:cursor-default focus:bg-[#eef3ff]";
 
 type Props = {
   form: DocketForm;
@@ -86,7 +86,7 @@ export function DocketPaper({ form, onChange, readOnly = false, showPrices, work
                     disabled={readOnly}
                     aria-pressed={on}
                     onClick={() => set("required", on ? { kind: "none" } : { kind: "text", text: t })}
-                    className={`min-h-8 rounded-full border px-2.5 text-[11px] font-bold ${on ? "border-[#c8102e] bg-[#c8102e] text-white" : "border-[#1b1b1b]/40 text-[#1b1b1b]"}`}
+                    className={`min-h-11 rounded-full border px-3 text-[11px] font-bold ${on ? "border-[#c8102e] bg-[#c8102e] text-white" : "border-[#1b1b1b]/40 text-[#1b1b1b]"}`}
                   >
                     {t}
                   </button>
@@ -149,7 +149,7 @@ export function DocketPaper({ form, onChange, readOnly = false, showPrices, work
                     disabled={readOnly}
                     aria-pressed={on}
                     onClick={() => set("service", on ? form.service.filter((s) => s !== k) : [...form.service, k])}
-                    className={`min-h-9 rounded-full border px-3 text-[11.5px] font-bold ${on ? "border-[#1f3fa6] bg-[#1f3fa6] text-white" : "border-[#1b1b1b]/40"}`}
+                    className={`min-h-11 rounded-full border px-3 text-[11.5px] font-bold ${on ? "border-[#1f3fa6] bg-[#1f3fa6] text-white" : "border-[#1b1b1b]/40"}`}
                   >
                     {k}
                   </button>
@@ -182,7 +182,7 @@ export function DocketPaper({ form, onChange, readOnly = false, showPrices, work
                     <td key={k} className={j < 3 ? `border-r ${RULE}` : ""}>
                       <input
                         aria-label={`${{ name: "NAME", work: "WORK", hrs: "HRS", date: "DATE" }[k]} ${i + 1}`}
-                        className={`${INK} h-9 px-1 text-[13px]`}
+                        className={`${INK} h-11 px-1 text-[13px]`}
                         inputMode={k === "hrs" ? "decimal" : undefined}
                         value={l[k]}
                         readOnly={readOnly}
@@ -208,7 +208,7 @@ export function DocketPaper({ form, onChange, readOnly = false, showPrices, work
                   <td className={`border-r ${RULE}`}>
                     <input
                       aria-label={`MATERIAL ${i + 1}`}
-                      className={`${INK} h-9 px-1 text-[13px]`}
+                      className={`${INK} h-11 px-1 text-[13px]`}
                       value={m.name}
                       readOnly={readOnly}
                       onChange={(e) => set("materials", form.materials.map((x, xi) => (xi === i ? { ...x, name: e.target.value } : x)))}
@@ -218,7 +218,7 @@ export function DocketPaper({ form, onChange, readOnly = false, showPrices, work
                     {showPrices && (
                       <input
                         aria-label={`COST ${i + 1}`}
-                        className={`${INK} h-9 px-1 text-right text-[13px]`}
+                        className={`${INK} h-11 px-1 text-right text-[13px]`}
                         inputMode="decimal"
                         value={m.cost}
                         readOnly={readOnly}
@@ -305,7 +305,7 @@ function Line({ ctx, label, field, type = "text", className = "", inputMode }: {
 
 function Check({ ctx, label, field }: { ctx: Ctx; label: string; field: CheckField }) {
   return (
-    <label className="flex min-h-9 items-center gap-2 text-[12px] font-semibold text-[#1b1b1b]">
+    <label className="flex min-h-11 items-center gap-2 text-[12px] font-semibold text-[#1b1b1b]">
       <input
         type="checkbox"
         aria-label={label}
@@ -323,7 +323,7 @@ const toNumber = (s: string) => Number.parseFloat(s.replace(/[$,\s]/g, "")) || 0
 
 function TotalRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`flex min-h-10 items-center justify-between border-t ${RULE} px-2`}>
+    <div className={`flex min-h-11 items-center justify-between border-t ${RULE} px-2`}>
       <dt className="font-semibold">{label}</dt>
       <dd className="font-semibold text-[#1f3fa6]">{value}</dd>
     </div>
@@ -346,7 +346,7 @@ function TotalInput({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className={`flex min-h-10 items-center justify-between gap-2 border-t ${RULE} px-2`}>
+    <div className={`flex min-h-11 items-center justify-between gap-2 border-t ${RULE} px-2`}>
       <dt className="font-semibold">{label}</dt>
       <dd className="w-28">
         {show && (

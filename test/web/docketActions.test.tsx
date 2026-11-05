@@ -62,6 +62,10 @@ describe("PDF after save", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(calls.some((c) => c.method === "PUT" && c.url.pathname === "/api/virtual-dockets/91488/pdf")).toBe(true));
     expect(renderDocketPdf).toHaveBeenCalledWith(expect.objectContaining({ forName: "Encore Lounge" }), "91488", true);
+    await new Promise((r) => setTimeout(r, 300));
+    const puts = calls.filter((c) => c.method === "PUT" && c.url.pathname === "/api/virtual-dockets/91488/pdf");
+    expect(puts).toHaveLength(1); // once per save, not again when the editor reloads the docket
+    expect(puts[0].url.searchParams.get("version")).toBe("1");
   });
 
   it("regenerates a missing PDF when a manager opens the docket", async () => {
