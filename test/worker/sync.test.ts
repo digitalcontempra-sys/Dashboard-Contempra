@@ -68,7 +68,7 @@ describe("runSync", () => {
     await runSync(env, [HEADER, row(1)]);
     const okState = await state();
     expect(okState?.last_success_at).toBeTruthy();
-    const r = await runSync({ ...env, GOOGLE_SA_JSON: "not json" });
+    const r = await runSync(env); // no Google connection in this test file
     expect(r.ok).toBe(false);
     expect(await count()).toBe(1);
     expect((await state())?.last_success_at).toBe(okState?.last_success_at);
@@ -88,7 +88,7 @@ describe("runSync", () => {
   });
 
   it("explains that the Google Sheet is not connected yet", async () => {
-    const r = await runSync({ ...env, SHEET_ID: "", GOOGLE_SA_JSON: undefined as unknown as string });
+    const r = await runSync(env);
     expect(r).toMatchObject({ ok: false, error: "Google Sheet is not connected yet" });
   });
 });

@@ -99,7 +99,8 @@ describe("runIncrementalSync", () => {
   });
 
   it("explains when no Google Sheet is connected", async () => {
-    const r = await runIncrementalSync({ ...env, SHEET_ID: "" });
+    await env.DB.prepare("DELETE FROM google_connection").run();
+    const r = await runIncrementalSync(env);
     expect(r).toMatchObject({ ok: false, error: "Google Sheet is not connected yet" });
   });
 });

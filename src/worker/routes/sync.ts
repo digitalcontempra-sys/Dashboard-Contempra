@@ -26,7 +26,7 @@ syncRoutes.get("/sync/status", requireLevel("admin", "manager"), async (c) => {
     rowsSeen: Number(s?.rows_seen ?? 0),
     rowsChanged: Number(s?.rows_changed ?? 0),
     rowsDeleted: Number(s?.rows_deleted ?? 0),
-    configured: isSheetConfigured(c.env),
+    configured: await isSheetConfigured(c.env),
   };
   return c.json(status);
 });

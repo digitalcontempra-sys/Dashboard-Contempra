@@ -43,3 +43,27 @@ export async function login(username: string, password = "password123"): Promise
   if (res.status !== 200) throw new Error(`login failed: ${res.status}`);
   return res.headers.get("set-cookie")!.split(";")[0];
 }
+
+/** A fixed 32-byte test key (base64) matching vitest.config.ts TOKEN_KEY. */
+export const TEST_TOKEN_KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+
+/** Stores a connected Google account for the sheet `test-sheet`. */
+export async function seedConnection(opts: { status?: "connected" | "disconnected"; sheetId?: string | null } = {}) {
+  const { encryptSecret } = await import("../../src/worker/google/crypto");
+  await env.DB.prepare("DELETE FROM google_connection").run();
+  await env.DB.prepare(
+    `INSERT INTO google_connection (id, email, refresh_token_enc, sheet_id, sheet_gid, status, connected_at, connected_by)
+     VALUES (1, 'owner@gmail.com', ?, ?, 0, ?, ?, 1)`,
+  )
+    .bind(
+      await encryptSecret("refresh-1", TEST_TOKEN_KEY),
+      opts.sheetId === undefined ? "test-sheet" : opts.sheetId,
+      opts.status ?? "connected",
+      new Date().toISOString(),
+    )
+    .run();
+}
+
+export async function clearConnection() {
+  await env.DB.prepare("DELETE FROM google_connection").run();
+}

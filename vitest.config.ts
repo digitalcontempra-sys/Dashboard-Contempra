@@ -13,8 +13,9 @@ export default defineConfig({
               bindings: {
                 TEST_MIGRATIONS: await readD1Migrations("./migrations"),
                 SETUP_TOKEN: "test-setup-token",
-                SHEET_ID: "test-sheet",
-                GOOGLE_SA_JSON: "{}",
+                GOOGLE_CLIENT_ID: "test-client-id",
+                GOOGLE_CLIENT_SECRET: "test-client-secret",
+                TOKEN_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
                 ENVIRONMENT: "development",
               },
             },

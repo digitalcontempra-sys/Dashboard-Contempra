@@ -1,4 +1,6 @@
 ENVIRONMENT=development
 SETUP_TOKEN=change-me
-SHEET_ID=your-backup-sheet-id
-GOOGLE_SA_JSON={"client_email":"...","private_key":"..."}
+GOOGLE_CLIENT_ID=your-oauth-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-oauth-client-secret
+# 32 random bytes, base64: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+TOKEN_KEY=

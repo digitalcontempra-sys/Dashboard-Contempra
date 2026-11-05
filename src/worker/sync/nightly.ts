@@ -12,7 +12,7 @@ const message = (e: unknown) => (e as Error)?.message || String(e);
 export async function runNightlyReconcile(env: Env, reader?: SheetReader): Promise<SyncResult> {
   const db = env.DB;
   const now = new Date().toISOString();
-  if (!reader && !isSheetConfigured(env)) return recordFailure(db, now, "Google Sheet is not connected yet");
+  if (!reader && !(await isSheetConfigured(env))) return recordFailure(db, now, "Google Sheet is not connected yet");
   const read = reader ?? googleReader(env);
 
   try {

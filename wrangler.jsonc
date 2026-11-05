@@ -16,6 +16,7 @@
       "migrations_dir": "migrations"
     }
   ],
+  "r2_buckets": [{ "binding": "DOCKETS_BUCKET", "bucket_name": "contempra-dockets" }],
   "triggers": { "crons": ["*/5 * * * *", "0 8 * * *"] },
   "vars": { "ENVIRONMENT": "production" }
 }

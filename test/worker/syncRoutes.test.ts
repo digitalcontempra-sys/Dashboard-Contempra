@@ -3,7 +3,7 @@ import { createExecutionContext } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import worker from "../../src/worker/index";
 import { HEADER, row } from "./fixtures";
-import { api, BASE, createUser, login, resetAuthTables } from "./helpers";
+import { api, BASE, createUser, login, resetAuthTables, seedConnection } from "./helpers";
 
 beforeEach(async () => {
   await resetAuthTables();
@@ -41,6 +41,7 @@ describe("sync routes", () => {
   });
 
   it("sync status says whether a Google Sheet is configured", async () => {
+    await seedConnection();
     await createUser("mgr", "manager");
     const res = await api("/api/sync/status", { cookie: await login("mgr") });
     expect(await res.json()).toMatchObject({ configured: true });

@@ -35,7 +35,7 @@ export async function runIncrementalSync(
 ): Promise<SyncResult> {
   const db = env.DB;
   const now = new Date().toISOString();
-  if (!reader && !isSheetConfigured(env)) return recordFailure(db, now, "Google Sheet is not connected yet");
+  if (!reader && !(await isSheetConfigured(env))) return recordFailure(db, now, "Google Sheet is not connected yet");
   const read = reader ?? googleReader(env);
   const firstPageRow = opts.topRows + 2;
 

@@ -1,4 +1,5 @@
 import type { Env } from "../env";
+import { isSheetConfigured } from "../google/oauth";
 import { fetchContempraValues } from "../sheet/googleClient";
 import { mapSheet, type DocketRecord } from "../sheet/mapRows";
 
@@ -12,9 +13,7 @@ export type SyncResult = {
 
 const CHUNK = 100;
 
-export function isSheetConfigured(env: Pick<Env, "SHEET_ID" | "GOOGLE_SA_JSON">): boolean {
-  return Boolean(env.SHEET_ID?.trim() && env.GOOGLE_SA_JSON?.trim());
-}
+export { isSheetConfigured } from "../google/oauth";
 /** Below this many stored dockets the shrink guard is skipped (fresh or tiny sheets). */
 export const SHRINK_GUARD_MIN = 100;
 
@@ -50,7 +49,7 @@ export async function recordFailure(db: D1Database, now: string, error: string):
 export async function runSync(env: Env, values?: unknown[][]): Promise<SyncResult> {
   const db = env.DB;
   const now = new Date().toISOString();
-  if (!values && !isSheetConfigured(env)) return recordFailure(db, now, "Google Sheet is not connected yet");
+  if (!values && !(await isSheetConfigured(env))) return recordFailure(db, now, "Google Sheet is not connected yet");
   let mapped: Awaited<ReturnType<typeof mapSheet>>;
   try {
     mapped = await mapSheet(values ?? (await fetchContempraValues(env)));
