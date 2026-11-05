@@ -45,6 +45,7 @@ function setup(syncOver: Record<string, unknown> = {}) {
       configured: true,
       ...syncOver,
     }),
+    "GET /api/virtual-dockets/91487": () => Response.json({ error: "Work order not found" }, { status: 404 }),
     "GET /api/dockets/91487": () => ({
       ...item(),
       sheetRow: 2,

@@ -5,6 +5,7 @@ import { api } from "../api";
 import { dueLabel, longDate } from "../format";
 import { BucketTag } from "./BucketChip";
 import { Icon } from "./Icon";
+import { DocketActions } from "../docket/DocketActions";
 
 const STATUS: Record<Detail["status"], { label: string; cls: string }> = {
   active: { label: "Active", cls: "bg-coming-soft text-coming" },
@@ -137,7 +138,9 @@ export function DocketDetail({ workOrder, onClose }: { workOrder: string; onClos
                 <Field label="Sheet Row" value={d.sheetRow} />
               </Section>
 
-              <p className="mt-6 text-center text-xs text-text-3">Production cards for this work order arrive in the next update.</p>
+              <div className="mt-6">
+                <DocketActions workOrder={workOrder} onDone={onClose} />
+              </div>
             </>
           )}
         </div>

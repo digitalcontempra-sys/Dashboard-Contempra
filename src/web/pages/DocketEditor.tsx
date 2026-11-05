@@ -10,6 +10,7 @@ import { DocketPaper } from "../docket/DocketPaper";
 import { ProductionPanel } from "../docket/ProductionPanel";
 import { draftKey, useDraft, type Draft } from "../docket/useDraft";
 import { afterDocketSaved } from "../docket/afterSave";
+import { DocketActions } from "../docket/DocketActions";
 
 const DEFAULT_JOBS: ProductionJob[] = [{ name: WHOLE_DOCKET, steps: [] }];
 
@@ -55,8 +56,10 @@ export function DocketEditor() {
       setJobs(existing.data.jobs.length ? existing.data.jobs : DEFAULT_JOBS);
       setVersion(existing.data.version);
       setLoaded(true);
+      // A saved docket without its PDF (e.g. the upload failed) gets one now.
+      if (canEdit && existing.data.source === "virtual" && !existing.data.pdf.stored) void afterDocketSaved(existing.data, qc);
     }
-  }, [existing.data, loaded]);
+  }, [existing.data, loaded, canEdit, qc]);
 
   useEffect(() => {
     if (canEdit) setDraft(restore());
@@ -133,6 +136,12 @@ export function DocketEditor() {
           </>
         )}
       </div>
+
+      {!isNew && (
+        <div className="mx-4 mt-4 md:mx-6">
+          <DocketActions workOrder={wo!} showOpen={false} />
+        </div>
+      )}
 
       {draft && canEdit && (
         <div className="mx-4 mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-warn-soft px-4 py-3 text-sm md:mx-6">

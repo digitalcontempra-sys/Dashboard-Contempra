@@ -8,6 +8,7 @@ import { Login } from "./pages/Login";
 import { MyCards } from "./pages/MyCards";
 import { NeedsReview } from "./pages/NeedsReview";
 import { NonBilled } from "./pages/NonBilled";
+import { Trash } from "./pages/Trash";
 import { Providers } from "./providers";
 
 function Home() {
@@ -61,6 +62,14 @@ export function AppRoutes() {
           element={
             <RequireLevel levels={[...MANAGERS]}>
               <NeedsReview />
+            </RequireLevel>
+          }
+        />
+        <Route
+          path="/admin/trash"
+          element={
+            <RequireLevel levels={["admin"]}>
+              <Trash />
             </RequireLevel>
           }
         />

@@ -10,6 +10,7 @@ const PATHS = {
   sync: "M21 12a9 9 0 0 1-15.4 6.4L3 16M3 12a9 9 0 0 1 15.4-6.4L21 8M21 3v5h-5M3 21v-5h5",
   chevron: "M9 18l6-6-6-6",
   plus: "M12 5v14M5 12h14",
+  trash: "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6",
 } as const;
 
 export type IconName = keyof typeof PATHS;

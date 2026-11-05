@@ -12,6 +12,7 @@ const NAV: NavItem[] = [
   { to: "/non-billed", label: "Non Billed Jobs", short: "Billing", icon: "billing", levels: ["admin", "manager"] },
   { to: "/needs-review", label: "Needs Review", short: "Review", icon: "review", levels: ["admin", "manager"] },
   { to: "/admin/users", label: "Admin", short: "Admin", icon: "users", levels: ["admin"] },
+  { to: "/admin/trash", label: "Trash", short: "Trash", icon: "trash", levels: ["admin"] },
 ];
 
 export function Layout() {

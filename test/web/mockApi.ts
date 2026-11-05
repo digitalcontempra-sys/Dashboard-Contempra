@@ -8,7 +8,13 @@ export function mockApi(routes: Record<string, Handler>) {
   const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://localhost");
     const method = (init?.method ?? "GET").toUpperCase();
-    calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    let body: unknown;
+    try {
+      body = init?.body ? JSON.parse(String(init.body)) : undefined;
+    } catch {
+      body = init?.body; // binary uploads (PDF)
+    }
+    calls.push({ method, url, body });
     const handler = routes[`${method} ${url.pathname}`];
     if (!handler) return Response.json({ error: "Not signed in" }, { status: 401 });
     const out = await handler(url, init);
