@@ -11,7 +11,18 @@ export interface SheetGateway {
   insertTopRow(cells: RowCells): Promise<void>;
   updateCells(row: number, cells: RowCells): Promise<void>;
   deleteRow(row: number): Promise<void>;
+  /** Adds the tab when it does not exist yet. */
+  ensureTab(title: string): Promise<void>;
+  /** Writes raw values starting at the range's top-left cell (any tab). */
+  writeRange(a1: string, values: unknown[][]): Promise<void>;
+  /** Appends raw rows after the last row of a tab. */
+  appendRows(tab: string, values: unknown[][]): Promise<void>;
+  /** Clears values and data validation (old checkboxes) of the Contempra tab's columns, from a row down. */
+  clearColumns(fromCol: string, toCol: string, fromRow: number): Promise<void>;
 }
+
+/** A1 tab prefix, quoted so names with spaces or dashes work: 'Legacy Q-Y'!A1. */
+export const tabRef = (tab: string) => `'${tab.replace(/'/g, "''")}'`;
 
 const TAB = "Contempra";
 const WIDTH = 16; // A..P
@@ -78,6 +89,48 @@ export function realSheetGateway(env: GoogleEnv): SheetGateway {
         .map(([col, v]) => ({ range: `${TAB}!${col}${row}`, values: [[v ?? ""]] }));
       if (data.length === 0) return;
       await call(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchUpdate`, { valueInputOption: "RAW", data });
+    },
+
+    async ensureTab(title) {
+      const { id } = await target();
+      const token = await getAccessToken(env);
+      const res = await googleFetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties.title`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new SheetFetchError(`Google Sheets read failed (${res.status})`, res.status);
+      const json = (await res.json()) as { sheets?: { properties?: { title?: string } }[] };
+      if ((json.sheets ?? []).some((s) => s.properties?.title === title)) return;
+      await batchUpdate([{ addSheet: { properties: { title } } }]);
+    },
+
+    async writeRange(a1, values) {
+      const { id } = await target();
+      await call(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchUpdate`, {
+        valueInputOption: "RAW",
+        data: [{ range: a1, values }],
+      });
+    },
+
+    async appendRows(tab, values) {
+      const { id } = await target();
+      const range = encodeURIComponent(`${tabRef(tab)}!A1`);
+      await call(
+        `https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+        { values },
+      );
+    },
+
+    async clearColumns(fromCol, toCol, fromRow) {
+      const { gid } = await target();
+      await batchUpdate([
+        {
+          repeatCell: {
+            range: { sheetId: gid, startRowIndex: fromRow - 1, startColumnIndex: colIndex(fromCol), endColumnIndex: colIndex(toCol) + 1 },
+            cell: {},
+            fields: "userEnteredValue,dataValidation",
+          },
+        },
+      ]);
     },
 
     async deleteRow(row) {

@@ -1,5 +1,6 @@
 import { AREA_LABEL, normalizeJob, type CardStatus } from "../../shared/cards";
 import type { ProductionJob } from "../../shared/docketForm";
+import { queueCardSheet } from "./sheetSync";
 
 export type CardRow = {
   id: number;
@@ -123,5 +124,6 @@ export async function reconcileCards(db: D1Database, wo: string, jobs: Productio
     for (const area of areas) events.push(eventStmt(db, first.id, wo, "removed", actorId, now, { removedArea: area }));
   }
   if (events.length) await db.batch(events);
+  if (before.length || after.length) await queueCardSheet(db, wo);
   return activated;
 }

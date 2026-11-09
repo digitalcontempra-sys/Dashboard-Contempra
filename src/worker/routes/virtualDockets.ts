@@ -13,6 +13,7 @@ import {
   ServiceError,
   updateDocket,
 } from "../dockets/service";
+import { flushCardSheet } from "../cards/sheetSync";
 import { MAX_PDF_BYTES, pdfKey, storeDocketPdf, syncDocketPdfToDrive } from "../dockets/pdf";
 
 type Body = { form?: DocketForm; jobs?: ProductionJob[]; version?: number; confirm?: string };
@@ -30,17 +31,21 @@ virtualDocketRoutes.onError((e, c) => {
 const editors = requireLevel("admin", "manager");
 const admins = requireLevel("admin");
 
-virtualDocketRoutes.post("/virtual-dockets", editors, async (c) =>
-  c.json(await createDocket(c.env, c.get("user"), await c.req.json<Body>())),
-);
+virtualDocketRoutes.post("/virtual-dockets", editors, async (c) => {
+  const dto = await createDocket(c.env, c.get("user"), await c.req.json<Body>());
+  c.executionCtx.waitUntil(flushCardSheet(c.env, dto.workOrder));
+  return c.json(dto);
+});
 
 virtualDocketRoutes.get("/virtual-dockets/next-number", editors, async (c) => c.json({ workOrder: await previewNextWorkOrder(c.env) }));
 
 virtualDocketRoutes.get("/virtual-dockets/:wo", async (c) => c.json(await getVirtualDocket(c.env, c.get("user"), c.req.param("wo"))));
 
-virtualDocketRoutes.put("/virtual-dockets/:wo", editors, async (c) =>
-  c.json(await updateDocket(c.env, c.get("user"), c.req.param("wo"), await c.req.json<Body>())),
-);
+virtualDocketRoutes.put("/virtual-dockets/:wo", editors, async (c) => {
+  const dto = await updateDocket(c.env, c.get("user"), c.req.param("wo"), await c.req.json<Body>());
+  c.executionCtx.waitUntil(flushCardSheet(c.env, dto.workOrder));
+  return c.json(dto);
+});
 
 virtualDocketRoutes.post("/virtual-dockets/:wo/cancel", editors, async (c) => {
   await cancelDocket(c.env, c.req.param("wo"));

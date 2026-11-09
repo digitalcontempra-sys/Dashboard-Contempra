@@ -10,6 +10,7 @@ import { userRoutes } from "./routes/users";
 import { virtualDocketRoutes } from "./routes/virtualDockets";
 import { purgeTrash } from "./dockets/service";
 import { retryPendingDrive } from "./dockets/pdf";
+import { retryCardSheet } from "./cards/sheetSync";
 import { runIncrementalSync } from "./sync/incremental";
 import { runNightlyReconcile } from "./sync/nightly";
 import { isSheetConfigured, recordFailure } from "./sync/syncDockets";
@@ -45,7 +46,9 @@ export default {
     ctx.waitUntil(
       controller.cron === NIGHTLY_CRON
         ? runNightlyReconcile(env)
-        : runIncrementalSync(env).then(() => retryPendingDrive(env)),
+        : runIncrementalSync(env)
+            .then(() => retryPendingDrive(env))
+            .then(() => retryCardSheet(env)),
     );
   },
 } satisfies ExportedHandler<Env>;

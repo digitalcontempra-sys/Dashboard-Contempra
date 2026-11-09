@@ -32,13 +32,54 @@ export class FakeSheet implements SheetGateway {
     return this.rows.find((r, i) => i > 0 && String(r[2] ?? "") === wo);
   }
 
+  /** Other tabs by title ("Production", "Legacy Q-Y"). */
+  tabs: Record<string, unknown[][]> = {};
+  private grid(a1: string, create = false): unknown[][] {
+    const name = a1.split("!")[0].replace(/^'|'$/g, "").replace(/''/g, "'");
+    if (name === "Contempra") return this.rows;
+    if (!this.tabs[name]) {
+      if (!create) throw new Error(`Unable to parse range: ${a1}`);
+      this.tabs[name] = [];
+    }
+    return this.tabs[name];
+  }
+
   async readRange(a1: string) {
     this.check("readRange");
+    const rows = this.grid(a1);
     const m = /!([A-Z])(\d+):([A-Z])(\d*)$/.exec(a1)!;
     const c1 = m[1].charCodeAt(0) - 65;
     const c2 = m[3].charCodeAt(0) - 65;
-    const r2 = m[4] ? Number(m[4]) : this.rows.length;
-    return this.rows.slice(Number(m[2]) - 1, r2).map((r) => r.slice(c1, c2 + 1));
+    const r2 = m[4] ? Number(m[4]) : rows.length;
+    return rows.slice(Number(m[2]) - 1, r2).map((r) => r.slice(c1, c2 + 1));
+  }
+  async ensureTab(title: string) {
+    this.grid(`'${title}'!A1`, true);
+  }
+  async writeRange(a1: string, values: unknown[][]) {
+    this.check("updateCells");
+    const rows = this.grid(a1);
+    const m = /!([A-Z])(\d+)/.exec(a1)!;
+    const c0 = m[1].charCodeAt(0) - 65;
+    const r0 = Number(m[2]) - 1;
+    values.forEach((vals, i) => {
+      while (rows.length <= r0 + i) rows.push([]);
+      const row = rows[r0 + i];
+      while (row.length < c0) row.push("");
+      vals.forEach((v, j) => (row[c0 + j] = v));
+    });
+  }
+  async appendRows(tab: string, values: unknown[][]) {
+    this.check("updateCells");
+    this.grid(`'${tab}'!A1`).push(...values.map((v) => [...v]));
+  }
+  async clearColumns(fromCol: string, toCol: string, fromRow: number) {
+    const c1 = fromCol.charCodeAt(0) - 65;
+    const c2 = toCol.charCodeAt(0) - 65;
+    this.rows.forEach((r, i) => {
+      if (i < fromRow - 1) return;
+      for (let c = c1; c <= c2 && c < r.length; c++) r[c] = "";
+    });
   }
   async findRow(wo: string) {
     this.check("findRow");

@@ -5,7 +5,7 @@ import type { AppEnv } from "../app";
 import { requireAuth, requireLevel } from "../auth/sessions";
 import { claimCard, continueCard, saveCardFields, sendBackCard } from "../cards/actions";
 import { board, docketHistory, getCard, listMyCards, markSeen, myCardsSummary, setSound } from "../cards/read";
-import { flushCardSheet } from "../cards/sheetSync";
+import { flushCardSheet, retryCardSheet, setupProductionColumns } from "../cards/sheetSync";
 import { ServiceError } from "../dockets/errors";
 
 type Body = { fields?: unknown; version?: unknown; toStep?: unknown; reason?: unknown };
@@ -58,6 +58,14 @@ cardRoutes.get("/production-board", requireAuth, managers, async (c) => {
 
 // Registered before virtualDocketRoutes so it never falls into /virtual-dockets/:wo.
 cardRoutes.get("/virtual-dockets/:wo/history", requireAuth, managers, async (c) => c.json(await docketHistory(c.env, c.req.param("wo"))));
+
+cardRoutes.post("/admin/production-columns", requireAuth, requireLevel("admin"), async (c) => {
+  const b = await c.req.json<{ confirm?: unknown }>().catch(() => ({}) as { confirm?: unknown });
+  if (b.confirm !== "SET UP") return c.json({ error: "Type SET UP to confirm" }, 400);
+  const out = await setupProductionColumns(c.env, c.get("user"));
+  c.executionCtx.waitUntil(retryCardSheet(c.env));
+  return c.json(out);
+});
 
 cardRoutes.get("/cards/:id", async (c) => c.json(await getCard(c.env, c.get("user"), cardId(c))));
 

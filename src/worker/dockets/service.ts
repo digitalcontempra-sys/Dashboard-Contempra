@@ -59,13 +59,13 @@ const toRowValues = (cells: RowCells): unknown[] => COLUMNS.map((c) => cells[c] 
 const toCells = (values: unknown[]): RowCells => Object.fromEntries(COLUMNS.map((c, i) => [c, (values[i] ?? "") as never]));
 
 /** Refreshes the D1 mirror from one sheet row so the dashboard updates without waiting for the sync. */
-async function upsertMirror(db: D1Database, values: unknown[], sheetRow: number): Promise<void> {
+export async function upsertMirror(db: D1Database, values: unknown[], sheetRow: number): Promise<void> {
   const { dockets } = await mapSheet([EXPECTED_HEADERS, values], sheetRow);
   const d = dockets[0];
   if (d) await db.prepare(UPSERT_SQL).bind(...upsertParams(d, new Date().toISOString())).run();
 }
 
-async function readRow(env: Env, row: number): Promise<unknown[]> {
+export async function readRow(env: Env, row: number): Promise<unknown[]> {
   const values = await getGateways(env).sheet.readRange(`Contempra!A${row}:P${row}`);
   return values[0] ?? [];
 }
@@ -228,7 +228,7 @@ export async function getVirtualDocket(env: Env, actor: SessionUser, wo: string)
  * Finds the docket's row and re-reads it right before a write, so a row inserted by hand in the
  * meantime cannot redirect the write to another docket. Call inside the sheet lock.
  */
-async function locateRow(env: Env, wo: string): Promise<{ row: number; values: unknown[] }> {
+export async function locateRow(env: Env, wo: string): Promise<{ row: number; values: unknown[] }> {
   try {
     for (let attempt = 0; attempt < 3; attempt++) {
       const row = await getGateways(env).sheet.findRow(wo);
