@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DocketDetail as Detail } from "../../shared/types";
 import { api } from "../api";
+import { useAuth } from "../auth";
+import { DocketHistory, DocketProduction } from "./DocketHistory";
 import { dueLabel, longDate } from "../format";
 import { BucketTag } from "./BucketChip";
 import { Icon } from "./Icon";
@@ -55,6 +57,9 @@ export function DocketDetail({ workOrder, onClose }: { workOrder: string; onClos
     queryKey: ["docket", workOrder],
     queryFn: () => api<Detail>(`/api/dockets/${encodeURIComponent(workOrder)}`),
   });
+  const { user } = useAuth();
+  const managers = user?.accessLevel === "admin" || user?.accessLevel === "manager";
+  const [tab, setTab] = useState<"details" | "production" | "history">("details");
   const closeRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -111,7 +116,33 @@ export function DocketDetail({ workOrder, onClose }: { workOrder: string; onClos
 
         <div className="flex-1 overflow-y-auto px-5 pb-7 sm:px-7">
           {error && <p className="py-6 text-danger">{(error as Error).message}</p>}
-          {d && (
+          {d && managers && (
+            <div role="tablist" aria-label="Docket sections" className="mb-4 flex gap-1 rounded-full bg-surface-2 p-1">
+              {(
+                [
+                  ["details", "Details"],
+                  ["production", "Production"],
+                  ["history", "History"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === id}
+                  onClick={() => setTab(id)}
+                  className={`min-h-10 flex-1 rounded-full text-sm font-semibold transition ${
+                    tab === id ? "bg-surface-strong text-text shadow-card" : "text-text-2"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {d && managers && tab === "production" && <DocketProduction workOrder={workOrder} />}
+          {d && managers && tab === "history" && <DocketHistory workOrder={workOrder} />}
+          {d && tab === "details" && (
             <>
               <dl className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
                 <Fact label="Account Manager" value={d.accountManager} />

@@ -8,6 +8,7 @@ import { Login } from "./pages/Login";
 import { MyCards } from "./pages/MyCards";
 import { NeedsReview } from "./pages/NeedsReview";
 import { NonBilled } from "./pages/NonBilled";
+import { ProductionBoard } from "./pages/ProductionBoard";
 import { Trash } from "./pages/Trash";
 import { Providers } from "./providers";
 
@@ -46,6 +47,14 @@ export function AppRoutes() {
           element={
             <RequireLevel levels={[...MANAGERS]}>
               <Dashboard />
+            </RequireLevel>
+          }
+        />
+        <Route
+          path="/production"
+          element={
+            <RequireLevel levels={[...MANAGERS]}>
+              <ProductionBoard />
             </RequireLevel>
           }
         />

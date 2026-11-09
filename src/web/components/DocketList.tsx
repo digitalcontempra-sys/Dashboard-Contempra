@@ -42,6 +42,9 @@ function DocketTile({ d, onOpen, extra, showStatus }: { d: Item; onOpen: (wo: st
       <div className="mt-auto flex items-end justify-between gap-2 pt-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold tabular-nums">{dueLabel(d.dueIso, d.dueRaw)}</p>
+          {d.vendorPickup && (
+            <span className="mt-1 inline-block rounded-md bg-warn-soft px-1.5 py-px text-[10px] font-bold text-warn">Vendor pickup ready</span>
+          )}
           {extra?.(d)}
         </div>
         {live && <BucketTag bucket={d.bucket} overdue={d.overdue} />}

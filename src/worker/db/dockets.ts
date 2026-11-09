@@ -39,6 +39,10 @@ const VIEW_SQL: Record<DocketView, string> = {
   history: "status IN ('completed', 'cancelled')",
 };
 
+/** A finishing card marked "Ready for vendor pickup" that has not shipped: the office calls the vendor. */
+const VENDOR_PICKUP_SQL = `EXISTS (SELECT 1 FROM cards c WHERE c.work_order = dockets.work_order AND c.role_id = 'finishing'
+  AND json_extract(c.fields_json, '$.vendorPickup') = 1 AND coalesce(json_extract(c.fields_json, '$.packaged'), '') != 'shipped')`;
+
 const ACTIVE_ORDER =
   "ORDER BY (due_rush = 1 OR due_iso <= :today) DESC, due_rush DESC, due_iso IS NULL, due_iso ASC, CAST(work_order AS INTEGER) DESC";
 const HISTORY_ORDER = "ORDER BY CAST(work_order AS INTEGER) DESC";
@@ -75,6 +79,7 @@ function toSummary(r: Row, today: string): DocketSummary {
     billing: r.billing as DocketSummary["billing"],
     bucket,
     overdue,
+    vendorPickup: r.vendor_pickup === 1,
   };
 }
 
@@ -115,7 +120,7 @@ export async function listDockets(db: D1Database, p: DocketQuery, now: Date): Pr
   const [countsRes, totalRes, listRes] = await db.batch([
     sql.bind(db, countsSql),
     sql.bind(db, `SELECT count(*) AS n FROM dockets WHERE ${listWhere}`),
-    sql.bind(db, `SELECT * FROM dockets WHERE ${listWhere} ${order} LIMIT :limit OFFSET :offset`),
+    sql.bind(db, `SELECT *, ${VENDOR_PICKUP_SQL} AS vendor_pickup FROM dockets WHERE ${listWhere} ${order} LIMIT :limit OFFSET :offset`),
   ]);
   const c = (countsRes.results[0] ?? {}) as Record<TimeBucket, number | null>;
   return {

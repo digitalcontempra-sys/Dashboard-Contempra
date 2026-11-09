@@ -64,7 +64,14 @@ export function ProductionPanel({ jobs, onChange, roles, assignees, readOnly = f
                     <li key={si} className="rounded-xl bg-surface-strong p-2.5 shadow-card">
                       <div className="flex items-center gap-2">
                         <span className="grid size-6 place-items-center rounded-full bg-accent text-[11px] font-bold text-accent-ink">{si + 1}</span>
-                        <span className="flex-1 text-sm font-semibold">{roleLabel(step.roleId)}</span>
+                        <span className="flex-1 text-sm font-semibold">
+                          {roleLabel(step.roleId)} ·{" "}
+                          {step.assigneeIds.length === 0
+                            ? "Team"
+                            : step.assigneeIds
+                                .map((id) => assignees.find((a) => a.id === id)?.fullName.split(/\s+/)[0] ?? "?")
+                                .join(", ")}
+                        </span>
                         {!readOnly && (
                           <button
                             type="button"

@@ -30,6 +30,8 @@ export type DocketSummary = {
   billing: Billing;
   bucket: TimeBucket;
   overdue: boolean;
+  /** Finishing marked it ready for vendor pickup (list endpoint only). */
+  vendorPickup?: boolean;
 };
 
 export type DocketDetail = DocketSummary & {
