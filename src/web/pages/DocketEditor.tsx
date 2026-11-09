@@ -42,6 +42,13 @@ export function DocketEditor() {
     queryFn: () => api<AccountManagerCount[]>("/api/account-managers"),
     enabled: canEdit,
   });
+  const nextNumber = useQuery({
+    queryKey: ["next-work-order"],
+    queryFn: () => api<{ workOrder: string }>("/api/virtual-dockets/next-number"),
+    enabled: isNew && canEdit,
+    retry: false,
+    refetchInterval: 60_000,
+  });
   const existing = useQuery({
     queryKey: ["virtual-docket", wo],
     queryFn: () => api<VirtualDocketDTO>(`/api/virtual-dockets/${encodeURIComponent(wo!)}`),
@@ -85,6 +92,7 @@ export function DocketEditor() {
       clear();
       setDirty(false);
       qc.invalidateQueries({ queryKey: ["dockets"] });
+      qc.invalidateQueries({ queryKey: ["next-work-order"] });
       qc.setQueryData(["virtual-docket", dto.workOrder], dto);
       void afterDocketSaved(dto, qc);
       if (andNew) {
@@ -193,6 +201,7 @@ export function DocketEditor() {
           readOnly={!canEdit}
           showPrices={canEdit}
           workOrder={workOrder}
+          nextWorkOrder={nextNumber.data?.workOrder ?? null}
           salespeople={ams.data?.map((a) => a.accountManager) ?? []}
         />
         <div className="min-[1180px]:sticky min-[1180px]:top-24">

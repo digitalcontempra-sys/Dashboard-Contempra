@@ -271,3 +271,12 @@ describe("final review fixes: sheet races and edits", () => {
     expect(s.pdf.driveLink).toBeNull();
   });
 });
+
+describe("next work order preview", () => {
+  it("tells editors the number the next docket will get", async () => {
+    const res = await api("/api/virtual-dockets/next-number", { cookie: manager });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ workOrder: "91488" });
+    expect((await api("/api/virtual-dockets/next-number", { cookie: staff })).status).toBe(403);
+  });
+});

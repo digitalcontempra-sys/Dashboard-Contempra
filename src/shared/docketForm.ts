@@ -25,6 +25,8 @@ export type DocketForm = {
   labour: { name: string; work: string; hrs: string; date: string }[];
   materials: { name: string; cost: string }[];
   savedAs: string;
+  /** Typed TOTAL; null = sum of the COST column. */
+  totalOverride: string | null;
   delivery: string;
   gst: string | null; // null = automatic 5%
   pst: string | null; // null = automatic 7%
@@ -72,6 +74,7 @@ export function emptyForm(todayIso: string, orderTakenBy: string): DocketForm {
     labour: Array.from({ length: LABOUR_ROWS }, () => ({ name: "", work: "", hrs: "", date: "" })),
     materials: Array.from({ length: MATERIAL_ROWS }, () => ({ name: "", cost: "" })),
     savedAs: "",
+    totalOverride: null,
     delivery: "",
     gst: null,
     pst: null,
@@ -101,7 +104,7 @@ export function computeTotals(f: DocketForm): {
   balanceDue: number;
 } {
   // All math in integer cents so 5% of $160.50 is $8.03, not $8.02.
-  const total = f.materials.reduce((sum, m) => sum + toCents(m.cost), 0);
+  const total = f.totalOverride == null ? f.materials.reduce((sum, m) => sum + toCents(m.cost), 0) : toCents(f.totalOverride);
   const subtotal = total + toCents(f.delivery);
   const gst = f.gst === null ? Math.round(subtotal * GST_RATE) : toCents(f.gst);
   const pst = f.pst === null ? Math.round(subtotal * PST_RATE) : toCents(f.pst);
@@ -170,6 +173,7 @@ export function stripPrices(f: DocketForm): DocketForm {
   return {
     ...f,
     materials: f.materials.map((m) => ({ ...m, cost: "" })),
+    totalOverride: null,
     delivery: "",
     deposit: "",
     gst: null,

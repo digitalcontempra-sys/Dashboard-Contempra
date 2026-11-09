@@ -160,3 +160,17 @@ describe("amounts with $ and commas", () => {
   });
 });
 });
+
+describe("TOTAL override", () => {
+  it("uses a typed TOTAL instead of the sum of costs", () => {
+    const f = base();
+    f.materials[0].cost = "100";
+    f.totalOverride = "500";
+    expect(computeTotals(f)).toMatchObject({ total: 500, subtotal: 500, gst: 25, pst: 35, grandTotal: 560 });
+  });
+  it("strips the typed TOTAL for staff", () => {
+    const f = base();
+    f.totalOverride = "500";
+    expect(stripPrices(f).totalOverride).toBeNull();
+  });
+});

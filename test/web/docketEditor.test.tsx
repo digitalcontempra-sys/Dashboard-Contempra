@@ -131,3 +131,18 @@ describe("drafts and leaving", () => {
   });
 });
 });
+
+describe("number preview and totals", () => {
+  it("shows the next work order number before saving", async () => {
+    mockApi({ ...lists, "GET /api/auth/me": () => managerUser, "GET /api/virtual-dockets/next-number": () => ({ workOrder: "91488" }) });
+    renderApp("/dockets/new");
+    await waitFor(() => expect(screen.getByTestId("work-order")).toHaveTextContent("91488"));
+  });
+
+  it("lets editors type the TOTAL", async () => {
+    mockApi({ ...lists, "GET /api/auth/me": () => managerUser });
+    renderApp("/dockets/new");
+    await userEvent.type(await screen.findByLabelText("TOTAL"), "500");
+    expect(screen.getByTestId("grand-total")).toHaveTextContent("$560.00");
+  });
+});

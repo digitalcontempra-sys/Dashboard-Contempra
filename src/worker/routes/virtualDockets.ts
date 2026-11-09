@@ -8,6 +8,7 @@ import {
   deleteDocket,
   getVirtualDocket,
   listTrash,
+  previewNextWorkOrder,
   restoreDocket,
   ServiceError,
   updateDocket,
@@ -32,6 +33,8 @@ const admins = requireLevel("admin");
 virtualDocketRoutes.post("/virtual-dockets", editors, async (c) =>
   c.json(await createDocket(c.env, c.get("user"), await c.req.json<Body>())),
 );
+
+virtualDocketRoutes.get("/virtual-dockets/next-number", editors, async (c) => c.json({ workOrder: await previewNextWorkOrder(c.env) }));
 
 virtualDocketRoutes.get("/virtual-dockets/:wo", async (c) => c.json(await getVirtualDocket(c.env, c.get("user"), c.req.param("wo"))));
 

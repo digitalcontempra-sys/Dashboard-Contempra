@@ -16,7 +16,12 @@ export function mockApi(routes: Record<string, Handler>) {
     }
     calls.push({ method, url, body });
     const handler = routes[`${method} ${url.pathname}`];
-    if (!handler) return Response.json({ error: "Not signed in" }, { status: 401 });
+    // Unmocked: signed out for the session check, "not found" for everything else.
+    if (!handler) {
+      return url.pathname === "/api/auth/me"
+        ? Response.json({ error: "Not signed in" }, { status: 401 })
+        : Response.json({ error: "Not found" }, { status: 404 });
+    }
     const out = await handler(url, init);
     return out instanceof Response ? out : Response.json(out);
   });

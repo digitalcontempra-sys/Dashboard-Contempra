@@ -21,10 +21,12 @@ type Props = {
   readOnly?: boolean;
   showPrices: boolean;
   workOrder: string | null;
+  /** Shown in grey while the docket is new: the number it will most likely get. */
+  nextWorkOrder?: string | null;
   salespeople?: string[];
 };
 
-export function DocketPaper({ form, onChange, readOnly = false, showPrices, workOrder, salespeople = [] }: Props) {
+export function DocketPaper({ form, onChange, readOnly = false, showPrices, workOrder, nextWorkOrder = null, salespeople = [] }: Props) {
   const set = <K extends keyof DocketForm>(k: K, v: DocketForm[K]) => onChange?.({ ...form, [k]: v });
   const totals = computeTotals(form);
   const ctx: Ctx = { form, set, readOnly };
@@ -44,7 +46,12 @@ export function DocketPaper({ form, onChange, readOnly = false, showPrices, work
         <p className="flex items-end gap-2 text-[17px] font-semibold whitespace-nowrap">
           Work Order #
           <span className="min-w-24 border-b border-[#1b1b1b] text-[20px] font-bold text-[#1f3fa6]" data-testid="work-order">
-            {workOrder ?? "New"}
+            {workOrder ?? (nextWorkOrder ? (
+              <span title="Assigned when you save">
+                {nextWorkOrder}
+                <span className="ml-1 align-middle text-[10px] font-semibold text-[#8a929c] uppercase">next</span>
+              </span>
+            ) : "New")}
           </span>
         </p>
       </div>
@@ -234,8 +241,15 @@ export function DocketPaper({ form, onChange, readOnly = false, showPrices, work
           <Line ctx={ctx} label="SAVED AS" field="savedAs" />
 
           <dl className="text-[12px]">
-            <TotalRow label="TOTAL" value={showPrices ? formatMoney(totals.total) : ""} />
-            <TotalInput label="DELIVERY" show={showPrices} value={form.delivery} readOnly={readOnly} onChange={(v) => set("delivery", v)} />
+            <TotalInput
+              label="TOTAL"
+              show={showPrices}
+              value={form.totalOverride ?? ""}
+              placeholder={formatMoney(computeTotals({ ...form, totalOverride: null }).total)}
+              readOnly={readOnly}
+              onChange={(v) => set("totalOverride", v === "" ? null : v)}
+            />
+            <TotalInput label="DELIVERY" show={showPrices} value={form.delivery} placeholder="$0.00" readOnly={readOnly} onChange={(v) => set("delivery", v)} />
             <TotalInput
               label="G.S.T."
               show={showPrices}
@@ -253,7 +267,7 @@ export function DocketPaper({ form, onChange, readOnly = false, showPrices, work
               onChange={(v) => set("pst", v === "" ? null : v)}
             />
             <TotalRow label="SUB-TOTAL" value={showPrices ? formatMoney(totals.subtotal) : ""} />
-            <TotalInput label="DEPOSIT" show={showPrices} value={form.deposit} readOnly={readOnly} onChange={(v) => set("deposit", v)} />
+            <TotalInput label="DEPOSIT" show={showPrices} value={form.deposit} placeholder="$0.00" readOnly={readOnly} onChange={(v) => set("deposit", v)} />
             <div className={`flex min-h-11 items-center justify-between border-t-2 ${RULE} px-2`}>
               <dt className="text-[13px] font-black">GRAND TOTAL</dt>
               <dd className="text-[16px] font-bold text-[#1f3fa6]" data-testid="grand-total">

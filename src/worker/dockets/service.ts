@@ -142,7 +142,7 @@ function toDto(row: VirtualRow, jobs: ProductionJob[], actor: SessionUser): Virt
   };
 }
 
-async function nextWorkOrder(env: Env): Promise<number> {
+export async function nextWorkOrder(env: Env): Promise<number> {
   const db = env.DB;
   const mirror = await db.prepare("SELECT max(CAST(work_order AS INTEGER)) AS n FROM dockets").first<{ n: number | null }>();
   const virt = await db.prepare("SELECT max(CAST(work_order AS INTEGER)) AS n FROM virtual_dockets").first<{ n: number | null }>();
@@ -392,4 +392,13 @@ export async function purgeTrash(env: Env, now = new Date()): Promise<number> {
     await env.DB.prepare("DELETE FROM virtual_dockets WHERE work_order = ?").bind(r.work_order).run();
   }
   return results.length;
+}
+
+/** The number the next new docket will most likely get (a preview: the real one is reserved on save). */
+export async function previewNextWorkOrder(env: Env): Promise<string> {
+  try {
+    return String(await nextWorkOrder(env));
+  } catch (e) {
+    throw googleError(e, "Could not read the Google Sheet. Try again.");
+  }
 }
