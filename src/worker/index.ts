@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "./app";
 import type { Env } from "./env";
 import { authRoutes } from "./routes/auth";
+import { cardRoutes } from "./routes/cards";
 import { docketRoutes } from "./routes/dockets";
 import { googleRoutes } from "./routes/google";
 import { syncRoutes } from "./routes/sync";
@@ -25,6 +26,7 @@ app.route("/", syncRoutes);
 app.route("/", userRoutes);
 app.route("/", docketRoutes);
 app.route("/", googleRoutes);
+app.route("/", cardRoutes);
 app.route("/", virtualDocketRoutes);
 
 export default {
