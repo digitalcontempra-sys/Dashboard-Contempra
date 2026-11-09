@@ -1,8 +1,10 @@
 import { Hono, type Context } from "hono";
+import type { TimeBucket } from "../../shared/rules";
 import type { CardDTO } from "../../shared/types";
 import type { AppEnv } from "../app";
-import { requireAuth } from "../auth/sessions";
+import { requireAuth, requireLevel } from "../auth/sessions";
 import { claimCard, continueCard, saveCardFields, sendBackCard } from "../cards/actions";
+import { board, docketHistory, getCard, listMyCards, markSeen, myCardsSummary, setSound } from "../cards/read";
 import { flushCardSheet } from "../cards/sheetSync";
 import { ServiceError } from "../dockets/errors";
 
@@ -28,6 +30,41 @@ function reply(c: Context<AppEnv>, dto: CardDTO) {
   c.executionCtx.waitUntil(flushCardSheet(c.env, dto.workOrder));
   return c.json(dto);
 }
+
+const managers = requireLevel("admin", "manager");
+const BUCKETS: TimeBucket[] = ["rush_today", "this_week", "coming", "no_due_date"];
+
+cardRoutes.get("/my-cards", requireAuth, async (c) => c.json(await listMyCards(c.env, c.get("user"))));
+cardRoutes.get("/my-cards/summary", requireAuth, async (c) => c.json(await myCardsSummary(c.env, c.get("user"))));
+
+cardRoutes.put("/me/sound", requireAuth, async (c) => {
+  const b = await c.req.json<{ on?: unknown }>().catch(() => ({}) as { on?: unknown });
+  await setSound(c.env, c.get("user"), b.on);
+  return c.json({ ok: true });
+});
+
+cardRoutes.get("/production-board", requireAuth, managers, async (c) => {
+  const q = c.req.query();
+  const userId = Number(q.user);
+  return c.json(
+    await board(c.env, c.get("user"), {
+      area: q.area || undefined,
+      userId: Number.isInteger(userId) && userId > 0 ? userId : undefined,
+      bucket: BUCKETS.includes(q.bucket as TimeBucket) ? (q.bucket as TimeBucket) : undefined,
+      wo: q.wo || undefined,
+    }),
+  );
+});
+
+// Registered before virtualDocketRoutes so it never falls into /virtual-dockets/:wo.
+cardRoutes.get("/virtual-dockets/:wo/history", requireAuth, managers, async (c) => c.json(await docketHistory(c.env, c.req.param("wo"))));
+
+cardRoutes.get("/cards/:id", async (c) => c.json(await getCard(c.env, c.get("user"), cardId(c))));
+
+cardRoutes.post("/cards/:id/seen", async (c) => {
+  await markSeen(c.env, c.get("user"), cardId(c));
+  return c.json({ ok: true });
+});
 
 cardRoutes.post("/cards/:id/claim", async (c) => reply(c, await claimCard(c.env, c.get("user"), cardId(c))));
 
