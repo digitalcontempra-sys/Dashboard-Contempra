@@ -25,7 +25,7 @@ describe("users API", () => {
     const res = await api("/api/roles", { cookie: await login("ana") });
     const roles = (await res.json()) as { id: string; label: string }[];
     expect(roles[0]).toEqual({ id: "designer", label: "Designer" });
-    expect(roles).toHaveLength(7);
+    expect(roles).toHaveLength(8);
   });
 
   it("creates a user with multiple roles", async () => {
