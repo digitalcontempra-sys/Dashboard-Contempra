@@ -10,17 +10,22 @@ Set-Location (Split-Path $PSScriptRoot -Parent)
 if (-not (Test-Path .prod.vars)) { New-Item -ItemType File .prod.vars | Out-Null }
 $saved = Select-String -Path .prod.vars -Pattern '^TOKEN_KEY=(.+)$' | Select-Object -First 1
 if ($saved) {
-  $key = $saved.Matches[0].Groups[1].Value.Trim()
+  # Already uploaded on the first publish; re-upload only when asked: publish.ps1 -ResendKey
+  Write-Host "`n[1/3] TOKEN_KEY already set (skipping)."
+  if ($args -contains "-ResendKey") {
+    $saved.Matches[0].Groups[1].Value.Trim() | npx wrangler secret put TOKEN_KEY
+    if ($LASTEXITCODE -ne 0) { throw "Could not set TOKEN_KEY" }
+  }
 } else {
   $bytes = New-Object byte[] 32
   [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
   $key = [Convert]::ToBase64String($bytes)
+  Write-Host "`n[1/3] Uploading a new TOKEN_KEY secret..."
+  $key | npx wrangler secret put TOKEN_KEY
+  if ($LASTEXITCODE -ne 0) { throw "Could not set TOKEN_KEY" }
   Add-Content -Path .prod.vars -Value "TOKEN_KEY=$key" -Encoding ascii
-  Write-Host "Generated a new TOKEN_KEY (saved in .prod.vars, never commit it)."
+  Write-Host "Saved TOKEN_KEY in .prod.vars (never commit it)."
 }
-Write-Host "`n[1/3] Uploading TOKEN_KEY secret..."
-$key | npx wrangler secret put TOKEN_KEY
-if ($LASTEXITCODE -ne 0) { throw "Could not set TOKEN_KEY" }
 
 Write-Host "`n[2/3] Applying database migrations..."
 npx wrangler d1 migrations apply dashboard-contempra --remote
