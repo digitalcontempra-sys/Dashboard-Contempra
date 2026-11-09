@@ -1,11 +1,13 @@
 import { AREA_LABEL } from "../../shared/cards";
 import type { CardDTO } from "../../shared/types";
+import { useAuth } from "../auth";
 import { BucketTag } from "../components/BucketChip";
 
 const firstName = (n: string) => n.trim().split(/\s+/)[0] ?? n;
 
 /** Square card tile: NEW glow, red returned strip, who is on it, dimmed when waiting. */
 export function CardTile({ card, onOpen, noMembers }: { card: CardDTO; onOpen: () => void; noMembers?: boolean }) {
+  const { user } = useAuth();
   const waiting = card.status === "waiting";
   return (
     <button
@@ -32,7 +34,11 @@ export function CardTile({ card, onOpen, noMembers }: { card: CardDTO; onOpen: (
         ) : (
           <BucketTag bucket={card.header.bucket} />
         )}
-        {card.claimedBy && <span className="text-[11px] text-text-2">{firstName(card.claimedBy.name)} is working on it</span>}
+        {card.claimedBy && (
+          <span className="text-[11px] text-text-2">
+            {card.claimedBy.id === user?.id ? "You're on it" : `${firstName(card.claimedBy.name)} is working on it`}
+          </span>
+        )}
         {noMembers && <span className="text-[11px] font-semibold text-warn">No one has this role</span>}
       </div>
     </button>

@@ -100,6 +100,19 @@ describe("My Cards page", () => {
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
+  it("a tile you claimed says You're on it; others show the name", async () => {
+    app({
+      cards: [
+        makeCard({ id: 1, workOrder: "1", claimedBy: { id: staffUser.id, name: "Ana Lopez" } }),
+        makeCard({ id: 2, workOrder: "2", claimedBy: { id: 99, name: "Seb Bastian" } }),
+      ],
+    });
+    renderApp("/my-cards");
+    expect(await screen.findByText("You're on it")).toBeInTheDocument();
+    expect(screen.getByText("Seb is working on it")).toBeInTheDocument();
+    expect(screen.queryByText("Ana is working on it")).toBeNull();
+  });
+
   it("says so when there is nothing", async () => {
     app();
     renderApp("/my-cards");
