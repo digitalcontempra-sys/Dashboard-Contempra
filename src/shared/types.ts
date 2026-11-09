@@ -95,3 +95,43 @@ export type SessionUser = {
   accessLevel: AccessLevel;
   roles: string[];
 };
+
+export type CardDTO = {
+  id: number;
+  workOrder: string;
+  jobName: string;
+  step: number;
+  roleId: string;
+  status: import("./cards").CardStatus;
+  assigneeIds: number[];
+  team: boolean;
+  claimedBy: { id: number; name: string } | null;
+  fields: import("./cards").CardFields;
+  returned: { reason: string; by: string } | null;
+  version: number;
+  activatedAt: string | null;
+  isNew: boolean;
+  nextRoleId: string | null;
+  earlier: { step: number; roleId: string }[];
+  header: {
+    customer: string | null;
+    accountManager: string | null;
+    project: string | null;
+    address: string | null;
+    bucket: TimeBucket;
+    dueIso: string | null;
+    dueRaw: string | null;
+    proofRequired: boolean;
+  };
+};
+
+export type CardEventDTO = { at: string; area: string; user: string | null; action: string; detail: string };
+
+export type MyCardsSummary = { newCount: number; activeCount: number; soundOn: boolean };
+
+export type BoardCard = CardDTO & { noMembers: boolean };
+
+export type BoardDTO = {
+  columns: { roleId: string; area: string; cards: BoardCard[] }[];
+  productionColumnsReady: boolean;
+};
