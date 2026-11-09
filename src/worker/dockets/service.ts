@@ -1,3 +1,4 @@
+import { reconcileCards } from "../cards/service";
 import {
   cancelStamp,
   emptyForm,
@@ -200,6 +201,7 @@ export async function createDocket(
     db.prepare("UPDATE virtual_dockets SET state = 'saved' WHERE work_order = ?").bind(wo),
     ...jobStatements(db, wo, jobs),
   ]);
+  await reconcileCards(db, wo, jobs, actor.id, now);
   await upsertMirror(db, toRowValues(cells), 2);
   return toDto((await loadVirtual(db, wo))!, jobs, actor);
 }
@@ -290,6 +292,7 @@ export async function updateDocket(
         .bind(wo, JSON.stringify(form), current + 1, actor.id, now, actor.id, now),
       ...jobStatements(db, wo, jobs),
     ]);
+    await reconcileCards(db, wo, jobs, actor.id, now);
     await upsertMirror(db, await readRow(env, row), row).catch(() => undefined);
     return toDto((await loadVirtual(db, wo))!, jobs, actor);
   });
