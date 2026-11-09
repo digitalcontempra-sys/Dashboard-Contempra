@@ -226,6 +226,21 @@ body {
 @utility animate-sheet-in {
   animation: sheet-in 280ms var(--ease-spring) both;
 }
+/* New-card badge: pulses until the cards are opened. */
+@keyframes pulse-badge {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  50% {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+@utility animate-pulse-badge {
+  animation: pulse-badge 1.2s ease-in-out infinite;
+}
 @utility animate-fade-in {
   animation: fade-in 200ms ease both;
 }

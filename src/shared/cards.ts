@@ -25,6 +25,18 @@ export const ROLE_ORDER = [
   "installer",
 ] as const;
 
+/** Role names as in the roles table (used for role tabs). */
+export const ROLE_LABEL: Record<string, string> = {
+  designer: "Designer",
+  printer_roll: "Printer Roll",
+  printer_fb: "Printer FB",
+  laminate_roll: "Laminate Roll",
+  liquid_lam: "Liquid Lam",
+  colex: "Colex",
+  finishing: "Finishing / Packaging",
+  installer: "Installer",
+};
+
 /** Area name of each role, used in "Continue → <area>" and the sheet's Stage column. */
 export const AREA_LABEL: Record<string, string> = {
   designer: "Design",

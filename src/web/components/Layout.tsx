@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import type { AccessLevel } from "../../shared/types";
 import { useAuth } from "../auth";
+import { useCardAlerts } from "../cards/useCardAlerts";
 import { BrandLogo } from "./BrandLogo";
 import { Icon, type IconName } from "./Icon";
 
@@ -9,14 +10,44 @@ type NavItem = { to: string; label: string; short: string; icon: IconName; level
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Main Dashboard", short: "Dashboard", icon: "dashboard", levels: ["admin", "manager"] },
   { to: "/my-cards", label: "My Cards", short: "My Cards", icon: "cards", levels: ["admin", "manager", "staff"] },
+  { to: "/production", label: "Production Board", short: "Board", icon: "board", levels: ["admin", "manager"] },
   { to: "/non-billed", label: "Non Billed Jobs", short: "Billing", icon: "billing", levels: ["admin", "manager"] },
   { to: "/needs-review", label: "Needs Review", short: "Review", icon: "review", levels: ["admin", "manager"] },
   { to: "/admin/users", label: "Admin", short: "Admin", icon: "users", levels: ["admin"] },
   { to: "/admin/trash", label: "Trash", short: "Trash", icon: "trash", levels: ["admin"] },
 ];
 
+/** Bold red count that pulses while there are unopened cards. */
+function NewBadge({ count, className = "" }: { count: number; className?: string }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      aria-label={`${count} new card${count === 1 ? "" : "s"}`}
+      className={`animate-pulse-badge grid min-w-5 place-items-center rounded-full bg-accent px-1.5 text-[11px] leading-5 font-black text-accent-ink ${className}`}
+    >
+      {count}
+    </span>
+  );
+}
+
+function SoundToggle({ on, onChange, className = "" }: { on: boolean; onChange: (on: boolean) => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      className={`grid size-11 place-items-center rounded-full text-text-2 transition hover:bg-surface-strong hover:text-text ${className}`}
+      onClick={() => onChange(!on)}
+      aria-label={on ? "Sound on" : "Sound off"}
+      aria-pressed={on}
+      title={on ? "Sound on" : "Sound off"}
+    >
+      <Icon name={on ? "bell" : "bellOff"} className="size-[18px]" />
+    </button>
+  );
+}
+
 export function Layout() {
   const { user, logout } = useAuth();
+  const alerts = useCardAlerts(Boolean(user));
   if (!user) return null;
   const items = NAV.filter((n) => n.levels.includes(user.accessLevel));
   const initials = user.fullName
@@ -45,7 +76,8 @@ export function Layout() {
               }
             >
               <Icon name={n.icon} className="size-[18px]" />
-              {n.label}
+              <span className="flex-1">{n.label}</span>
+              {n.to === "/my-cards" && <NewBadge count={alerts.newCount} />}
             </NavLink>
           ))}
         </nav>
@@ -57,6 +89,7 @@ export function Layout() {
             <p className="truncate text-sm font-semibold">{user.fullName}</p>
             <p className="text-xs capitalize text-text-3">{user.accessLevel}</p>
           </div>
+          <SoundToggle on={alerts.soundOn} onChange={alerts.setSoundOn} />
           <button
             className="grid size-9 place-items-center rounded-full text-text-2 transition hover:bg-surface-strong hover:text-text"
             onClick={logout}
@@ -70,6 +103,7 @@ export function Layout() {
 
       <header className="glass sticky top-0 z-20 flex items-center justify-between rounded-none border-x-0 border-t-0 px-4 py-3 md:hidden">
         <BrandLogo className="h-10 w-auto" />
+        <SoundToggle on={alerts.soundOn} onChange={alerts.setSoundOn} className="ml-auto" />
         <button className="flex items-center gap-2 text-sm text-text-2" onClick={logout} aria-label="Sign out">
           <span className="grid size-8 place-items-center rounded-full bg-surface-strong text-xs font-bold text-text shadow-card">
             {initials}
@@ -97,7 +131,10 @@ export function Layout() {
               }`
             }
           >
-            <Icon name={n.icon} />
+            <span className="relative">
+              <Icon name={n.icon} />
+              {n.to === "/my-cards" && <NewBadge count={alerts.newCount} className="absolute -top-2 -right-3" />}
+            </span>
             {n.short}
           </NavLink>
         ))}
