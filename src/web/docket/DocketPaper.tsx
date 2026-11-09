@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import {
   computeTotals,
+  formatMoneyInput,
   REQUIRED_TEXTS,
   SERVICE_KINDS,
   type DocketForm,
@@ -230,6 +231,10 @@ export function DocketPaper({ form, onChange, readOnly = false, showPrices, work
                         value={m.cost}
                         readOnly={readOnly}
                         onChange={(e) => set("materials", form.materials.map((x, xi) => (xi === i ? { ...x, cost: e.target.value } : x)))}
+                        onBlur={(e) => {
+                          const v = formatMoneyInput(e.target.value);
+                          if (v !== m.cost) set("materials", form.materials.map((x, xi) => (xi === i ? { ...x, cost: v } : x)));
+                        }}
                       />
                     )}
                   </td>
@@ -372,6 +377,10 @@ function TotalInput({
             placeholder={placeholder}
             readOnly={readOnly}
             onChange={(e) => onChange(e.target.value)}
+            onBlur={(e) => {
+              const v = formatMoneyInput(e.target.value);
+              if (v !== value) onChange(v);
+            }}
           />
         )}
       </dd>

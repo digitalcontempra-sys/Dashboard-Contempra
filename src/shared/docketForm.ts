@@ -93,6 +93,16 @@ export function toCents(s: string | null | undefined): number {
 
 const dollars = (cents: number) => cents / 100;
 
+const CAD = new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", currencyDisplay: "narrowSymbol" });
+
+/** "1222" -> "$1,222.00" (Canadian dollars). Blank stays blank; text that is not a number is left as typed. */
+export function formatMoneyInput(s: string): string {
+  const t = s.trim();
+  if (!t) return "";
+  if (!/^\$?\s*-?[\d,]*\.?\d+$|^\$?\s*-?[\d,]+\.?$/.test(t)) return s;
+  return CAD.format(toCents(t) / 100);
+}
+
 export function computeTotals(f: DocketForm): {
   total: number;
   delivery: number;

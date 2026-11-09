@@ -146,3 +146,17 @@ describe("number preview and totals", () => {
     expect(screen.getByTestId("grand-total")).toHaveTextContent("$560.00");
   });
 });
+
+describe("money formatting", () => {
+  it("shows typed amounts as $ with two decimals when leaving the field", async () => {
+    mockApi({ ...lists, "GET /api/auth/me": () => managerUser });
+    renderApp("/dockets/new");
+    const total = await screen.findByLabelText("TOTAL");
+    await userEvent.type(total, "1222");
+    await userEvent.tab();
+    expect(total).toHaveValue("$1,222.00");
+    await userEvent.type(screen.getByLabelText("COST 1"), "50.5");
+    await userEvent.tab();
+    expect(screen.getByLabelText("COST 1")).toHaveValue("$50.50");
+  });
+});

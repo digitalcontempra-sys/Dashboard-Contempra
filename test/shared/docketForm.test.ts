@@ -174,3 +174,14 @@ describe("TOTAL override", () => {
     expect(stripPrices(f).totalOverride).toBeNull();
   });
 });
+
+describe("formatMoneyInput", () => {
+  it("formats typed amounts as Canadian dollars", async () => {
+    const { formatMoneyInput } = await import("../../src/shared/docketForm");
+    expect(formatMoneyInput("1222")).toBe("$1,222.00");
+    expect(formatMoneyInput("1,000.5")).toBe("$1,000.50");
+    expect(formatMoneyInput("$12.345")).toBe("$12.35");
+    expect(formatMoneyInput("  ")).toBe("");
+    expect(formatMoneyInput("ask Jeff")).toBe("ask Jeff");
+  });
+});
