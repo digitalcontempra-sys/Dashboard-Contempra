@@ -24,6 +24,8 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
   const pending = useRef<CardFields | null>(null);
   const version = useRef(initial.version);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inFlight = useRef<Promise<boolean> | null>(null);
+  const flushRef = useRef<() => Promise<boolean>>(async () => true);
   const closeRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -41,7 +43,9 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      if (timer.current) clearTimeout(timer.current);
+      // Closing within the save delay must not lose the last edits.
+      if (pending.current) void flushRef.current();
+      else if (timer.current) clearTimeout(timer.current);
       opener?.focus?.();
     };
   }, [initial.id, qc]);
@@ -57,22 +61,33 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
     refresh();
   };
 
-  /** Sends the edits made so far; resolves once the server has them. */
+  /**
+   * Sends the edits made so far; resolves once the server has them. Waits for a save already in
+   * flight first, so every request carries the version the previous one returned.
+   */
   async function flush(): Promise<boolean> {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
+    if (inFlight.current && !(await inFlight.current)) return false;
     const changes = pending.current;
     if (!changes) return true;
     pending.current = null;
-    try {
-      const dto = await api<CardDTO>(`/api/cards/${card.id}/fields`, { method: "PUT", json: { fields: changes, version: version.current } });
-      version.current = dto.version;
-      return true;
-    } catch (e) {
-      fail(e);
-      return false;
-    }
+    const save = (async () => {
+      try {
+        const dto = await api<CardDTO>(`/api/cards/${card.id}/fields`, { method: "PUT", json: { fields: changes, version: version.current } });
+        version.current = dto.version;
+        return true;
+      } catch (e) {
+        fail(e);
+        return false;
+      }
+    })();
+    inFlight.current = save;
+    const ok = await save;
+    if (inFlight.current === save) inFlight.current = null;
+    return ok;
   }
+  flushRef.current = flush;
 
   function change(key: string, value: string | boolean | null) {
     setError(null);

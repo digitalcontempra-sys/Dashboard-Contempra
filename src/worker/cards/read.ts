@@ -8,9 +8,9 @@ import { toCardDTOs } from "./dto";
 import type { CardRow } from "./service";
 
 /** Cards of live dockets only: not in the Trash and not cancelled. */
-const LIVE = `c.work_order IN (
-  SELECT v.work_order FROM virtual_dockets v LEFT JOIN dockets d ON d.work_order = v.work_order
-  WHERE v.state = 'saved' AND v.deleted_at IS NULL AND coalesce(d.status, '') != 'cancelled')`;
+const LIVE = `EXISTS (
+  SELECT 1 FROM virtual_dockets v LEFT JOIN dockets d ON d.work_order = v.work_order
+  WHERE v.work_order = c.work_order AND v.state = 'saved' AND v.deleted_at IS NULL AND coalesce(d.status, '') != 'cancelled')`;
 
 /** The user has the card's role, and the card is a team card or names the user. */
 const VISIBLE_TO = `c.role_id IN (SELECT role_id FROM user_roles WHERE user_id = ?1)
@@ -135,8 +135,8 @@ function describe(action: string, roleId: string, d: Record<string, unknown>): s
 
 export async function docketHistory(env: Env, wo: string): Promise<CardEventDTO[]> {
   const { results } = await env.DB.prepare(
-    `SELECT e.action, e.detail_json, e.at, c.role_id, u.full_name FROM card_events e
-     JOIN cards c ON c.id = e.card_id LEFT JOIN users u ON u.id = e.user_id
+    `SELECT e.action, e.detail_json, e.at, e.role_id, u.full_name FROM card_events e
+     LEFT JOIN users u ON u.id = e.user_id
      WHERE e.work_order = ? ORDER BY e.at, e.id`,
   )
     .bind(wo)

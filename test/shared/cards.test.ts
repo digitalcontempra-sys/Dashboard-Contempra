@@ -74,6 +74,14 @@ describe("normalizeJob", () => {
     expect(out.map((c) => c.status)).toEqual(["active", "waiting", "waiting"]);
     out.forEach((c, i) => expect(c).toBe(input[i]));
   });
+  it("done work stays done after a step is inserted before it", () => {
+    const out = normalizeJob([
+      { step: 0, status: "waiting" as const },
+      { step: 1, status: "done" as const },
+      { step: 2, status: "waiting" as const },
+    ]);
+    expect(out.map((c) => c.status)).toEqual(["active", "done", "waiting"]);
+  });
   it("sorts by step", () => {
     const out = normalizeJob([
       { step: 1, status: "waiting" as const },

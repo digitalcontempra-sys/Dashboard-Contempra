@@ -78,7 +78,9 @@ cardRoutes.post("/cards/:id/claim", async (c) => reply(c, await claimCard(c.env,
 
 cardRoutes.put("/cards/:id/fields", async (c) => {
   const b = await body(c);
-  return reply(c, await saveCardFields(c.env, c.get("user"), cardId(c), b.fields, b.version));
+  // Field edits arrive every second while someone types; the 5-minute cron writes them to the sheet,
+  // which keeps Google calls well under quota. Moves (claim, continue, send back) write right away.
+  return c.json(await saveCardFields(c.env, c.get("user"), cardId(c), b.fields, b.version));
 });
 
 cardRoutes.post("/cards/:id/continue", async (c) => {

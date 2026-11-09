@@ -53,6 +53,16 @@ describe("SheetGateway tabs and ranges", () => {
     expect(JSON.parse(calls[0].body)).toEqual({ valueInputOption: "RAW", data: [{ range: "'Legacy Q-Y'!A1", values: [["Work Order"], ["91488"]] }] });
   });
 
+  it("writeRanges sends many ranges in one request", async () => {
+    google(() => ({}));
+    await realSheetGateway(env).writeRanges([
+      { range: "'Production'!A2", values: [["1"]] },
+      { range: "'Production'!A3", values: [["2"]] },
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(calls[0].body).data).toHaveLength(2);
+  });
+
   it("ensureTab adds a missing tab only", async () => {
     google((c) => (c.method === "GET" ? { sheets: [{ properties: { title: "Contempra" } }, { properties: { title: "Production" } }] } : {}));
     await realSheetGateway(env).ensureTab("Production");

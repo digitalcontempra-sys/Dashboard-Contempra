@@ -23,7 +23,7 @@ describe("schema", () => {
     const card = await env.DB.prepare(
       "INSERT INTO cards (work_order, job_sort, job_name, step, role_id, status, updated_at) VALUES ('77001',0,'Whole docket',0,'colex','active',?) RETURNING id",
     ).bind(now).first<{ id: number }>();
-    await env.DB.prepare("INSERT INTO card_events (card_id, work_order, action, user_id, at) VALUES (?, '77001', 'activated', ?, ?)").bind(card!.id, u!.id, now).run();
+    await env.DB.prepare("INSERT INTO card_events (card_id, role_id, work_order, action, user_id, at) VALUES (?, 'colex', '77001', 'activated', ?, ?)").bind(card!.id, u!.id, now).run();
     await env.DB.prepare("INSERT INTO card_seen (user_id, card_id, seen_at) VALUES (?, ?, ?)").bind(u!.id, card!.id, now).run();
     await env.DB.prepare("DELETE FROM virtual_dockets WHERE work_order = '77001'").run();
     for (const t of ["cards", "card_events", "card_seen"]) {

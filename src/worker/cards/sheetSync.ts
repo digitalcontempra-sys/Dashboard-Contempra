@@ -24,7 +24,7 @@ const PRODUCTION_TAB = "Production";
 const LEGACY_TAB = "Legacy Q-Y";
 /** Sheet columns R..Y, one per area, in role order. */
 const AREA_COLS = ["R", "S", "T", "U", "V", "W", "X", "Y"];
-const MAX_ATTEMPTS = 20;
+const RETRY_BATCH = 20;
 
 /** Marks a docket's sheet columns as needing a rewrite. hold/comp: a later non-null value wins. */
 export async function queueCardSheet(db: D1Database, wo: string, patch: { hold?: 0 | 1; comp?: 1 } = {}): Promise<void> {
@@ -32,7 +32,7 @@ export async function queueCardSheet(db: D1Database, wo: string, patch: { hold?:
     .prepare(
       `INSERT INTO card_sheet_queue (work_order, hold, comp, queued_at) VALUES (?, ?, ?, ?)
        ON CONFLICT (work_order) DO UPDATE SET hold = coalesce(excluded.hold, hold), comp = coalesce(excluded.comp, comp),
-         queued_at = excluded.queued_at`,
+         queued_at = excluded.queued_at, attempts = 0, last_error = NULL`,
     )
     .bind(wo, patch.hold ?? null, patch.comp ?? null, new Date().toISOString())
     .run();
@@ -154,21 +154,24 @@ function productionRow(wo: string, c: SheetCard, names: Map<number, string>): un
 /** Writes the queued docket to the Google Sheet. Never throws: failures stay queued for the cron. */
 export async function flushCardSheet(env: Env, wo: string): Promise<void> {
   const db = env.DB;
-  const q = await db
-    .prepare("SELECT hold, comp, queued_at FROM card_sheet_queue WHERE work_order = ?")
-    .bind(wo)
-    .first<{ hold: number | null; comp: number | null; queued_at: string }>();
-  if (!q || !(await columnsReady(db))) return;
+  if (!(await columnsReady(db))) return;
   try {
-    const cards = await sheetCards(db, wo);
-    const names = await userNames(db, [...new Set(cards.flatMap(assigneeIds))]);
     const sheet = getGateways(env).sheet;
     await withLock(db, SHEET_LOCK, async () => {
+      // Read the state only once we hold the lock, so an older flush can never overwrite a newer one.
+      const q = await db
+        .prepare("SELECT hold, comp, queued_at FROM card_sheet_queue WHERE work_order = ?")
+        .bind(wo)
+        .first<{ hold: number | null; comp: number | null; queued_at: string }>();
+      if (!q) return;
+      const cards = await sheetCards(db, wo);
+      const names = await userNames(db, [...new Set(cards.flatMap(assigneeIds))]);
       const { row } = await locateRow(env, wo);
       await sheet.updateCells(row, stageRowCells(cards, names, q));
 
-      // Production tab: one row per (Work Order, Job, Step), updated in place.
+      // Production tab: one row per (Work Order, Job, Step), updated in place in one request.
       const existing = await sheet.readRange(`${tabRef(PRODUCTION_TAB)}!A2:F`);
+      const updates: { range: string; values: unknown[][] }[] = [];
       const fresh: unknown[][] = [];
       const seen = new Set<number>();
       for (const c of cards) {
@@ -176,20 +179,21 @@ export async function flushCardSheet(env: Env, wo: string): Promise<void> {
         const i = existing.findIndex((r) => String(r?.[0] ?? "") === wo && String(r?.[1] ?? "") === c.job_name && Number(r?.[2]) === c.step + 1);
         if (i >= 0) {
           seen.add(i);
-          await sheet.writeRange(`${tabRef(PRODUCTION_TAB)}!A${i + 2}`, [values]);
+          updates.push({ range: `${tabRef(PRODUCTION_TAB)}!A${i + 2}`, values: [values] });
         } else fresh.push(values);
       }
       // Rows of this docket that no longer match a card were removed from the route.
       for (const [i, r] of existing.entries()) {
         if (String(r?.[0] ?? "") === wo && !seen.has(i) && r?.[5] !== "Removed") {
-          await sheet.writeRange(`${tabRef(PRODUCTION_TAB)}!F${i + 2}`, [["Removed"]]);
+          updates.push({ range: `${tabRef(PRODUCTION_TAB)}!F${i + 2}`, values: [["Removed"]] });
         }
       }
+      if (updates.length) await sheet.writeRanges(updates);
       if (fresh.length) await sheet.appendRows(PRODUCTION_TAB, fresh);
       await upsertMirror(db, await readRow(env, row), row).catch(() => undefined);
+      // A change queued while we were writing keeps its row for the next flush.
+      await db.prepare("DELETE FROM card_sheet_queue WHERE work_order = ? AND queued_at = ?").bind(wo, q.queued_at).run();
     });
-    // A change queued while we were writing keeps its row for the next flush.
-    await db.prepare("DELETE FROM card_sheet_queue WHERE work_order = ? AND queued_at = ?").bind(wo, q.queued_at).run();
   } catch (e) {
     await db
       .prepare("UPDATE card_sheet_queue SET attempts = attempts + 1, last_error = ? WHERE work_order = ?")
@@ -198,13 +202,16 @@ export async function flushCardSheet(env: Env, wo: string): Promise<void> {
   }
 }
 
-/** Cron: retries queued dockets, oldest first. */
+/**
+ * Cron: retries queued dockets, fewest failures first, so a docket that keeps failing never blocks
+ * the others and nothing is ever given up on (the sheet catches up once Google is back).
+ */
 export async function retryCardSheet(env: Env): Promise<void> {
   if (!(await columnsReady(env.DB))) return;
   const { results } = await env.DB.prepare(
-    "SELECT work_order FROM card_sheet_queue WHERE attempts < ? ORDER BY queued_at LIMIT 20",
+    "SELECT work_order FROM card_sheet_queue ORDER BY attempts, queued_at LIMIT ?",
   )
-    .bind(MAX_ATTEMPTS)
+    .bind(RETRY_BATCH)
     .all<{ work_order: string }>();
   for (const r of results) await flushCardSheet(env, r.work_order);
 }

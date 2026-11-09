@@ -181,13 +181,17 @@ export function continueLabel(roleId: string, nextRoleId: string | null): string
   return `Continue → ${nextRoleId ? (AREA_LABEL[nextRoleId] ?? nextRoleId) : "Done"}`;
 }
 
-/** Within one job: a done prefix, then one active card, then waiting cards. Unchanged cards keep their identity. */
+/**
+ * Within one job: done cards stay done; the first card that is not done is active and the other
+ * open cards wait. (A step inserted before finished work does not undo that work.)
+ * Unchanged cards keep their identity.
+ */
 export function normalizeJob<T extends { step: number; status: CardStatus }>(cards: T[]): T[] {
   const sorted = [...cards].sort((a, b) => a.step - b.step);
   let seenOpen = false;
   return sorted.map((c) => {
     let want: CardStatus;
-    if (!seenOpen && c.status === "done") want = "done";
+    if (c.status === "done") want = "done";
     else if (!seenOpen) {
       want = "active";
       seenOpen = true;

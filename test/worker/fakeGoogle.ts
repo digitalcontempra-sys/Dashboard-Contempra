@@ -58,6 +58,9 @@ export class FakeSheet implements SheetGateway {
   }
   async writeRange(a1: string, values: unknown[][]) {
     this.check("updateCells");
+    await this.write(a1, values);
+  }
+  private async write(a1: string, values: unknown[][]) {
     const rows = this.grid(a1);
     const m = /!([A-Z])(\d+)/.exec(a1)!;
     const c0 = m[1].charCodeAt(0) - 65;
@@ -68,6 +71,10 @@ export class FakeSheet implements SheetGateway {
       while (row.length < c0) row.push("");
       vals.forEach((v, j) => (row[c0 + j] = v));
     });
+  }
+  async writeRanges(data: { range: string; values: unknown[][] }[]) {
+    this.check("updateCells");
+    for (const d of data) await this.write(d.range, d.values);
   }
   async appendRows(tab: string, values: unknown[][]) {
     this.check("updateCells");

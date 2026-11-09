@@ -18,14 +18,14 @@ function show(card: CardDTO, extra: Record<string, (u: URL, init?: RequestInit) 
     ...extra,
   });
   const onClose = vi.fn();
-  render(
+  const { unmount } = render(
     <MemoryRouter>
       <Providers>
         <CardView card={card} onClose={onClose} />
       </Providers>
     </MemoryRouter>,
   );
-  return { ...api, onClose };
+  return { ...api, onClose, unmount };
 }
 
 describe("CardView", () => {
@@ -40,6 +40,31 @@ describe("CardView", () => {
     const put = calls.find((c) => c.method === "PUT")!;
     expect(put.url.pathname).toBe("/api/cards/7/fields");
     expect(put.body).toEqual({ fields: { laminated: true }, version: 0 });
+  });
+
+  it("closing right after an edit still saves it", async () => {
+    const { calls, unmount } = show(makeCard());
+    await userEvent.click(screen.getByRole("checkbox", { name: "Laminated" }));
+    unmount(); // the parent closes the card before the 1 s save timer fires
+    await waitFor(() => expect(calls.some((c) => c.method === "PUT" && c.url.pathname === "/api/cards/7/fields")).toBe(true));
+  });
+
+  it("Continue waits for a save in flight and sends its new version", async () => {
+    let finishPut!: () => void;
+    const card = makeCard();
+    const { calls } = show(card, {
+      "PUT /api/cards/7/fields": (_u, init) =>
+        new Promise((resolve) => {
+          finishPut = () => resolve({ ...card, fields: JSON.parse(String(init?.body)).fields, version: 5 });
+        }),
+      "POST /api/cards/7/continue": () => makeCard({ status: "done", version: 6 }),
+    });
+    await userEvent.click(screen.getByRole("checkbox", { name: "Laminated" }));
+    await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true), { timeout: 2500 });
+    await userEvent.click(screen.getByRole("button", { name: "Continue → Finishing" }));
+    finishPut();
+    await waitFor(() => expect(calls.some((c) => c.url.pathname === "/api/cards/7/continue")).toBe(true));
+    expect(calls.find((c) => c.url.pathname === "/api/cards/7/continue")!.body).toEqual({ version: 5 });
   });
 
   it("marks the card seen when it opens", async () => {

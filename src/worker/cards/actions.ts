@@ -65,7 +65,7 @@ async function settleJob(db: D1Database, wo: string, jobSort: number, actorId: n
         )
         .bind(c.status, activating ? 1 : 0, now, now, c.id),
     );
-    if (activating) stmts.push(eventStmt(db, c.id, wo, "activated", actorId, now));
+    if (activating) stmts.push(eventStmt(db, c, wo, "activated", actorId, now));
   }
   if (stmts.length) await db.batch(stmts);
 }
@@ -77,7 +77,7 @@ export async function claimCard(env: Env, user: SessionUser, id: number): Promis
   const now = new Date().toISOString();
   await db.batch([
     db.prepare("UPDATE cards SET claimed_by = ?, updated_at = ? WHERE id = ? AND status = 'active'").bind(user.id, now, id),
-    eventStmt(db, id, card.work_order, "claimed", user.id, now),
+    eventStmt(db, card, card.work_order, "claimed", user.id, now),
   ]);
   await queueCardSheet(db, card.work_order);
   return cardDTO(db, user.id, id);
@@ -92,7 +92,7 @@ export async function saveCardFields(env: Env, user: SessionUser, id: number, fi
   const changed = Object.keys(merged).filter((k) => merged[k] !== before[k]);
   const now = new Date().toISOString();
   await guardedUpdate(db, card, "fields_json = ?, updated_at = ?", JSON.stringify(merged), now);
-  if (changed.length) await eventStmt(db, id, card.work_order, "field", user.id, now, { keys: changed }).run();
+  if (changed.length) await eventStmt(db, card, card.work_order, "field", user.id, now, { keys: changed }).run();
   const holdChanged = card.role_id === "designer" && changed.includes("onHold");
   await queueCardSheet(db, card.work_order, holdChanged ? { hold: merged.onHold === true ? 1 : 0 } : {});
   return cardDTO(db, user.id, id);
@@ -119,14 +119,14 @@ export async function continueCard(env: Env, user: SessionUser, id: number, vers
     now,
     now,
   );
-  await eventStmt(db, id, card.work_order, "continued", user.id, now, { to: next ? AREA_LABEL[next.role_id] : "Done" }).run();
+  await eventStmt(db, card, card.work_order, "continued", user.id, now, { to: next ? AREA_LABEL[next.role_id] : "Done" }).run();
   await settleJob(db, card.work_order, card.job_sort, user.id, now);
   const open = await db
     .prepare("SELECT count(*) AS n FROM cards WHERE work_order = ? AND status != 'done'")
     .bind(card.work_order)
     .first<{ n: number }>();
   if (open!.n === 0) {
-    await eventStmt(db, id, card.work_order, "completed", user.id, now).run();
+    await eventStmt(db, card, card.work_order, "completed", user.id, now).run();
     await queueCardSheet(db, card.work_order, { comp: 1 });
   } else await queueCardSheet(db, card.work_order);
   return cardDTO(db, user.id, id);
@@ -167,8 +167,8 @@ export async function sendBackCard(
            claimed_by = NULL, activated_at = ?, version = version + 1, updated_at = ? WHERE id = ?`,
       )
       .bind(why, user.id, now, now, target.id),
-    eventStmt(db, id, card.work_order, "sent_back", user.id, now, { to: AREA_LABEL[target.role_id], reason: why }),
-    eventStmt(db, target.id, card.work_order, "activated", user.id, now),
+    eventStmt(db, card, card.work_order, "sent_back", user.id, now, { to: AREA_LABEL[target.role_id], reason: why }),
+    eventStmt(db, target, card.work_order, "activated", user.id, now),
   ]);
   await queueCardSheet(db, card.work_order);
   return cardDTO(db, user.id, id);

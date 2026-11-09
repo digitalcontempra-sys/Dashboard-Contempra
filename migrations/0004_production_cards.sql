@@ -31,10 +31,13 @@ CREATE TABLE cards (
 CREATE INDEX idx_cards_role_status ON cards (role_id, status);
 CREATE INDEX idx_cards_wo ON cards (work_order);
 
+-- Events outlive their card (a step removed from the route keeps its history), so card_id has no
+-- foreign key; they go away with the docket itself.
 CREATE TABLE card_events (
   id INTEGER PRIMARY KEY,
-  card_id INTEGER NOT NULL REFERENCES cards (id) ON DELETE CASCADE,
-  work_order TEXT NOT NULL,
+  card_id INTEGER NOT NULL,
+  role_id TEXT NOT NULL,
+  work_order TEXT NOT NULL REFERENCES virtual_dockets (work_order) ON DELETE CASCADE,
   action TEXT NOT NULL CHECK (action IN ('activated', 'claimed', 'field', 'continued', 'sent_back', 'completed', 'removed')),
   detail_json TEXT NOT NULL DEFAULT '{}',
   user_id INTEGER REFERENCES users (id),

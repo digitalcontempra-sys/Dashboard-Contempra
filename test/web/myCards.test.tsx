@@ -56,6 +56,18 @@ describe("card alerts", () => {
     expect(playChime).not.toHaveBeenCalled();
   });
 
+  it("does not poll for someone with no production roles", async () => {
+    const { calls } = mockApi({
+      "GET /api/auth/me": () => managerUser,
+      "GET /api/my-cards": () => [],
+      "GET /api/my-cards/summary": () => ({ newCount: 0, activeCount: 0, soundOn: true }),
+    });
+    renderApp("/my-cards");
+    await screen.findByRole("heading", { name: "My Cards" });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(calls.some((c) => c.url.pathname === "/api/my-cards/summary")).toBe(false);
+  });
+
   it("the sound toggle saves the setting", async () => {
     const { calls } = app();
     renderApp("/my-cards");

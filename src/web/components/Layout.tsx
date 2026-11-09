@@ -47,7 +47,8 @@ function SoundToggle({ on, onChange, className = "" }: { on: boolean; onChange: 
 
 export function Layout() {
   const { user, logout } = useAuth();
-  const alerts = useCardAlerts(Boolean(user));
+  // Only people with a production role get cards, so only they poll.
+  const alerts = useCardAlerts(Boolean(user?.roles.length));
   if (!user) return null;
   const items = NAV.filter((n) => n.levels.includes(user.accessLevel));
   const initials = user.fullName
