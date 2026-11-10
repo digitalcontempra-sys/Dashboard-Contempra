@@ -49,6 +49,23 @@ describe("New Docket", () => {
     expect(body.jobs[0].name).toBe("Whole docket");
   });
 
+  it("Save takes you back to the Main Dashboard and says it was saved", async () => {
+    mockApi({
+      ...lists,
+      "GET /api/auth/me": () => managerUser,
+      "GET /api/virtual-dockets/91488": () => saved({ ...emptyForm("2026-11-05", "x"), forName: "Encore Lounge" }),
+      "PUT /api/virtual-dockets/91488": (_u, init) => ({ ...saved(JSON.parse(String(init?.body)).form), version: 2 }),
+      "PUT /api/virtual-dockets/91488/pdf": () => ({ ok: true }),
+      "GET /api/dockets": () => ({ items: [], total: 0, page: 1, pageSize: 50, counts: { rush_today: 0, this_week: 0, coming: 0, no_due_date: 0 } }),
+      "GET /api/my-cards/summary": () => ({ newCount: 0, activeCount: 0, soundOn: true }),
+    });
+    renderApp("/dockets/91488");
+    await userEvent.type(await screen.findByLabelText("Job details"), " plus vinyl");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("heading", { name: "Main Dashboard" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Docket #91488 saved.");
+  });
+
   it("adds up the grand total with GST and PST", async () => {
     mockApi({ ...lists, "GET /api/auth/me": () => managerUser });
     renderApp("/dockets/new");

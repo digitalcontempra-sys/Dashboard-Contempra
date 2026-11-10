@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import type { TimeBucket } from "../../shared/rules";
 import type { DocketListResponse, DocketView, HistoryFilter } from "../../shared/types";
@@ -34,6 +34,15 @@ export function Dashboard() {
   const [q, setQ] = useParam("q");
   const setParams = useSetParams();
   const [open, setOpen] = useState<string | null>(null);
+  // Set by the docket editor after Save: confirm it here, then fade out.
+  const location = useLocation();
+  const [saved, setSaved] = useState<string | null>((location.state as { savedWorkOrder?: string } | null)?.savedWorkOrder ?? null);
+  useEffect(() => {
+    if (!saved) return;
+    window.history.replaceState({ ...window.history.state, usr: null }, "");
+    const t = setTimeout(() => setSaved(null), 5000);
+    return () => clearTimeout(t);
+  }, [saved]);
 
   const v = (view || "active") as DocketView;
   const h = (history || "all") as HistoryFilter;
@@ -72,6 +81,11 @@ export function Dashboard() {
         }
       />
       <div className="space-y-3 px-4 md:px-6">
+        {saved && (
+          <p role="status" className="animate-fade-in rounded-2xl bg-ok-soft px-4 py-2.5 text-sm font-semibold text-ok">
+            Docket #{saved} saved.
+          </p>
+        )}
         <div className="max-w-md">
           <Tabs
             label="View"

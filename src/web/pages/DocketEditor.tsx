@@ -101,8 +101,9 @@ export function DocketEditor() {
         setVersion(0);
         navigate("/dockets/new");
       } else {
+        // Back to the Main Dashboard, so it is clear the docket was saved (the PDF keeps uploading in the background).
         setVersion(dto.version);
-        navigate(`/dockets/${dto.workOrder}`, { replace: isNew });
+        navigate("/dashboard", { state: { savedWorkOrder: dto.workOrder } });
       }
     } catch (e) {
       setError((e as Error).message);
