@@ -23,8 +23,9 @@ Que las tarjetas **organicen el trabajo** y no solo lo muestren. Cada docket rec
 ## 2. Roles (cambios)
 
 - **Se agrega** `installer` (`Installer`).
+- **Se agrega** `contour_cut` (`Contour Cut`, 2026-11-10): rollos impresos con cropmarks que vuelven al equipo de rollo para cortarse en la Graphtec o con troquel. Lo hacen Erin, Justin y Sebastian.
 - **Se renombra** `colex_finish` (`Colex Finish`) a `colex` (`Colex`). Colex y Finishing son dos actividades distintas.
-- **Orden de los roles** en la UI y en las rutas: Designer · Printer Roll · Printer FB · Laminate Roll · Liquid Lam · Colex · Finishing / Packaging · Installer.
+- **Orden de los roles** en la UI y en las rutas: Designer · Printer Roll · Printer FB · Laminate Roll · Contour Cut · Liquid Lam · Colex · Finishing / Packaging · Installer.
 
 ## 3. Rutas y equipos (desde el Docket Virtual)
 
@@ -76,6 +77,7 @@ En el chip del paso se ve `Printer Roll · Team` o `Printer Roll · Erin`.
 | **Printer Roll** | ★☐ `Printed` · `Machine` (catálogo) · `Material used` (catálogo) · `Material length (LN FT)` (opcional por ahora) · `Note` · ★`File`: ◉ `OK` / ◉ `Missing` |
 | **Printer FB** | ★☐ `Printed` · `Material` (catálogo) · ★ ◉ `New sheet` / ◉ `Cut off`, cada uno con `Size` y `Qty` · `# Sheets used` · `Notes` · ★`File`: ◉ `OK` / ◉ `Missing` |
 | **Laminate Roll** | ★☐ `Laminated` · `Material` (catálogo) · `Material length (LN FT)` · `Notes` |
+| **Contour Cut** | ★☐ `Cut` · ☐ `Cut file missing` (bloquea y sugiere devolver a Design) · `Notes` |
 | **Liquid Lam** | ★☐ `Laminated` · `Coating` · `Notes` |
 | **Colex** | ★☐ `Completed` · ☐ `Cut file missing` (bloquea) · `Notes` |
 | **Finishing / Packaging** | ☐ `Grommets` · ☐ `Tape` + `Kind` · ☐ `Trimmed` · ☐ `Mounted` · ☐ `Ready for vendor pickup` (Sewn Hem & Grommets) · ★`Packaged`: `Almost Ready` → `Ready` → `Shipped` (Continue pide `Ready` o `Shipped`) · ★`I left this job at…` |
@@ -112,11 +114,11 @@ Una tarjeta deja de contar como nueva cuando esa persona la abre.
 
 ## 8. Google Sheet
 
-### 8.1 Columnas Q–Z (resumen; las escribe solo el dashboard)
+### 8.1 Columnas Q–AA (resumen; las escribe solo el dashboard)
 
-| Q | R | S | T | U | V | W | X | Y | Z |
+| Q | R | S | T | U | V | W | X | Y | Z | AA |
 |---|---|---|---|---|---|---|---|---|---|
-| `Stage` | `Design` | `Print Roll` | `Print FB` | `Laminate` | `Liquid Lam` | `Colex` | `Finishing` | `Install` | `Assigned` |
+| `Stage` | `Design` | `Print Roll` | `Print FB` | `Laminate` | `Contour Cut` | `Liquid Lam` | `Colex` | `Finishing` | `Install` | `Assigned` |
 
 - **`Stage`:** área o áreas activas (`Print Roll` o `Print Roll, Colex` si hay varios jobs), o `Done`.
 - **Columnas de área:**
@@ -130,7 +132,9 @@ Una tarjeta deja de contar como nueva cuando esa persona la abre.
 
 **Paso único de preparación**, desde Admin con el botón `Set up production columns` (pide confirmación):
 1. Copia las columnas Q–Y actuales a la pestaña `Legacy Q-Y`, con el Work Order de referencia.
-2. Escribe los nuevos encabezados Q–Z.
+2. Escribe los nuevos encabezados Q–AA.
+
+Una hoja preparada con la distribución anterior (Q–Z, sin Contour Cut) se actualiza con el mismo botón: solo reescribe Q–AA y no toca `Legacy Q-Y`.
 
 SUB y QC se eliminan; su contenido queda en `Legacy Q-Y`.
 

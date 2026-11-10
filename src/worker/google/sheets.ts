@@ -28,7 +28,8 @@ export const tabRef = (tab: string) => `'${tab.replace(/'/g, "''")}'`;
 
 const TAB = "Contempra";
 const WIDTH = 16; // A..P
-const colIndex = (col: string) => col.charCodeAt(0) - 65;
+/** "A" -> 0, "Z" -> 25, "AA" -> 26. */
+const colIndex = (col: string) => [...col].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
 
 function cellData(v: CellValue) {
   if (v === null || v === undefined || v === "") return {};
@@ -87,7 +88,7 @@ export function realSheetGateway(env: GoogleEnv): SheetGateway {
     async updateCells(row, cells) {
       const { id } = await target();
       const data = Object.entries(cells)
-        .filter(([col]) => colIndex(col) >= 0 && colIndex(col) < 26)
+        .filter(([col]) => /^[A-Z]{1,2}$/.test(col))
         .map(([col, v]) => ({ range: `${TAB}!${col}${row}`, values: [[v ?? ""]] }));
       if (data.length === 0) return;
       await call(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchUpdate`, { valueInputOption: "RAW", data });

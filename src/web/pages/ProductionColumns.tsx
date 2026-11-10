@@ -10,7 +10,7 @@ export function ProductionColumns() {
   const [typed, setTyped] = useState("");
   const status = useQuery({ queryKey: ["board", "", "", null], queryFn: () => api<BoardDTO>("/api/production-board") });
   const run = useMutation({
-    mutationFn: () => api<{ archivedRows: number }>("/api/admin/production-columns", { method: "POST", json: { confirm: "SET UP" } }),
+    mutationFn: () => api<{ archivedRows: number; updated?: boolean }>("/api/admin/production-columns", { method: "POST", json: { confirm: "SET UP" } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["board"] }),
   });
 
@@ -18,7 +18,7 @@ export function ProductionColumns() {
     return (
       <section className="card p-4">
         <h2 className="font-semibold">Production columns</h2>
-        <p className="mt-1 text-sm text-ok">Done. {run.data.archivedRows} rows archived.</p>
+        <p className="mt-1 text-sm text-ok">{run.data.updated ? "Done. Columns updated." : `Done. ${run.data.archivedRows} rows archived.`}</p>
       </section>
     );
   }

@@ -3,6 +3,9 @@ import type { Gateways } from "../../src/worker/google/gateways";
 import type { RowCells, SheetGateway } from "../../src/worker/google/sheets";
 import { HEADER } from "./fixtures";
 
+/** "A" -> 0, "Z" -> 25, "AA" -> 26. */
+const col = (c: string) => [...c].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+
 type SheetOp = "readRange" | "findRow" | "insertTopRow" | "updateCells" | "deleteRow";
 
 /** In-memory `Contempra` tab. rows[0] is the header (sheet row 1). */
@@ -47,9 +50,9 @@ export class FakeSheet implements SheetGateway {
   async readRange(a1: string) {
     this.check("readRange");
     const rows = this.grid(a1);
-    const m = /!([A-Z])(\d+):([A-Z])(\d*)$/.exec(a1)!;
-    const c1 = m[1].charCodeAt(0) - 65;
-    const c2 = m[3].charCodeAt(0) - 65;
+    const m = /!([A-Z]+)(\d+):([A-Z]+)(\d*)$/.exec(a1)!;
+    const c1 = col(m[1]);
+    const c2 = col(m[3]);
     const r2 = m[4] ? Number(m[4]) : rows.length;
     return rows.slice(Number(m[2]) - 1, r2).map((r) => r.slice(c1, c2 + 1));
   }
@@ -62,8 +65,8 @@ export class FakeSheet implements SheetGateway {
   }
   private async write(a1: string, values: unknown[][]) {
     const rows = this.grid(a1);
-    const m = /!([A-Z])(\d+)/.exec(a1)!;
-    const c0 = m[1].charCodeAt(0) - 65;
+    const m = /!([A-Z]+)(\d+)/.exec(a1)!;
+    const c0 = col(m[1]);
     const r0 = Number(m[2]) - 1;
     values.forEach((vals, i) => {
       while (rows.length <= r0 + i) rows.push([]);
@@ -81,8 +84,8 @@ export class FakeSheet implements SheetGateway {
     this.grid(`'${tab}'!A1`).push(...values.map((v) => [...v]));
   }
   async clearColumns(fromCol: string, toCol: string, fromRow: number) {
-    const c1 = fromCol.charCodeAt(0) - 65;
-    const c2 = toCol.charCodeAt(0) - 65;
+    const c1 = col(fromCol);
+    const c2 = col(toCol);
     this.rows.forEach((r, i) => {
       if (i < fromRow - 1) return;
       for (let c = c1; c <= c2 && c < r.length; c++) r[c] = "";
@@ -104,7 +107,7 @@ export class FakeSheet implements SheetGateway {
   }
   async updateCells(row: number, cells: RowCells) {
     this.check("updateCells");
-    for (const [col, v] of Object.entries(cells)) this.rows[row - 1][col.charCodeAt(0) - 65] = v ?? "";
+    for (const [c, v] of Object.entries(cells)) this.rows[row - 1][col(c)] = v ?? "";
   }
   async deleteRow(row: number) {
     this.check("deleteRow");

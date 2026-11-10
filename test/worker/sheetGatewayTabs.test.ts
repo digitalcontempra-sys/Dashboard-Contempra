@@ -38,6 +38,15 @@ describe("SheetGateway tabs and ranges", () => {
     });
   });
 
+  it("updateCells reaches column AA", async () => {
+    google(() => ({}));
+    await realSheetGateway(env).updateCells(7, { Z: "Install", AA: "Team" });
+    expect(JSON.parse(calls[0].body).data).toEqual([
+      { range: "Contempra!Z7", values: [["Install"]] },
+      { range: "Contempra!AA7", values: [["Team"]] },
+    ]);
+  });
+
   it("appendRows appends raw rows to a tab", async () => {
     google(() => ({}));
     await realSheetGateway(env).appendRows("Production", [["91488", "Whole docket"]]);

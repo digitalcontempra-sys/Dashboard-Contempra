@@ -23,6 +23,14 @@ describe("staff roster", () => {
   });
 });
 
+describe("roster roles", () => {
+  it("Erin and Justin also do Contour Cut", () => {
+    const roles = (u: string) => STAFF_ROSTER.find((p) => p.username === u)!.roles;
+    expect(roles("erin")).toContain("contour_cut");
+    expect(roles("justin")).toContain("contour_cut");
+  });
+});
+
 describe("Import staff", () => {
   it("previews who is new and who already exists", async () => {
     await createUser("erin", "staff");

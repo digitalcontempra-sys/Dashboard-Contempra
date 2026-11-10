@@ -3,7 +3,7 @@ import type { AccessLevel } from "./types";
 /**
  * Contempra staff from the sheet's Contributors tab, as approved by the owner on 2026-11-09.
  * Usernames are the first name, plus the last initial where a first name repeats.
- * Sebastian is not here: he already has his own admin account.
+ * Sebastian is not here: he already has his own admin account (add Printer Roll, Designer and Contour Cut to it).
  */
 export type RosterPerson = { username: string; fullName: string; accessLevel: AccessLevel; roles: string[] };
 
@@ -17,7 +17,7 @@ export const STAFF_ROSTER: RosterPerson[] = [
   { username: "ali", fullName: "Ali", accessLevel: "manager", roles: [] },
   { username: "kristy", fullName: "Kristy", accessLevel: "manager", roles: [] },
   { username: "jackie", fullName: "Jackie", accessLevel: "manager", roles: [] },
-  { username: "justin", fullName: "Justin", accessLevel: "manager", roles: ["designer"] },
+  { username: "justin", fullName: "Justin", accessLevel: "manager", roles: ["designer", "contour_cut"] },
   staff("ira", "Ira", "designer"),
   staff("nataly", "Nataly", "designer"),
   staff("george.g", "George Gonzales", "printer_fb"),
@@ -33,6 +33,6 @@ export const STAFF_ROSTER: RosterPerson[] = [
   staff("larry", "Larry", "finishing"),
   staff("robert.m", "Robert Merkel", "finishing"),
   staff("lee", "Lee Fonseca", "colex", "finishing"),
-  staff("erin", "Erin", "printer_roll"),
+  staff("erin", "Erin", "printer_roll", "contour_cut"),
   staff("rob.p", "Rob Porter", "printer_fb", "printer_roll"),
 ];

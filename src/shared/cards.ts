@@ -19,6 +19,7 @@ export const ROLE_ORDER = [
   "printer_roll",
   "printer_fb",
   "laminate_roll",
+  "contour_cut",
   "liquid_lam",
   "colex",
   "finishing",
@@ -31,6 +32,7 @@ export const ROLE_LABEL: Record<string, string> = {
   printer_roll: "Printer Roll",
   printer_fb: "Printer FB",
   laminate_roll: "Laminate Roll",
+  contour_cut: "Contour Cut",
   liquid_lam: "Liquid Lam",
   colex: "Colex",
   finishing: "Finishing / Packaging",
@@ -43,6 +45,7 @@ export const AREA_LABEL: Record<string, string> = {
   printer_roll: "Print Roll",
   printer_fb: "Print FB",
   laminate_roll: "Laminate",
+  contour_cut: "Contour Cut",
   liquid_lam: "Liquid Lam",
   colex: "Colex",
   finishing: "Finishing",
@@ -97,6 +100,7 @@ export const CARD_FIELDS: Record<string, FieldSpec[]> = {
     text("lengthFt", "Material length (LN FT)"),
     text("note", "Notes"),
   ],
+  contour_cut: [check("cut", "Cut", true), check("cutFileMissing", "Cut file missing"), text("note", "Notes")],
   liquid_lam: [check("laminated", "Laminated", true), text("coating", "Coating"), text("note", "Notes")],
   colex: [check("completed", "Completed", true), check("cutFileMissing", "Cut file missing"), text("note", "Notes")],
   finishing: [
@@ -158,7 +162,7 @@ export function continueBlocker(
   if (specs.some((s) => s.key === "file" && s.kind === "choice") && f.file === "missing") {
     return block("File is missing. Send it back to Design.", true);
   }
-  if (roleId === "colex" && f.cutFileMissing === true) return block("Cut file is missing. Send it back to Design.", true);
+  if ((roleId === "colex" || roleId === "contour_cut") && f.cutFileMissing === true) return block("Cut file is missing. Send it back to Design.", true);
   for (const s of specs) {
     const required = s.required || (roleId === "designer" && s.key === "proofApproved" && ctx.proofRequired);
     if (required && s.kind === "check" && f[s.key] !== true) return block(`Mark "${s.label}" to continue`);

@@ -7,7 +7,22 @@ import type { Env } from "../env";
 import { getGateways } from "../google/gateways";
 import { tabRef, type RowCells } from "../google/sheets";
 
-export const STAGE_HEADERS = ["Stage", "Design", "Print Roll", "Print FB", "Laminate", "Liquid Lam", "Colex", "Finishing", "Install", "Assigned"];
+/** Q..AA. Bump PRODUCTION_COLUMNS_VERSION whenever this layout changes. */
+export const STAGE_HEADERS = [
+  "Stage",
+  "Design",
+  "Print Roll",
+  "Print FB",
+  "Laminate",
+  "Contour Cut",
+  "Liquid Lam",
+  "Colex",
+  "Finishing",
+  "Install",
+  "Assigned",
+];
+/** app_settings.production_columns once the sheet has the current layout ("ready" was Q–Z, before Contour Cut). */
+export const PRODUCTION_COLUMNS_VERSION = "v2";
 export const PRODUCTION_HEADERS = [
   "Work Order",
   "Job",
@@ -22,8 +37,8 @@ export const PRODUCTION_HEADERS = [
 ];
 const PRODUCTION_TAB = "Production";
 const LEGACY_TAB = "Legacy Q-Y";
-/** Sheet columns R..Y, one per area, in role order. */
-const AREA_COLS = ["R", "S", "T", "U", "V", "W", "X", "Y"];
+/** Sheet columns R..Z, one per area, in role order; AA is Assigned. */
+const AREA_COLS = ["R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
 const RETRY_BATCH = 20;
 
 /** Marks a docket's sheet columns as needing a rewrite. hold/comp: a later non-null value wins. */
@@ -40,7 +55,7 @@ export async function queueCardSheet(db: D1Database, wo: string, patch: { hold?:
 
 async function columnsReady(db: D1Database): Promise<boolean> {
   const r = await db.prepare("SELECT value FROM app_settings WHERE key = 'production_columns'").first<{ value: string }>();
-  return r?.value === "ready";
+  return r?.value === PRODUCTION_COLUMNS_VERSION;
 }
 
 type SheetCard = {
@@ -129,7 +144,7 @@ export function stageRowCells(cards: SheetCard[], names: Map<number, string>, q:
           .join(" | ")
       : "—";
   });
-  cells.Z = active.length ? [...new Set(active.map((c) => assignedText(c, names)))].join(", ") : "";
+  cells.AA = active.length ? [...new Set(active.map((c) => assignedText(c, names)))].join(", ") : "";
   if (q.comp === 1) cells.D = true;
   if (q.hold !== null) cells.E = q.hold === 1;
   return cells;
@@ -216,13 +231,24 @@ export async function retryCardSheet(env: Env): Promise<void> {
   for (const r of results) await flushCardSheet(env, r.work_order);
 }
 
-/** One-time: archives Q–Y to "Legacy Q-Y", clears them, and writes the production headers. */
-export async function setupProductionColumns(env: Env, _user: SessionUser): Promise<{ archivedRows: number }> {
+/**
+ * One-time: archives Q–Y to "Legacy Q-Y", clears them, and writes the production headers.
+ * A sheet set up with an older layout (before Contour Cut) only gets its stage columns and headers
+ * rewritten; its legacy tab is left alone.
+ */
+export async function setupProductionColumns(env: Env, _user: SessionUser): Promise<{ archivedRows: number; updated?: true }> {
   const db = env.DB;
   const sheet = getGateways(env).sheet;
+  const setting = await db.prepare("SELECT value FROM app_settings WHERE key = 'production_columns'").first<{ value: string }>();
   const archivedRows = await withLock(db, SHEET_LOCK, async () => {
-    const head = await sheet.readRange("Contempra!Q1:Z1");
-    if (String(head[0]?.[0] ?? "").trim() === "Stage") throw new ServiceError(409, "Production columns are already set up.");
+    const head = await sheet.readRange("Contempra!Q1:AA1");
+    if (String(head[0]?.[0] ?? "").trim() === "Stage") {
+      if (setting?.value === PRODUCTION_COLUMNS_VERSION) throw new ServiceError(409, "Production columns are already set up.");
+      // Older layout: the stage cells are rewritten from the cards by the flushes queued below.
+      await sheet.clearColumns("Q", "AA", 2);
+      await sheet.writeRange("Contempra!Q1", [STAGE_HEADERS]);
+      return null;
+    }
     const wos = await sheet.readRange("Contempra!C1:C");
     const old = await sheet.readRange("Contempra!Q1:Y");
     const pad = (r: unknown[] | undefined) => Array.from({ length: 9 }, (_, i) => r?.[i] ?? "");
@@ -233,14 +259,15 @@ export async function setupProductionColumns(env: Env, _user: SessionUser): Prom
     }
     await sheet.ensureTab(LEGACY_TAB);
     await sheet.writeRange(`${tabRef(LEGACY_TAB)}!A1`, legacy);
-    await sheet.clearColumns("Q", "Z", 2);
+    await sheet.clearColumns("Q", "AA", 2);
     await sheet.writeRange("Contempra!Q1", [STAGE_HEADERS]);
     await sheet.ensureTab(PRODUCTION_TAB);
     await sheet.writeRange(`${tabRef(PRODUCTION_TAB)}!A1`, [PRODUCTION_HEADERS]);
     return legacy.length - 1;
   });
   await db
-    .prepare("INSERT INTO app_settings (key, value) VALUES ('production_columns', 'ready') ON CONFLICT (key) DO UPDATE SET value = 'ready'")
+    .prepare("INSERT INTO app_settings (key, value) VALUES ('production_columns', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value")
+    .bind(PRODUCTION_COLUMNS_VERSION)
     .run();
   const now = new Date().toISOString();
   await db
@@ -250,5 +277,5 @@ export async function setupProductionColumns(env: Env, _user: SessionUser): Prom
     )
     .bind(now)
     .run();
-  return { archivedRows };
+  return archivedRows === null ? { archivedRows: 0, updated: true } : { archivedRows };
 }

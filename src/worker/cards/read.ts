@@ -5,6 +5,7 @@ import { ServiceError } from "../dockets/errors";
 import type { Env } from "../env";
 import { canAct } from "./actions";
 import { toCardDTOs } from "./dto";
+import { PRODUCTION_COLUMNS_VERSION } from "./sheetSync";
 import type { CardRow } from "./service";
 
 /** Cards of live dockets only: not in the Trash and not cancelled. */
@@ -62,7 +63,7 @@ export async function setSound(env: Env, user: SessionUser, on: unknown): Promis
 
 export async function productionColumnsReady(db: D1Database): Promise<boolean> {
   const r = await db.prepare("SELECT value FROM app_settings WHERE key = 'production_columns'").first<{ value: string }>();
-  return r?.value === "ready";
+  return r?.value === PRODUCTION_COLUMNS_VERSION;
 }
 
 export async function board(

@@ -130,7 +130,7 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
   function openSendBack(toDesign: boolean) {
     const design = card.earlier.find((e) => e.roleId === "designer") ?? card.earlier[0];
     const reason = toDesign
-      ? card.roleId === "colex"
+      ? card.roleId === "colex" || card.roleId === "contour_cut"
         ? "Cut file missing"
         : "File missing"
       : "";

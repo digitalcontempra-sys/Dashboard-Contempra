@@ -47,6 +47,26 @@ describe("continueBlocker", () => {
   });
 });
 
+describe("Contour Cut", () => {
+  it("needs Cut, and a missing cut file sends it back to Design", () => {
+    expect(msg("contour_cut", {})).toBe('Mark "Cut" to continue');
+    expect(continueBlocker("contour_cut", { cut: true, cutFileMissing: true }, ctx)).toEqual({
+      message: "Cut file is missing. Send it back to Design.",
+      sendBackToDesign: true,
+    });
+    expect(msg("contour_cut", { cut: true })).toBeNull();
+    expect(sanitizeFields("contour_cut", { cut: true, cutFileMissing: false, note: "ok", machine: "x" })).toEqual({
+      cut: true,
+      cutFileMissing: false,
+      note: "ok",
+    });
+  });
+  it("is named Contour Cut and sorts after Laminate", () => {
+    expect(continueLabel("laminate_roll", "contour_cut")).toBe("Continue → Contour Cut");
+    expect(stageText([{ roleId: "liquid_lam" }, { roleId: "contour_cut" }], false)).toBe("Contour Cut, Liquid Lam");
+  });
+});
+
 describe("continueLabel", () => {
   it("names the next area", () => {
     expect(continueLabel("printer_roll", "laminate_roll")).toBe("Continue → Laminate");
