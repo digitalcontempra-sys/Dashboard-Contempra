@@ -99,6 +99,30 @@ describe("CardView", () => {
     expect(screen.getByLabelText("Reason")).toHaveValue("File missing");
   });
 
+  it("Print FB suggests flatbed materials; Print Roll keeps the roll list", () => {
+    const optionValues = () => [...document.querySelectorAll("#card-field-material-list option")].map((o) => (o as HTMLOptionElement).value);
+    const { unmount } = show(makeCard({ roleId: "printer_fb", nextRoleId: null }));
+    expect(optionValues()).toEqual([
+      "Coroplast",
+      "Foamcore",
+      "Dibond",
+      "Styrene",
+      "Sintra",
+      "Acrylic",
+      "Paper",
+      "Lamacoid",
+      "Magnetic",
+      "Aluminum Blanks",
+      "Mesh",
+      "Lexan",
+      "Crezon",
+    ]);
+    unmount();
+    show(makeCard({ roleId: "printer_roll", nextRoleId: null }));
+    expect(optionValues()).toContain("1105 (Vehicle Wrap)");
+    expect(optionValues()).not.toContain("Coroplast");
+  });
+
   it("shows who returned it and why", () => {
     show(makeCard({ returned: { reason: "Cut file missing", by: "Seb" } }));
     expect(screen.getByText("Returned by Seb · Cut file missing")).toBeInTheDocument();

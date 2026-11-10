@@ -1,0 +1,19 @@
+{
+  "type": "Flatbed (Print FB) Material",
+  "source": "Owner list, 2026-11-10. Only for Print FB; Roll uses roll-print-materials.json.",
+  "items": [
+    { "name": "Coroplast" },
+    { "name": "Foamcore" },
+    { "name": "Dibond" },
+    { "name": "Styrene" },
+    { "name": "Sintra" },
+    { "name": "Acrylic" },
+    { "name": "Paper" },
+    { "name": "Lamacoid" },
+    { "name": "Magnetic" },
+    { "name": "Aluminum Blanks" },
+    { "name": "Mesh" },
+    { "name": "Lexan" },
+    { "name": "Crezon" }
+  ]
+}

@@ -1,9 +1,14 @@
 import { CARD_FIELDS, type CardFields, type FieldSpec } from "../../shared/cards";
+import flatbedMaterials from "../../../data/catalogs/flatbed-materials.json";
 import rollMaterials from "../../../data/catalogs/roll-print-materials.json";
 
 const MATERIALS = [...rollMaterials.items]
   .sort((a, b) => Number(b.favorite) - Number(a.favorite))
   .map((m) => m.name);
+const FLATBED_MATERIALS = flatbedMaterials.items.map((m) => m.name);
+
+/** Suggestions for a role's Material field: flatbed boards for Print FB, the roll list otherwise. */
+const materialsFor = (roleId: string) => (roleId === "printer_fb" ? FLATBED_MATERIALS : roleId === "liquid_lam" ? [] : MATERIALS);
 
 type Props = {
   roleId: string;
@@ -85,7 +90,7 @@ export function CardFieldsEditor({ roleId, values, onChange, disabled, placehold
             />
             {list && (
               <datalist id={list}>
-                {(s.key === "material" && roleId !== "liquid_lam" ? MATERIALS : []).map((m) => (
+                {(s.key === "material" ? materialsFor(roleId) : []).map((m) => (
                   <option key={m} value={m} />
                 ))}
               </datalist>
