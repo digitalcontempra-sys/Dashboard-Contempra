@@ -135,7 +135,21 @@ export type CardDTO = {
 
 export type CardEventDTO = { at: string; area: string; user: string | null; action: string; detail: string };
 
-export type MyCardsSummary = { newCount: number; activeCount: number; soundOn: boolean };
+/** newCount includes newTasks (they ring); doneTasks are the sender's soft alerts (no chime). */
+export type MyCardsSummary = { newCount: number; activeCount: number; soundOn: boolean; newTasks?: number; doneTasks?: number };
+
+export type TaskCardDTO = {
+  id: number;
+  from: { id: number; name: string };
+  to: { id: number; name: string };
+  note: string;
+  due: import("./taskCards").TaskDue;
+  bucket: TimeBucket;
+  status: "open" | "done";
+  createdAt: string;
+  doneAt: string | null;
+  isNew: boolean;
+};
 
 export type BoardCard = CardDTO & { noMembers: boolean };
 

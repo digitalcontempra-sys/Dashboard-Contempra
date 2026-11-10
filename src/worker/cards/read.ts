@@ -37,7 +37,22 @@ export async function myCardsSummary(env: Env, user: SessionUser): Promise<MyCar
     .bind(user.id)
     .first<{ active: number; fresh: number | null }>();
   const u = await env.DB.prepare("SELECT sound_on FROM users WHERE id = ?").bind(user.id).first<{ sound_on: number }>();
-  return { newCount: counts?.fresh ?? 0, activeCount: counts?.active ?? 0, soundOn: u?.sound_on !== 0 };
+  const tasks = await env.DB.prepare(
+    `SELECT sum(CASE WHEN to_user = ?1 AND status = 'open' AND seen_at IS NULL THEN 1 ELSE 0 END) AS fresh,
+            sum(CASE WHEN to_user = ?1 AND status = 'open' THEN 1 ELSE 0 END) AS open,
+            sum(CASE WHEN from_user = ?1 AND status = 'done' AND done_seen_at IS NULL THEN 1 ELSE 0 END) AS done
+     FROM task_cards WHERE to_user = ?1 OR from_user = ?1`,
+  )
+    .bind(user.id)
+    .first<{ fresh: number | null; open: number | null; done: number | null }>();
+  const newTasks = tasks?.fresh ?? 0;
+  return {
+    newCount: (counts?.fresh ?? 0) + newTasks,
+    activeCount: (counts?.active ?? 0) + (tasks?.open ?? 0),
+    soundOn: u?.sound_on !== 0,
+    newTasks,
+    doneTasks: tasks?.done ?? 0,
+  };
 }
 
 export async function getCard(env: Env, user: SessionUser, id: number): Promise<CardDTO> {
