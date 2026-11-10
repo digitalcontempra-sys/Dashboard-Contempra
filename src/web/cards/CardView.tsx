@@ -4,6 +4,7 @@ import { AREA_LABEL, CARD_FIELDS, continueBlocker, continueLabel, type CardField
 import type { CardDTO } from "../../shared/types";
 import { api } from "../api";
 import { useAuth } from "../auth";
+import { AreaChip } from "../components/AreaChip";
 import { BucketTag } from "../components/BucketChip";
 import { Icon } from "../components/Icon";
 import { CardFieldsEditor } from "./fields";
@@ -153,7 +154,7 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-xs font-semibold text-text-3">Work Order #{card.workOrder}</span>
-              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-bold text-accent">{AREA_LABEL[card.roleId]}</span>
+              <AreaChip roleId={card.roleId} size="md" />
               <BucketTag bucket={card.header.bucket} />
               {card.status === "waiting" && (
                 <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-text-2">Up next</span>

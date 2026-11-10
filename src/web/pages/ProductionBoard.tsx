@@ -8,6 +8,7 @@ import { api, withQuery } from "../api";
 import { useAuth } from "../auth";
 import { CardTile } from "../cards/CardTile";
 import { CardView } from "../cards/CardView";
+import { areaColor } from "../components/AreaChip";
 import { BucketFilter } from "../components/BucketChip";
 import { PageHeader } from "../components/Layout";
 
@@ -69,7 +70,8 @@ export function ProductionBoard() {
           <div className="flex gap-3">
             {(data?.columns ?? []).map((col) => (
               <section key={col.roleId} aria-label={col.area} className="card flex w-64 shrink-0 flex-col gap-2.5 p-3">
-                <h2 className="text-sm font-bold">
+                <h2 className="flex items-center gap-2 text-sm font-bold">
+                  <span className="size-2.5 shrink-0 rounded-full" style={{ background: areaColor(col.roleId) }} aria-hidden="true" />
                   {col.area} ({col.cards.length})
                 </h2>
                 {col.cards.map((c) => (

@@ -91,6 +91,40 @@
   }
 }
 
+/* ---------- Production areas (never red: alerts; never yellow: task cards) ---------- */
+:root {
+  --area-design: rgb(124 58 237);
+  --area-print-roll: rgb(37 99 235);
+  --area-print-fb: rgb(8 145 178);
+  --area-laminate: rgb(15 118 110);
+  --area-contour-cut: rgb(22 163 74);
+  --area-liquid-lam: rgb(180 83 9);
+  --area-colex: rgb(234 88 12);
+  --area-finishing: rgb(219 39 119);
+  --area-install: rgb(139 94 60);
+  --area-soft-alpha: 0.13;
+  --task-bg: rgb(254 249 195);
+  --task-border: rgb(234 179 8 / 0.45);
+  --task-ink: rgb(66 50 4);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --area-design: rgb(180 150 255);
+    --area-print-roll: rgb(120 170 255);
+    --area-print-fb: rgb(80 205 230);
+    --area-laminate: rgb(70 205 185);
+    --area-contour-cut: rgb(90 215 130);
+    --area-liquid-lam: rgb(245 175 90);
+    --area-colex: rgb(255 150 90);
+    --area-finishing: rgb(255 130 185);
+    --area-install: rgb(215 170 130);
+    --area-soft-alpha: 0.2;
+    --task-bg: rgb(66 56 16);
+    --task-border: rgb(234 179 8 / 0.5);
+    --task-ink: rgb(254 243 199);
+  }
+}
+
 /* ---------- Layer 3: component tokens ---------- */
 :root {
   --radius-tile: 22px;

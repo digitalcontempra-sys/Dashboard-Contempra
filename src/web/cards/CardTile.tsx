@@ -1,6 +1,7 @@
 import { AREA_LABEL } from "../../shared/cards";
 import type { CardDTO } from "../../shared/types";
 import { useAuth } from "../auth";
+import { AreaChip, areaColor } from "../components/AreaChip";
 import { BucketTag } from "../components/BucketChip";
 
 const firstName = (n: string) => n.trim().split(/\s+/)[0] ?? n;
@@ -13,7 +14,8 @@ export function CardTile({ card, onOpen, noMembers }: { card: CardDTO; onOpen: (
     <button
       type="button"
       onClick={onOpen}
-      className={`tile group ${card.isNew ? "ring-2 ring-accent shadow-[0_0_24px_var(--accent-soft)]" : ""} ${waiting ? "opacity-60" : ""}`}
+      style={{ borderLeftColor: areaColor(card.roleId) }}
+      className={`tile group border-l-4 ${card.isNew ? "ring-2 ring-accent shadow-[0_0_24px_var(--accent-soft)]" : ""} ${waiting ? "opacity-60" : ""}`}
       aria-label={`${AREA_LABEL[card.roleId]} card, work order ${card.workOrder}, ${card.header.customer ?? "no customer"}${card.isNew ? ", new" : ""}`}
     >
       {card.returned && (
@@ -24,7 +26,9 @@ export function CardTile({ card, onOpen, noMembers }: { card: CardDTO; onOpen: (
       <div className={`flex items-center gap-1.5 ${card.returned ? "mt-5" : ""}`}>
         <span className="font-mono text-[11px] font-semibold text-text-3 tabular-nums">#{card.workOrder}</span>
         {card.isNew && <span className="rounded-md bg-accent px-1.5 py-px text-[10px] font-black text-accent-ink">NEW</span>}
-        <span className="ml-auto rounded-md bg-surface-2 px-1.5 py-px text-[10px] font-bold text-text-2">{AREA_LABEL[card.roleId]}</span>
+        <span className="ml-auto">
+          <AreaChip roleId={card.roleId} />
+        </span>
       </div>
       <p className="mt-2 line-clamp-2 text-[15px] font-bold leading-tight">{card.header.customer ?? "—"}</p>
       <p className="mt-1 line-clamp-2 text-[13px] text-text-2">{card.jobName}</p>

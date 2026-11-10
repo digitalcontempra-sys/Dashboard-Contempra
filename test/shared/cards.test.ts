@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  AREA_TOKEN,
+  ROLE_ORDER,
   areaCellText,
   continueBlocker,
   continueLabel,
@@ -162,5 +164,14 @@ describe("stageText", () => {
     expect(stageText([{ roleId: "colex" }, { roleId: "colex" }], false)).toBe("Colex");
     expect(stageText([], true)).toBe("Done");
     expect(stageText([], false)).toBe("—");
+  });
+});
+
+describe("AREA_TOKEN", () => {
+  it("gives every area its own color token", () => {
+    const tokens = ROLE_ORDER.map((r) => AREA_TOKEN[r]);
+    expect(tokens.every(Boolean)).toBe(true);
+    expect(new Set(tokens).size).toBe(ROLE_ORDER.length);
+    expect(AREA_TOKEN.laminate_roll).toBe("area-laminate");
   });
 });

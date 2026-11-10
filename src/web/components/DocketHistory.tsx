@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { BoardDTO, CardDTO, CardEventDTO } from "../../shared/types";
-import { AREA_LABEL } from "../../shared/cards";
 import { api, withQuery } from "../api";
+import { AreaChip } from "./AreaChip";
 
 /** Some ICU versions put a narrow no-break space before AM/PM. */
 const NARROW_SPACE = new RegExp(String.fromCharCode(0x202f), "g");
@@ -58,7 +58,9 @@ export function DocketProduction({ workOrder }: { workOrder: string }) {
               .sort((a, b) => a.step - b.step)
               .map((c) => (
                 <li key={c.id} className="flex items-center gap-3 rounded-xl bg-surface-2 px-3.5 py-2.5">
-                  <span className="flex-1 text-sm font-semibold">{AREA_LABEL[c.roleId]}</span>
+                  <span className="flex-1">
+                    <AreaChip roleId={c.roleId} size="md" />
+                  </span>
                   <span className={`text-xs font-bold ${c.returned ? "text-danger" : c.status === "done" ? "text-ok" : "text-text-2"}`}>
                     {STEP_STATUS(c)}
                   </span>

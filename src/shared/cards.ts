@@ -39,6 +39,19 @@ export const ROLE_LABEL: Record<string, string> = {
   installer: "Installer",
 };
 
+/** CSS color token (without "--") of each area; the light background is color-mix of it. */
+export const AREA_TOKEN: Record<string, string> = {
+  designer: "area-design",
+  printer_roll: "area-print-roll",
+  printer_fb: "area-print-fb",
+  laminate_roll: "area-laminate",
+  contour_cut: "area-contour-cut",
+  liquid_lam: "area-liquid-lam",
+  colex: "area-colex",
+  finishing: "area-finishing",
+  installer: "area-install",
+};
+
 /** Area name of each role, used in "Continue → <area>" and the sheet's Stage column. */
 export const AREA_LABEL: Record<string, string> = {
   designer: "Design",
