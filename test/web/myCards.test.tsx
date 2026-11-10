@@ -22,6 +22,7 @@ function app(opts: { user?: object; cards?: CardDTO[]; summaries?: { newCount: n
   return mockApi({
     "GET /api/auth/me": () => opts.user ?? staffUser,
     "GET /api/my-cards": () => opts.cards ?? [],
+    "GET /api/task-cards": () => [],
     "GET /api/my-cards/summary": () => {
       const s = summaries[Math.min(n++, summaries.length - 1)];
       return { activeCount: s.newCount, soundOn: true, ...s };
@@ -56,7 +57,7 @@ describe("card alerts", () => {
     expect(playChime).not.toHaveBeenCalled();
   });
 
-  it("does not poll for someone with no production roles", async () => {
+  it("polls for everyone, even with no production roles (anyone can receive task cards)", async () => {
     const { calls } = mockApi({
       "GET /api/auth/me": () => managerUser,
       "GET /api/my-cards": () => [],
@@ -65,7 +66,7 @@ describe("card alerts", () => {
     renderApp("/my-cards");
     await screen.findByRole("heading", { name: "My Cards" });
     await new Promise((r) => setTimeout(r, 50));
-    expect(calls.some((c) => c.url.pathname === "/api/my-cards/summary")).toBe(false);
+    expect(calls.some((c) => c.url.pathname === "/api/my-cards/summary")).toBe(true);
   });
 
   it("the sound toggle saves the setting", async () => {
@@ -98,7 +99,7 @@ describe("My Cards page", () => {
   it("filters by role when the user has several", async () => {
     app({ user: seb, cards });
     renderApp("/my-cards");
-    const tabs = await screen.findByRole("tablist");
+    const tabs = await screen.findByRole("tablist", { name: "Roles" });
     expect(within(tabs).getAllByRole("tab").map((t) => t.textContent)).toEqual(["All", "Designer", "Printer Roll"]);
     await userEvent.click(within(tabs).getByRole("tab", { name: "Designer" }));
     expect(screen.getByText("Back Co")).toBeInTheDocument();

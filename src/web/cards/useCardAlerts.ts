@@ -7,7 +7,8 @@ import { armChime, playChime } from "./chime";
 export const POLL_MS = 20_000;
 
 /** Polls for new cards; rings and retitles the tab when more arrive. */
-export function useCardAlerts(enabled: boolean): { newCount: number; soundOn: boolean; setSoundOn: (on: boolean) => void } {
+/** badge = new cards and tasks (they ring) + tasks you sent that were just finished (no chime). */
+export function useCardAlerts(enabled: boolean): { newCount: number; badge: number; soundOn: boolean; setSoundOn: (on: boolean) => void } {
   const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ["my-cards-summary"],
@@ -17,6 +18,7 @@ export function useCardAlerts(enabled: boolean): { newCount: number; soundOn: bo
     enabled,
   });
   const newCount = data?.newCount ?? 0;
+  const badge = newCount + (data?.doneTasks ?? 0);
   const soundOn = data?.soundOn ?? true;
   const prev = useRef<number | null>(null);
   const baseTitle = useRef(document.title);
@@ -30,12 +32,13 @@ export function useCardAlerts(enabled: boolean): { newCount: number; soundOn: bo
     if (before !== null && data.newCount > before) {
       if (data.soundOn) playChime();
       void qc.invalidateQueries({ queryKey: ["my-cards"] });
+      void qc.invalidateQueries({ queryKey: ["tasks"] });
     }
   }, [data, qc]);
 
   useEffect(() => {
-    document.title = newCount > 0 ? `(${newCount}) New cards · Contempra` : baseTitle.current;
-  }, [newCount]);
+    document.title = badge > 0 ? `(${badge}) New cards · Contempra` : baseTitle.current;
+  }, [badge]);
 
   useEffect(() => {
     const title = baseTitle.current;
@@ -51,5 +54,5 @@ export function useCardAlerts(enabled: boolean): { newCount: number; soundOn: bo
     );
   };
 
-  return { newCount, soundOn, setSoundOn };
+  return { newCount, badge, soundOn, setSoundOn };
 }

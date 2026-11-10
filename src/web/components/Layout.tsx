@@ -47,8 +47,8 @@ function SoundToggle({ on, onChange, className = "" }: { on: boolean; onChange: 
 
 export function Layout() {
   const { user, logout } = useAuth();
-  // Only people with a production role get cards, so only they poll.
-  const alerts = useCardAlerts(Boolean(user?.roles.length));
+  // Anyone can receive task cards, so everyone signed in polls.
+  const alerts = useCardAlerts(Boolean(user));
   if (!user) return null;
   const items = NAV.filter((n) => n.levels.includes(user.accessLevel));
   const initials = user.fullName
@@ -78,7 +78,7 @@ export function Layout() {
             >
               <Icon name={n.icon} className="size-[18px]" />
               <span className="flex-1">{n.label}</span>
-              {n.to === "/my-cards" && <NewBadge count={alerts.newCount} />}
+              {n.to === "/my-cards" && <NewBadge count={alerts.badge} />}
             </NavLink>
           ))}
         </nav>
@@ -134,7 +134,7 @@ export function Layout() {
           >
             <span className="relative">
               <Icon name={n.icon} />
-              {n.to === "/my-cards" && <NewBadge count={alerts.newCount} className="absolute -top-2 -right-3" />}
+              {n.to === "/my-cards" && <NewBadge count={alerts.badge} className="absolute -top-2 -right-3" />}
             </span>
             {n.short}
           </NavLink>

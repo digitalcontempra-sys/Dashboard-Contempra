@@ -10,6 +10,7 @@ import { DocketDetail } from "../components/DocketDetail";
 import { DocketList, EmptyState, ListSkeleton } from "../components/DocketList";
 import { AccountManagerSelect, SearchBox, Tabs } from "../components/Filters";
 import { AreaLegend } from "../components/AreaChip";
+import { NewTaskCardButton } from "../tasks/NewTaskCard";
 import { PageHeader } from "../components/Layout";
 import { SyncBadge } from "../components/SyncBadge";
 import { useParam, useSetParams } from "../hooks";
@@ -60,6 +61,9 @@ export function Dashboard() {
                 <Icon name="plus" className="size-4" />
                 New Docket
               </Link>
+            </div>
+            <div className="flex flex-col items-stretch gap-1 md:items-end">
+              <NewTaskCardButton />
             </div>
             <div className="md:max-w-sm">
               <AreaLegend />

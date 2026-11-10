@@ -8,7 +8,8 @@ const LEVELS: AccessLevel[] = ["admin", "manager", "staff"];
 
 export const userRoutes = new Hono<AppEnv>();
 userRoutes.use("/roles", requireAuth);
-userRoutes.use("/assignees", requireAuth, requireLevel("admin", "manager"));
+// Everyone picks recipients for task cards; it returns only ids, names and roles.
+userRoutes.use("/assignees", requireAuth);
 userRoutes.use("/users", requireAuth, requireLevel("admin"));
 userRoutes.use("/users/*", requireAuth, requireLevel("admin"));
 

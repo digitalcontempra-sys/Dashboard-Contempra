@@ -111,6 +111,7 @@ describe("assignees", () => {
     expect(res.status).toBe(200);
     const list = (await res.json()) as { id: number; fullName: string; roles: string[] }[];
     expect(list.find((u) => u.fullName === "Luis")).toMatchObject({ roles: ["printer_roll"] });
-    expect((await api("/api/assignees", { cookie: await login("ana") })).status).toBe(403);
+    // Everyone picks a recipient for task cards, so Staff can read the list too.
+    expect((await api("/api/assignees", { cookie: await login("ana") })).status).toBe(200);
   });
 });
