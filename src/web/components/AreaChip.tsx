@@ -12,7 +12,10 @@ export function AreaChip({ roleId, size = "sm" }: { roleId: string; size?: "sm" 
       className={`inline-flex shrink-0 items-center rounded-md font-bold whitespace-nowrap ${
         size === "md" ? "px-2 py-0.5 text-[12px]" : "px-1.5 py-px text-[10.5px]"
       }`}
-      style={{ color, background: `color-mix(in srgb, ${color} calc(var(--area-soft-alpha) * 100%), transparent)` }}
+      style={{
+        color: `var(--${AREA_TOKEN[roleId] ?? "text-3"}-ink, ${color})`,
+        background: `color-mix(in srgb, ${color} calc(var(--area-soft-alpha) * 100%), transparent)`,
+      }}
     >
       {AREA_LABEL[roleId] ?? roleId}
     </span>

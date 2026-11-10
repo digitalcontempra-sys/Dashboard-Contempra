@@ -103,6 +103,16 @@
   --area-finishing: rgb(219 39 119);
   --area-install: rgb(139 94 60);
   --area-soft-alpha: 0.13;
+  /* Chip text: darker than the area color so it reads (AA) on the tint. */
+  --area-design-ink: rgb(91 33 182);
+  --area-print-roll-ink: rgb(30 64 175);
+  --area-print-fb-ink: rgb(14 94 117);
+  --area-laminate-ink: rgb(17 94 89);
+  --area-contour-cut-ink: rgb(21 101 52);
+  --area-liquid-lam-ink: rgb(120 53 15);
+  --area-colex-ink: rgb(154 52 18);
+  --area-finishing-ink: rgb(157 23 77);
+  --area-install-ink: rgb(101 67 33);
   --task-bg: rgb(254 249 195);
   --task-border: rgb(234 179 8 / 0.45);
   --task-ink: rgb(66 50 4);
@@ -119,6 +129,15 @@
     --area-finishing: rgb(255 130 185);
     --area-install: rgb(215 170 130);
     --area-soft-alpha: 0.2;
+    --area-design-ink: rgb(200 185 255);
+    --area-print-roll-ink: rgb(165 200 255);
+    --area-print-fb-ink: rgb(130 225 245);
+    --area-laminate-ink: rgb(120 230 210);
+    --area-contour-cut-ink: rgb(140 235 165);
+    --area-liquid-lam-ink: rgb(252 211 140);
+    --area-colex-ink: rgb(255 190 150);
+    --area-finishing-ink: rgb(255 175 210);
+    --area-install-ink: rgb(235 205 175);
     --task-bg: rgb(66 56 16);
     --task-border: rgb(234 179 8 / 0.5);
     --task-ink: rgb(254 243 199);

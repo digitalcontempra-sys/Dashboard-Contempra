@@ -41,7 +41,10 @@ export function TaskView({ task, onClose }: { task: TaskCardDTO; onClose: () => 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
+  // Once per task: a refresh behind the dialog must not re-mark it seen or move focus.
   useEffect(() => {
     void api(`/api/task-cards/${task.id}/seen`, { method: "POST" })
       .then(() => {
@@ -50,10 +53,10 @@ export function TaskView({ task, onClose }: { task: TaskCardDTO; onClose: () => 
       })
       .catch(() => undefined);
     closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCloseRef.current();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [task.id, qc, onClose]);
+  }, [task.id, qc]);
 
   async function done() {
     setBusy(true);

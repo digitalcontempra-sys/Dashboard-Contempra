@@ -59,13 +59,16 @@ function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const toRef = useRef<HTMLInputElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
+  // Once per open dialog: a refresh behind it must not move the cursor while someone types.
   useEffect(() => {
     toRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCloseRef.current();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
 
   const q = query.trim().toLowerCase();
   const matches = (people.data ?? []).filter((p) => p.id !== user?.id && (!q || p.fullName.toLowerCase().includes(q)));
