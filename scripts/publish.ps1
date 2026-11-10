@@ -7,7 +7,9 @@
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 # Prefer IPv4: some networks drop IPv6 to api.cloudflare.com intermittently.
-$env:NODE_OPTIONS = "--dns-result-order=ipv4first"
+# On slow links Node gives up on each connection attempt after 250 ms ("fetch failed" / ETIMEDOUT);
+# allow 3 s per attempt.
+$env:NODE_OPTIONS = "--dns-result-order=ipv4first --network-family-autoselection-attempt-timeout=3000"
 
 function Invoke-WithRetry([string]$Label, [scriptblock]$Step) {
   for ($try = 1; $try -le 3; $try++) {
