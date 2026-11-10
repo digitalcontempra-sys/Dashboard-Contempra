@@ -27,7 +27,9 @@
 }
 
 /* ---------- Layer 2: semantic ---------- */
-:root {
+/* .force-light keeps light values inside cards even when the OS is in dark mode. */
+:root,
+.force-light {
   --bg: rgb(var(--p-mist-50));
   --bg-tint-1: rgb(var(--p-brand-500) / 0.1);
   --bg-tint-2: rgb(var(--p-blue-500) / 0.08);
@@ -92,7 +94,8 @@
 }
 
 /* ---------- Production areas (never red: alerts; never yellow: task cards) ---------- */
-:root {
+:root,
+.force-light {
   --area-design: rgb(124 58 237);
   --area-print-roll: rgb(37 99 235);
   --area-print-fb: rgb(8 145 178);
@@ -296,6 +299,17 @@ body {
 }
 @utility animate-fade-in {
   animation: fade-in 200ms ease both;
+}
+
+/* Cards stay white whatever the OS theme, so the area colors read clearly (owner request, 2026-11-10). */
+.force-light {
+  color: var(--text);
+  color-scheme: light;
+}
+.force-light.tile,
+.force-light.tile:hover,
+.force-light.tile:focus-visible {
+  background: rgb(255 255 255);
 }
 
 @media (prefers-reduced-motion: reduce) {

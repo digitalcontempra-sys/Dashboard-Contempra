@@ -21,7 +21,7 @@ function DocketTile({ d, onOpen, extra, showStatus }: { d: Item; onOpen: (wo: st
     <button
       type="button"
       onClick={() => onOpen(d.workOrder)}
-      className="tile group"
+      className="tile force-light group"
       aria-label={`Work order ${d.workOrder}, ${d.customer ?? "no customer"}`}
     >
       <div className="flex items-center gap-1.5">

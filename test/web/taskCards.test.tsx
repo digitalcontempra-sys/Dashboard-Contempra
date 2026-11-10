@@ -7,7 +7,7 @@ import { makeCard } from "./cardFixtures";
 import { managerUser, mockApi, staffUser } from "./mockApi";
 import { renderApp } from "./render";
 
-vi.mock("../../src/web/cards/chime", () => ({ playChime: vi.fn(), armChime: vi.fn() }));
+vi.mock("../../src/web/cards/chime", () => ({ playChime: vi.fn(), armChime: vi.fn(), isAudioReady: () => true, onAudioReady: () => () => undefined }));
 beforeEach(() => vi.mocked(playChime).mockClear());
 afterEach(() => {
   vi.useRealTimers();

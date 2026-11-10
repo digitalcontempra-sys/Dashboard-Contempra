@@ -114,6 +114,12 @@ export function Layout() {
       </header>
 
       <main className="min-w-0 flex-1 pb-28 md:pb-8">
+        {alerts.needsTap && (
+          <p className="mx-4 mt-3 flex items-center gap-2 rounded-2xl bg-accent-soft px-4 py-2.5 text-sm font-semibold text-accent md:mx-6">
+            <Icon name="bell" className="size-4 shrink-0" />
+            Tap anywhere to turn on sound
+          </p>
+        )}
         <Outlet />
       </main>
 

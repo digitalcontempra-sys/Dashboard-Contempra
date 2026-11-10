@@ -7,7 +7,16 @@ import { makeCard } from "./cardFixtures";
 import { managerUser, mockApi, staffUser } from "./mockApi";
 import { renderApp } from "./render";
 
-vi.mock("../../src/web/cards/chime", () => ({ playChime: vi.fn(), armChime: vi.fn() }));
+const audio = vi.hoisted(() => ({ ready: true, listeners: [] as (() => void)[] }));
+vi.mock("../../src/web/cards/chime", () => ({
+  playChime: vi.fn(),
+  armChime: vi.fn(),
+  isAudioReady: () => audio.ready,
+  onAudioReady: (fn: () => void) => {
+    audio.listeners.push(fn);
+    return () => undefined;
+  },
+}));
 
 beforeEach(() => vi.mocked(playChime).mockClear());
 afterEach(() => {
@@ -31,6 +40,34 @@ function app(opts: { user?: object; cards?: CardDTO[]; summaries?: { newCount: n
     "PUT /api/me/sound": () => ({ ok: true }),
   });
 }
+
+describe("sound unlock", () => {
+  afterEach(() => {
+    audio.ready = true;
+    audio.listeners = [];
+  });
+
+  it("asks for a tap until the browser allows sound, then rings for cards already waiting", async () => {
+    audio.ready = false;
+    app({ summaries: [{ newCount: 2 }] });
+    renderApp("/my-cards");
+    expect(await screen.findByText("Tap anywhere to turn on sound")).toBeInTheDocument();
+    expect(playChime).not.toHaveBeenCalled();
+    audio.ready = true;
+    act(() => audio.listeners.forEach((fn) => fn()));
+    expect(screen.queryByText("Tap anywhere to turn on sound")).toBeNull();
+    expect(playChime).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not ask when sound is off", async () => {
+    audio.ready = false;
+    app({ summaries: [{ newCount: 0, soundOn: false }] });
+    renderApp("/my-cards");
+    await screen.findByRole("heading", { name: "My Cards" });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.queryByText("Tap anywhere to turn on sound")).toBeNull();
+  });
+});
 
 describe("card alerts", () => {
   it("rings, shows a badge and changes the tab title when cards arrive", async () => {

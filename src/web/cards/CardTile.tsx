@@ -15,7 +15,7 @@ export function CardTile({ card, onOpen, noMembers }: { card: CardDTO; onOpen: (
       type="button"
       onClick={onOpen}
       style={{ borderLeftColor: areaColor(card.roleId) }}
-      className={`tile group border-l-4 ${card.isNew ? "ring-2 ring-accent shadow-[0_0_24px_var(--accent-soft)]" : ""} ${waiting ? "opacity-60" : ""}`}
+      className={`tile force-light group border-l-[6px] ${card.isNew ? "ring-2 ring-accent shadow-[0_0_24px_var(--accent-soft)]" : ""} ${waiting ? "opacity-60" : ""}`}
       aria-label={`${AREA_LABEL[card.roleId]} card, work order ${card.workOrder}, ${card.header.customer ?? "no customer"}${card.isNew ? ", new" : ""}`}
     >
       {card.returned && (

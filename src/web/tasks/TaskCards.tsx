@@ -19,7 +19,7 @@ export function TaskTile({ task, onOpen }: { task: TaskCardDTO; onOpen: () => vo
       type="button"
       onClick={onOpen}
       style={TASK_STYLE}
-      className={`tile group border ${task.isNew ? "ring-2 ring-accent" : ""}`}
+      className={`tile force-light group border ${task.isNew ? "ring-2 ring-accent" : ""}`}
       aria-label={`Task from ${firstName(task.from.name)}: ${task.note.slice(0, 60)}${task.isNew ? ", new" : ""}`}
     >
       <div className="flex items-center gap-1.5">
