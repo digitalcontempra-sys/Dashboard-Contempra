@@ -96,6 +96,8 @@ export type SessionUser = {
   fullName: string;
   accessLevel: AccessLevel;
   roles: string[];
+  /** Set on imported or reset accounts until the person chooses their own password. */
+  mustChangePassword?: boolean;
 };
 
 export type CardDTO = {

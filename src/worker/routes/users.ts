@@ -128,7 +128,7 @@ userRoutes.post("/users/:id/reset-password", async (c) => {
   if (!(await getUser(db, id))) return c.json({ error: "User not found" }, 404);
   const { password } = await c.req.json<{ password?: unknown }>();
   if (!isValidPassword(password)) throw new BadRequest(PASSWORD_ERROR);
-  await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(await hashPassword(password), id).run();
+  await db.prepare("UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?").bind(await hashPassword(password), id).run();
   await deleteUserSessions(db, id);
   return c.json({ ok: true });
 });

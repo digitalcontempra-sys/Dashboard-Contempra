@@ -56,3 +56,20 @@ authRoutes.post("/auth/logout", async (c) => {
 });
 
 authRoutes.get("/auth/me", requireAuth, (c) => c.json(c.get("user")));
+
+authRoutes.post("/auth/change-password", requireAuth, async (c) => {
+  const db = c.env.DB;
+  const me = c.get("user");
+  const b = await c.req.json<{ currentPassword?: unknown; newPassword?: unknown }>().catch(() => ({}) as Record<string, unknown>);
+  const row = await db.prepare("SELECT password_hash FROM users WHERE id = ?").bind(me.id).first<{ password_hash: string }>();
+  if (!row || typeof b.currentPassword !== "string" || !(await verifyPassword(b.currentPassword, row.password_hash))) {
+    return c.json({ error: "Current password is wrong" }, 400);
+  }
+  if (!isValidPassword(b.newPassword)) return c.json({ error: PASSWORD_ERROR }, 400);
+  if (b.newPassword === b.currentPassword) return c.json({ error: "Choose a new password, different from the current one" }, 400);
+  await db
+    .prepare("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?")
+    .bind(await hashPassword(b.newPassword), me.id)
+    .run();
+  return c.json(await loadUser(db, me.id));
+});

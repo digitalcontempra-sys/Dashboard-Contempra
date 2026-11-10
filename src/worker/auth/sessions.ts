@@ -34,9 +34,9 @@ export async function deleteUserSessions(db: D1Database, userId: number): Promis
 
 export async function loadUser(db: D1Database, userId: number): Promise<SessionUser | null> {
   const u = await db
-    .prepare("SELECT id, username, full_name, access_level FROM users WHERE id = ? AND active = 1")
+    .prepare("SELECT id, username, full_name, access_level, must_change_password FROM users WHERE id = ? AND active = 1")
     .bind(userId)
-    .first<{ id: number; username: string; full_name: string; access_level: AccessLevel }>();
+    .first<{ id: number; username: string; full_name: string; access_level: AccessLevel; must_change_password: number }>();
   if (!u) return null;
   const { results } = await db
     .prepare(
@@ -50,8 +50,11 @@ export async function loadUser(db: D1Database, userId: number): Promise<SessionU
     fullName: u.full_name,
     accessLevel: u.access_level,
     roles: results.map((r) => r.role_id),
+    mustChangePassword: u.must_change_password === 1,
   };
 }
+
+const PASSWORD_CHANGE_PATHS = ["/api/auth/me", "/api/auth/change-password", "/api/auth/logout"];
 
 export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   const token = getCookie(c, COOKIE);
@@ -61,6 +64,10 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
       .first<{ user_id: number }>();
     const user = s ? await loadUser(c.env.DB, s.user_id) : null;
     if (user) {
+      // Until they choose their own password, people can only do that (and see who they are or sign out).
+      if (user.mustChangePassword && !PASSWORD_CHANGE_PATHS.includes(c.req.path)) {
+        return c.json({ error: "Change your password first." }, 403);
+      }
       c.set("user", user);
       return next();
     }
