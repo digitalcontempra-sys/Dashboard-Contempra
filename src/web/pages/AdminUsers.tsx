@@ -50,13 +50,13 @@ function UserForm({ initial, roles, onClose }: { initial: Draft; roles: RoleDTO[
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
+      <div className="animate-fade-in absolute inset-0 bg-black/25 backdrop-blur-[3px]" onClick={onClose} aria-hidden="true" />
       <form
         role="dialog"
         aria-modal="true"
         aria-label={isNew ? "Add user" : "Edit user"}
         onSubmit={submit}
-        className="relative max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl bg-surface p-5 sm:max-w-lg sm:rounded-2xl"
+        className="glass-strong animate-sheet-in relative max-h-[92dvh] w-full overflow-y-auto rounded-t-[var(--radius-panel)] p-5 sm:max-w-lg sm:rounded-[var(--radius-panel)]"
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">{isNew ? "Add user" : `Edit ${initial.fullName}`}</h2>
