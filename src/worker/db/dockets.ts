@@ -1,3 +1,4 @@
+import { ROLE_ORDER } from "../../shared/cards";
 import { deriveTimeBucket, todayInBusinessTz, weekEnd, type TimeBucket } from "../../shared/rules";
 import {
   PAGE_SIZE,
@@ -43,6 +44,12 @@ const VIEW_SQL: Record<DocketView, string> = {
 const VENDOR_PICKUP_SQL = `EXISTS (SELECT 1 FROM cards c WHERE c.work_order = dockets.work_order AND c.role_id = 'finishing'
   AND json_extract(c.fields_json, '$.vendorPickup') = 1 AND coalesce(json_extract(c.fields_json, '$.packaged'), '') != 'shipped')`;
 
+/** Areas (role ids) with an active card, comma-separated. */
+const AREAS_SQL = `(SELECT group_concat(DISTINCT c.role_id) FROM cards c WHERE c.work_order = dockets.work_order AND c.status = 'active')`;
+/** Every card of the docket is done (and it has at least one). */
+const PRODUCTION_DONE_SQL = `(EXISTS (SELECT 1 FROM cards c WHERE c.work_order = dockets.work_order)
+  AND NOT EXISTS (SELECT 1 FROM cards c WHERE c.work_order = dockets.work_order AND c.status != 'done'))`;
+
 const ACTIVE_ORDER =
   "ORDER BY (due_rush = 1 OR due_iso <= :today) DESC, due_rush DESC, due_iso IS NULL, due_iso ASC, CAST(work_order AS INTEGER) DESC";
 const HISTORY_ORDER = "ORDER BY CAST(work_order AS INTEGER) DESC";
@@ -64,6 +71,9 @@ class Sql {
   }
 }
 
+const sortAreas = (ids: string[]) =>
+  ids.sort((a, b) => ROLE_ORDER.indexOf(a as (typeof ROLE_ORDER)[number]) - ROLE_ORDER.indexOf(b as (typeof ROLE_ORDER)[number]));
+
 function toSummary(r: Row, today: string): DocketSummary {
   const dueIso = (r.due_iso as string) ?? null;
   const { bucket, overdue } = deriveTimeBucket(dueIso, r.due_rush === 1, today);
@@ -80,6 +90,8 @@ function toSummary(r: Row, today: string): DocketSummary {
     bucket,
     overdue,
     vendorPickup: r.vendor_pickup === 1,
+    areas: typeof r.areas === "string" ? sortAreas(r.areas.split(",")) : [],
+    productionDone: r.production_done === 1,
   };
 }
 
@@ -120,7 +132,7 @@ export async function listDockets(db: D1Database, p: DocketQuery, now: Date): Pr
   const [countsRes, totalRes, listRes] = await db.batch([
     sql.bind(db, countsSql),
     sql.bind(db, `SELECT count(*) AS n FROM dockets WHERE ${listWhere}`),
-    sql.bind(db, `SELECT *, ${VENDOR_PICKUP_SQL} AS vendor_pickup FROM dockets WHERE ${listWhere} ${order} LIMIT :limit OFFSET :offset`),
+    sql.bind(db, `SELECT *, ${VENDOR_PICKUP_SQL} AS vendor_pickup, ${AREAS_SQL} AS areas, ${PRODUCTION_DONE_SQL} AS production_done FROM dockets WHERE ${listWhere} ${order} LIMIT :limit OFFSET :offset`),
   ]);
   const c = (countsRes.results[0] ?? {}) as Record<TimeBucket, number | null>;
   return {

@@ -32,6 +32,10 @@ export type DocketSummary = {
   overdue: boolean;
   /** Finishing marked it ready for vendor pickup (list endpoint only). */
   vendorPickup?: boolean;
+  /** Areas (role ids) the docket is in right now, in production order (list endpoint only). */
+  areas?: string[];
+  /** Every production card is done (list endpoint only). */
+  productionDone?: boolean;
 };
 
 export type DocketDetail = DocketSummary & {

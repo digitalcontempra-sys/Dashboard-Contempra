@@ -9,6 +9,7 @@ import { BucketFilter } from "../components/BucketChip";
 import { DocketDetail } from "../components/DocketDetail";
 import { DocketList, EmptyState, ListSkeleton } from "../components/DocketList";
 import { AccountManagerSelect, SearchBox, Tabs } from "../components/Filters";
+import { AreaLegend } from "../components/AreaChip";
 import { PageHeader } from "../components/Layout";
 import { SyncBadge } from "../components/SyncBadge";
 import { useParam, useSetParams } from "../hooks";
@@ -52,12 +53,17 @@ export function Dashboard() {
   return (
     <>
       <PageHeader title="Main Dashboard" subtitle={first ? `${first.total} work orders` : undefined} actions={
-          <div className="flex items-center gap-3">
-            <SyncBadge />
-            <Link to="/dockets/new" className="btn-primary">
-              <Icon name="plus" className="size-4" />
-              New Docket
-            </Link>
+          <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:items-end">
+            <div className="flex items-center gap-3 md:justify-end">
+              <SyncBadge />
+              <Link to="/dockets/new" className="btn-primary">
+                <Icon name="plus" className="size-4" />
+                New Docket
+              </Link>
+            </div>
+            <div className="md:max-w-sm">
+              <AreaLegend />
+            </div>
           </div>
         }
       />

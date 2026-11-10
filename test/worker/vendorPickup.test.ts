@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DocketListResponse } from "../../src/shared/types";
-import { cardsOf, newDocket, route, setupCards, teardownCards } from "./cardHelpers";
+import { cardsOf, newDocket, route, setupCards, step, teardownCards } from "./cardHelpers";
 import { api } from "./helpers";
 
 let s: Awaited<ReturnType<typeof setupCards>>;
@@ -25,5 +25,30 @@ describe("Vendor pickup ready", () => {
     const flag = (wo: string) => list.items.find((d) => d.workOrder === wo)?.vendorPickup;
     expect(flag(a.workOrder)).toBe(true);
     expect(flag(b.workOrder)).toBe(false);
+  });
+});
+
+describe("current area on the Main Dashboard", () => {
+  const list = async () => ((await (await api("/api/dockets?view=active", { cookie: s.manager })).json()) as DocketListResponse).items;
+
+  it("lists each active area once, in production order", async () => {
+    const d = await newDocket(s.manager, [
+      { name: "Banner", steps: [step("colex")] },
+      { name: "Decals", steps: [step("printer_roll")] },
+      { name: "Signs", steps: [step("printer_roll")] },
+    ]);
+    const item = (await list()).find((x) => x.workOrder === d.workOrder)!;
+    expect(item.areas).toEqual(["printer_roll", "colex"]);
+    expect(item.productionDone).toBe(false);
+  });
+
+  it("says done when every card is done, and nothing without a route", async () => {
+    const a = await newDocket(s.manager, route("colex"));
+    const [c] = await cardsOf(a.workOrder);
+    await env.DB.prepare("UPDATE cards SET status = 'done' WHERE id = ?").bind(c.id).run();
+    const b = await newDocket(s.manager, [{ name: "Whole docket", steps: [] }]);
+    const items = await list();
+    expect(items.find((x) => x.workOrder === a.workOrder)).toMatchObject({ areas: [], productionDone: true });
+    expect(items.find((x) => x.workOrder === b.workOrder)).toMatchObject({ areas: [], productionDone: false });
   });
 });

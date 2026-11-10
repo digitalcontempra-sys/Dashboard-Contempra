@@ -28,7 +28,7 @@ function setup(syncOver: Record<string, unknown> = {}) {
   return mockApi({
     "GET /api/auth/me": () => managerUser,
     "GET /api/dockets": () => ({
-      items: [item(), item({ workOrder: "91480", customer: "Kelly Ryback", dueIso: null, dueRaw: "in production", bucket: "no_due_date" })],
+      items: [item({ areas: ["laminate_roll"] }), item({ workOrder: "91480", customer: "Kelly Ryback", dueIso: null, dueRaw: "in production", bucket: "no_due_date", productionDone: true })],
       total: 2,
       page: 1,
       pageSize: 50,
@@ -143,5 +143,16 @@ describe("Main Dashboard", () => {
     renderApp("/dashboard");
     expect(await screen.findByText("Last synced 12 min ago")).toBeInTheDocument();
     expect(screen.getByText("Sync problem — showing last saved data")).toBeInTheDocument();
+  });
+});
+
+describe("areas on the Main Dashboard", () => {
+  it("shows each docket's current area, Done, and the color legend", async () => {
+    setup();
+    renderApp("/dashboard");
+    const tile = await screen.findByRole("button", { name: /Work order 91487/ });
+    expect(within(tile).getByText("Laminate")).toHaveAttribute("data-area", "laminate_roll");
+    expect(within(screen.getByRole("button", { name: /Work order 91480/ })).getByText("Done")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Areas" })).toBeInTheDocument();
   });
 });
