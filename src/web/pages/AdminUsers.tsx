@@ -8,6 +8,7 @@ import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/Layout";
 import { SyncBadge } from "../components/SyncBadge";
 import { GoogleConnection } from "./GoogleConnection";
+import { ImportStaff } from "./ImportStaff";
 import { ProductionColumns } from "./ProductionColumns";
 
 const LEVELS: { id: AccessLevel; label: string; hint: string }[] = [
@@ -241,6 +242,7 @@ export function AdminUsers() {
         <GoogleConnection />
         <SyncPanel />
         <ProductionColumns />
+        <ImportStaff />
         {users.isPending ? (
           <ListSkeleton />
         ) : users.error ? (

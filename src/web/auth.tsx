@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, type ReactNode } fro
 import { Navigate, useLocation } from "react-router-dom";
 import type { AccessLevel, SessionUser } from "../shared/types";
 import { api, ApiError, setUnauthorizedHandler } from "./api";
+import { ChangePassword } from "./pages/ChangePassword";
 
 type AuthValue = {
   user: SessionUser | null;
@@ -12,7 +13,8 @@ type AuthValue = {
 };
 
 const AuthContext = createContext<AuthValue | null>(null);
-const ME = ["auth", "me"];
+export const ME_QUERY = ["auth", "me"];
+const ME = ME_QUERY;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
@@ -69,6 +71,7 @@ export function RequireLevel({ levels, children }: { levels?: AccessLevel[]; chi
   const loc = useLocation();
   if (loading) return <FullScreenSpinner />;
   if (!user) return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
+  if (user.mustChangePassword) return <ChangePassword />;
   if (levels && !levels.includes(user.accessLevel)) return <Navigate to={homeFor(user)} replace />;
   return <>{children}</>;
 }
