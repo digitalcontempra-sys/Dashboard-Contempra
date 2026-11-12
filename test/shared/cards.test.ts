@@ -183,3 +183,11 @@ describe("installer photos field", () => {
     expect(fieldsSummary("installer", { photos: "0" })).toBe("");
   });
 });
+
+describe("date fields", () => {
+  it("installer Date only keeps a calendar date (YYYY-MM-DD)", () => {
+    expect(sanitizeFields("installer", { date: "2026-11-12" })).toEqual({ date: "2026-11-12" });
+    expect(sanitizeFields("installer", { date: "next tuesday" })).toEqual({ date: null });
+    expect(sanitizeFields("installer", { date: "12/11/2026" })).toEqual({ date: null });
+  });
+});

@@ -123,6 +123,11 @@ describe("CardView", () => {
     expect(optionValues()).not.toContain("Coroplast");
   });
 
+  it("the installer Date is picked from a calendar", () => {
+    show(makeCard({ roleId: "installer", nextRoleId: null }));
+    expect(screen.getByLabelText("Date")).toHaveAttribute("type", "date");
+  });
+
   it("shows who returned it and why", () => {
     show(makeCard({ returned: { reason: "Cut file missing", by: "Seb" } }));
     expect(screen.getByText("Returned by Seb · Cut file missing")).toBeInTheDocument();

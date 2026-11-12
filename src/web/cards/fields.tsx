@@ -90,6 +90,7 @@ export function CardFieldsEditor({ roleId, values, onChange, disabled, placehold
               id={id}
               className="field"
               list={list}
+              type={s.kind === "date" ? "date" : "text"}
               value={typeof values[s.key] === "string" ? (values[s.key] as string) : ""}
               placeholder={placeholders[s.key]}
               onChange={(e) => onChange(s.key, e.target.value)}

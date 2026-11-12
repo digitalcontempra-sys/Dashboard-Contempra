@@ -66,6 +66,13 @@ describe("New Docket", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Docket #91488 saved.");
   });
 
+  it("labour dates are picked from a calendar", async () => {
+    mockApi({ ...lists, "GET /api/auth/me": () => managerUser });
+    renderApp("/dockets/new");
+    expect(await screen.findByLabelText("DATE 1")).toHaveAttribute("type", "date");
+    expect(screen.getByLabelText("NAME 1")).not.toHaveAttribute("type", "date");
+  });
+
   it("adds up the grand total with GST and PST", async () => {
     mockApi({ ...lists, "GET /api/auth/me": () => managerUser });
     renderApp("/dockets/new");

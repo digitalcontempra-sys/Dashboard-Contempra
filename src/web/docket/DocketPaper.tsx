@@ -177,7 +177,7 @@ export function DocketPaper({ form, onChange, readOnly = false, showPrices, work
             <thead>
               <tr className={`border-b ${RULE}`}>
                 {["NAME", "WORK", "HRS.", "DATE"].map((h, i) => (
-                  <th key={h} className={`py-1 font-semibold ${i < 3 ? `border-r ${RULE}` : ""} ${h === "HRS." ? "w-12" : ""}`}>
+                  <th key={h} className={`py-1 font-semibold ${i < 3 ? `border-r ${RULE}` : ""} ${h === "HRS." ? "w-12" : h === "DATE" ? "w-[7.5rem]" : ""}`}>
                     {h}
                   </th>
                 ))}
@@ -192,6 +192,7 @@ export function DocketPaper({ form, onChange, readOnly = false, showPrices, work
                         aria-label={`${{ name: "NAME", work: "WORK", hrs: "HRS", date: "DATE" }[k]} ${i + 1}`}
                         className={`${INK} h-11 px-1 text-[13px]`}
                         inputMode={k === "hrs" ? "decimal" : undefined}
+                        type={k === "date" ? "date" : "text"}
                         value={l[k]}
                         readOnly={readOnly}
                         onChange={(e) => set("labour", form.labour.map((x, xi) => (xi === i ? { ...x, [k]: e.target.value } : x)))}

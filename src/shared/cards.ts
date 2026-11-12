@@ -9,7 +9,7 @@ export type FieldSpec = {
   key: string;
   label: string;
   /** "photos": a count kept by the server (photo uploads), never written by the card form. */
-  kind: "check" | "text" | "choice" | "catalog" | "photos";
+  kind: "check" | "text" | "choice" | "catalog" | "photos" | "date";
   options?: { value: string; label: string }[];
   required?: boolean;
 };
@@ -141,7 +141,7 @@ export const CARD_FIELDS: Record<string, FieldSpec[]> = {
     check("siteChecked", "Site checked"),
     check("installed", "Installed", true),
     text("address", "Address"),
-    text("date", "Date"),
+    { key: "date", label: "Date", kind: "date" },
     text("crew", "Crew"),
     { key: "photos", label: "Photos", kind: "photos" },
     text("note", "Notes"),
@@ -159,6 +159,8 @@ export function sanitizeFields(roleId: string, input: unknown): CardFields {
     const v = src[s.key];
     if (s.kind === "check") out[s.key] = v === true || v === "true" || v === "yes" || v === 1;
     else if (s.kind === "choice") out[s.key] = typeof v === "string" && s.options!.some((o) => o.value === v) ? v : null;
+    // Dates come from a calendar only, so every card stores the same format.
+    else if (s.kind === "date") out[s.key] = typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
     else out[s.key] = v === null || v === undefined ? null : String(v).trim().slice(0, MAX_TEXT);
   }
   return out;
