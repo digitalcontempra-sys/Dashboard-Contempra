@@ -148,6 +148,27 @@ export class FakeDrive implements DriveGateway {
     this.files.set(id, { name: `${wo} - ${title}.pdf`, bytes: pdf.byteLength, trashed: false });
     return { id, link: `https://drive.google.com/file/d/${id}/view` };
   }
+  /** Photo folders by id. */
+  folders = new Map<string, { name: string; year: number }>();
+  async createPhotoFolder(wo: string, title: string, year: number) {
+    if (this.fail) {
+      this.fail = false;
+      throw new Error("Google Drive request failed (503)");
+    }
+    const id = `folder-${++this.n}`;
+    this.folders.set(id, { name: `${wo} - ${title} Photos`, year });
+    return { id, link: `https://drive.google.com/drive/folders/${id}` };
+  }
+  async uploadImage(folderId: string, name: string, image: ArrayBuffer, _mime: string) {
+    if (this.fail) {
+      this.fail = false;
+      throw new Error("Google Drive request failed (503)");
+    }
+    if (!this.folders.has(folderId)) throw new Error(`no folder ${folderId}`);
+    const id = `file-${++this.n}`;
+    this.files.set(id, { name, bytes: image.byteLength, trashed: false });
+    return { id, link: `https://drive.google.com/file/d/${id}/view` };
+  }
   async trash(fileId: string) {
     const f = this.files.get(fileId);
     if (f) f.trashed = true;

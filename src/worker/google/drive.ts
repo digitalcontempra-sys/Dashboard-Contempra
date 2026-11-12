@@ -6,6 +6,9 @@ export interface DriveGateway {
   ensureRootFolder(): Promise<string>;
   upload(wo: string, title: string, year: number, pdf: ArrayBuffer, existingId?: string | null): Promise<{ id: string; link: string }>;
   trash(fileId: string): Promise<void>;
+  /** Creates `Contempra Dockets/<year>/<WO> - <FOR> Photos`. */
+  createPhotoFolder(wo: string, title: string, year: number): Promise<{ id: string; link: string }>;
+  uploadImage(folderId: string, name: string, image: ArrayBuffer, mime: string): Promise<{ id: string; link: string }>;
 }
 
 /** The Drive file this docket pointed to no longer exists (deleted by hand). */
@@ -78,6 +81,29 @@ export function realDriveGateway(env: GoogleEnv): DriveGateway {
       const meta = JSON.stringify({ name: `${wo} - ${safeName(title) || "Docket"}.pdf`, parents: [parent], mimeType: "application/pdf" });
       const head = `--${boundary}\r\ncontent-type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\ncontent-type: application/pdf\r\n\r\n`;
       const body = new Blob([head, pdf, `\r\n--${boundary}--`]);
+      const json = await request(`${UPLOAD}?uploadType=multipart&fields=id,webViewLink`, {
+        method: "POST",
+        headers: { "content-type": `multipart/related; boundary=${boundary}` },
+        body: await body.arrayBuffer(),
+      });
+      return { id: String(json.id), link: String(json.webViewLink) };
+    },
+
+    async createPhotoFolder(wo, title, year) {
+      const parent = await yearFolder(year);
+      const json = await request(`${API}?fields=id,webViewLink`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: `${wo} - ${safeName(title) || "Docket"} Photos`, mimeType: FOLDER_MIME, parents: [parent] }),
+      });
+      return { id: String(json.id), link: String(json.webViewLink) };
+    },
+
+    async uploadImage(folderId, name, image, mime) {
+      const boundary = `contempra${crypto.randomUUID()}`;
+      const meta = JSON.stringify({ name: safeName(name), parents: [folderId], mimeType: mime });
+      const head = `--${boundary}\r\ncontent-type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\ncontent-type: ${mime}\r\n\r\n`;
+      const body = new Blob([head, image, `\r\n--${boundary}--`]);
       const json = await request(`${UPLOAD}?uploadType=multipart&fields=id,webViewLink`, {
         method: "POST",
         headers: { "content-type": `multipart/related; boundary=${boundary}` },

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "./app";
 import type { Env } from "./env";
 import { authRoutes } from "./routes/auth";
+import { cardPhotoRoutes } from "./routes/cardPhotos";
 import { cardRoutes } from "./routes/cards";
 import { docketRoutes } from "./routes/dockets";
 import { googleRoutes } from "./routes/google";
@@ -31,6 +32,7 @@ app.route("/", staffImportRoutes);
 app.route("/", taskCardRoutes);
 app.route("/", docketRoutes);
 app.route("/", googleRoutes);
+app.route("/", cardPhotoRoutes);
 app.route("/", cardRoutes);
 app.route("/", virtualDocketRoutes);
 
