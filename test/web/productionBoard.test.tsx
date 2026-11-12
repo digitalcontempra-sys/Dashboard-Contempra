@@ -78,6 +78,7 @@ function showDetail(user: object) {
     "GET /api/auth/me": () => user,
     "GET /api/dockets/91488": () => detail,
     "GET /api/virtual-dockets/91488/history": () => history,
+    "GET /api/virtual-dockets/91488/photos": () => ({ count: 2, folderLink: "https://drive.google.com/drive/folders/p" }),
     "GET /api/production-board": () =>
       board({ columns: [{ roleId: "printer_roll", area: "Print Roll", cards: [{ ...makeCard({ roleId: "printer_roll", status: "done" }), noMembers: false }] }] }),
   });
@@ -106,6 +107,7 @@ describe("Docket detail tabs", () => {
     expect(await screen.findByText("Print Roll")).toBeInTheDocument();
     expect(screen.getByText("Done ✓")).toBeInTheDocument();
     expect(calls.find((c) => c.url.pathname === "/api/production-board")!.url.searchParams.get("wo")).toBe("91488");
+    expect(await screen.findByRole("link", { name: "Photos (2)" })).toHaveAttribute("href", "https://drive.google.com/drive/folders/p");
   });
 
   it("Staff get no tabs", async () => {

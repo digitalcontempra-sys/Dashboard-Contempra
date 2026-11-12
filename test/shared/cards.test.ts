@@ -175,3 +175,11 @@ describe("AREA_TOKEN", () => {
     expect(AREA_TOKEN.laminate_roll).toBe("area-laminate");
   });
 });
+
+describe("installer photos field", () => {
+  it("is set by the server only, and shows as a count", () => {
+    expect(sanitizeFields("installer", { photos: "99", note: "ok" })).toEqual({ note: "ok" });
+    expect(fieldsSummary("installer", { installed: true, photos: "3" })).toBe("Installed ✓ · Photos: 3");
+    expect(fieldsSummary("installer", { photos: "0" })).toBe("");
+  });
+});

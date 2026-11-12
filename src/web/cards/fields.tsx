@@ -1,4 +1,5 @@
 import { CARD_FIELDS, type CardFields, type FieldSpec } from "../../shared/cards";
+import { PhotoField } from "./PhotoField";
 import flatbedMaterials from "../../../data/catalogs/flatbed-materials.json";
 import rollMaterials from "../../../data/catalogs/roll-print-materials.json";
 
@@ -17,17 +18,22 @@ type Props = {
   disabled?: boolean;
   /** Shown as the placeholder when the field is empty (e.g. the docket address). */
   placeholders?: Record<string, string>;
+  /** Needed by the Photos field (uploads belong to a card). */
+  cardId?: number;
 };
 
 const required = (s: FieldSpec) => (s.required ? <span className="text-accent" aria-hidden="true"> ★</span> : null);
 
 /** The editors for one role's card fields, in the spec's order. */
-export function CardFieldsEditor({ roleId, values, onChange, disabled, placeholders = {} }: Props) {
+export function CardFieldsEditor({ roleId, values, onChange, disabled, placeholders = {}, cardId }: Props) {
   const specs = CARD_FIELDS[roleId] ?? [];
   return (
     <fieldset disabled={disabled} className="flex flex-col gap-2.5">
       {specs.map((s) => {
         const id = `card-field-${s.key}`;
+        if (s.kind === "photos") {
+          return cardId ? <PhotoField key={s.key} cardId={cardId} disabled={disabled} /> : null;
+        }
         if (s.kind === "check") {
           return (
             <label key={s.key} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl bg-surface-2 px-3.5">

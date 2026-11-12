@@ -8,7 +8,8 @@ export type CardFields = Record<string, string | boolean | null>;
 export type FieldSpec = {
   key: string;
   label: string;
-  kind: "check" | "text" | "choice" | "catalog";
+  /** "photos": a count kept by the server (photo uploads), never written by the card form. */
+  kind: "check" | "text" | "choice" | "catalog" | "photos";
   options?: { value: string; label: string }[];
   required?: boolean;
 };
@@ -142,7 +143,7 @@ export const CARD_FIELDS: Record<string, FieldSpec[]> = {
     text("address", "Address"),
     text("date", "Date"),
     text("crew", "Crew"),
-    text("photos", "Photos"),
+    { key: "photos", label: "Photos", kind: "photos" },
     text("note", "Notes"),
   ],
 };
@@ -154,7 +155,7 @@ export function sanitizeFields(roleId: string, input: unknown): CardFields {
   const src = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
   const out: CardFields = {};
   for (const s of specs) {
-    if (!(s.key in src)) continue;
+    if (!(s.key in src) || s.kind === "photos") continue;
     const v = src[s.key];
     if (s.kind === "check") out[s.key] = v === true || v === "true" || v === "yes" || v === 1;
     else if (s.kind === "choice") out[s.key] = typeof v === "string" && s.options!.some((o) => o.value === v) ? v : null;
@@ -226,6 +227,8 @@ export function fieldsSummary(roleId: string, f: CardFields): string {
     } else if (s.kind === "choice") {
       const opt = s.options!.find((o) => o.value === v);
       if (opt) parts.push(`${s.label}: ${opt.label}`);
+    } else if (s.kind === "photos") {
+      if (filled(v) && v !== "0") parts.push(`${s.label}: ${v}`);
     } else if (filled(v)) parts.push(`${s.label}: ${v}`);
   }
   return parts.join(" · ");

@@ -195,6 +195,7 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
               onChange={change}
               disabled={!active || busy}
               placeholders={{ address: card.header.address ?? "" }}
+              cardId={card.id}
             />
           )}
 

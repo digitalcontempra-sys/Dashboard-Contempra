@@ -42,6 +42,12 @@ export function DocketProduction({ workOrder }: { workOrder: string }) {
     queryKey: ["board", "wo", workOrder],
     queryFn: () => api<BoardDTO>(withQuery("/api/production-board", { wo: workOrder })),
   });
+  // Installer photos live in one Drive folder per docket.
+  const photos = useQuery({
+    queryKey: ["docket-photos", workOrder],
+    queryFn: () => api<{ count: number; folderLink: string | null }>(`/api/virtual-dockets/${encodeURIComponent(workOrder)}/photos`),
+    retry: false,
+  });
   if (error) return <p className="py-4 text-danger">{(error as Error).message}</p>;
   if (isPending) return <p className="py-4 text-text-3">Loading…</p>;
   const cards = data.columns.flatMap((c) => c.cards);
@@ -49,6 +55,11 @@ export function DocketProduction({ workOrder }: { workOrder: string }) {
   const jobs = [...new Set(cards.map((c) => c.jobName))];
   return (
     <div className="mt-4 space-y-4">
+      {photos.data && photos.data.count > 0 && photos.data.folderLink && (
+        <a href={photos.data.folderLink} target="_blank" rel="noreferrer" className="btn-ghost text-sm">
+          Photos ({photos.data.count})
+        </a>
+      )}
       {jobs.map((job) => (
         <section key={job}>
           <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-text-3">{job}</h3>
