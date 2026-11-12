@@ -187,7 +187,7 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
         )}
         {card.claimedBy && !claimedByOther && <p className="mx-5 mb-2 text-sm font-medium text-ok sm:mx-7">You're on it</p>}
 
-        <div className="flex-1 overflow-y-auto px-5 pb-4 sm:px-7">
+        <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-5 pb-4 sm:px-7">
           {(CARD_FIELDS[card.roleId] ?? []).length > 0 && (
             <CardFieldsEditor
               roleId={card.roleId}

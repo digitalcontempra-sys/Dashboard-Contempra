@@ -28,7 +28,7 @@ const required = (s: FieldSpec) => (s.required ? <span className="text-accent" a
 export function CardFieldsEditor({ roleId, values, onChange, disabled, placeholders = {}, cardId }: Props) {
   const specs = CARD_FIELDS[roleId] ?? [];
   return (
-    <fieldset disabled={disabled} className="flex flex-col gap-2.5">
+    <fieldset disabled={disabled} className="flex min-w-0 flex-col gap-2.5">
       {specs.map((s) => {
         const id = `card-field-${s.key}`;
         if (s.kind === "photos") {

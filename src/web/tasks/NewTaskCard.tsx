@@ -99,7 +99,7 @@ function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (
         role="dialog"
         aria-modal="true"
         aria-label="New Task Card"
-        className="glass-strong animate-sheet-in relative max-h-[92dvh] w-full overflow-y-auto rounded-t-[var(--radius-panel)] p-5 sm:max-w-md sm:rounded-[var(--radius-panel)]"
+        className="glass-strong animate-sheet-in relative max-h-[92dvh] w-full overflow-x-hidden overflow-y-auto rounded-t-[var(--radius-panel)] p-5 sm:max-w-md sm:rounded-[var(--radius-panel)]"
       >
         <h2 className="mb-4 text-lg font-bold">New Task Card</h2>
 

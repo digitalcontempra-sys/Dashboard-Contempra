@@ -114,7 +114,7 @@ export function DocketDetail({ workOrder, onClose }: { workOrder: string; onClos
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-5 pb-7 sm:px-7">
+        <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-5 pb-7 sm:px-7">
           {error && <p className="py-6 text-danger">{(error as Error).message}</p>}
           {d && managers && (
             <div role="tablist" aria-label="Docket sections" className="mb-4 flex gap-1 rounded-full bg-surface-2 p-1">

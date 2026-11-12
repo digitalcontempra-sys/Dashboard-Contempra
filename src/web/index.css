@@ -301,6 +301,17 @@ body {
   animation: fade-in 200ms ease both;
 }
 
+/* iPhone Safari gives date inputs a fixed min-content width that pushes cards sideways. */
+input[type="date"] {
+  min-width: 0;
+  max-width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+}
+fieldset {
+  min-width: 0;
+}
+
 /* Cards stay white whatever the OS theme, so the area colors read clearly (owner request, 2026-11-10). */
 .force-light {
   color: var(--text);

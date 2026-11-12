@@ -57,7 +57,7 @@ function UserForm({ initial, roles, onClose }: { initial: Draft; roles: RoleDTO[
         aria-modal="true"
         aria-label={isNew ? "Add user" : "Edit user"}
         onSubmit={submit}
-        className="glass-strong animate-sheet-in relative max-h-[92dvh] w-full overflow-y-auto rounded-t-[var(--radius-panel)] p-5 sm:max-w-lg sm:rounded-[var(--radius-panel)]"
+        className="glass-strong animate-sheet-in relative max-h-[92dvh] w-full overflow-x-hidden overflow-y-auto rounded-t-[var(--radius-panel)] p-5 sm:max-w-lg sm:rounded-[var(--radius-panel)]"
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">{isNew ? "Add user" : `Edit ${initial.fullName}`}</h2>
