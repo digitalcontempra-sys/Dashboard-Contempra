@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { flushCardSheet, PRODUCTION_HEADERS, queueCardSheet, retryCardSheet, STAGE_HEADERS } from "../../src/worker/cards/sheetSync";
+import { flushCardSheet, PRODUCTION_COLUMNS_VERSION, PRODUCTION_HEADERS, queueCardSheet, retryCardSheet, STAGE_HEADERS } from "../../src/worker/cards/sheetSync";
 import { cardsOf, errorOf, newDocket, post, put, route, setupCards, teardownCards } from "./cardHelpers";
 
 let s: Awaited<ReturnType<typeof setupCards>>;
@@ -16,7 +16,7 @@ afterEach(teardownCards);
 
 const setup = () => post("/api/admin/production-columns", s.admin, { confirm: "SET UP" });
 const sheetRow = (wo: string) => s.g.sheet.rowOf(wo)!;
-const stageCells = (wo: string) => sheetRow(wo).slice(16, 27);
+const stageCells = (wo: string) => sheetRow(wo).slice(16, 28);
 const today = new Intl.DateTimeFormat("en-US", { timeZone: "America/Winnipeg", month: "2-digit", day: "2-digit" }).format(new Date());
 
 describe("Set up production columns", () => {
@@ -28,11 +28,11 @@ describe("Set up production columns", () => {
       ["Work Order", ...OLD],
       [91487, "x", "", "", "", "", "", "", "", "old"],
     ]);
-    expect(s.g.sheet.rows[0].slice(16, 27)).toEqual(STAGE_HEADERS);
+    expect(s.g.sheet.rows[0].slice(16, 28)).toEqual(STAGE_HEADERS);
     expect(s.g.sheet.rows[1].slice(16, 25).every((v) => v === "")).toBe(true);
     expect(s.g.sheet.tabs.Production).toEqual([PRODUCTION_HEADERS]);
     const flag = await env.DB.prepare("SELECT value FROM app_settings WHERE key = 'production_columns'").first();
-    expect(flag).toEqual({ value: "v2" });
+    expect(flag).toEqual({ value: PRODUCTION_COLUMNS_VERSION });
   });
 
   it("runs once, needs confirmation, and is for admins only", async () => {
@@ -42,6 +42,32 @@ describe("Set up production columns", () => {
     const again = await setup();
     expect(again.status).toBe(409);
     expect(await errorOf(again)).toBe("Production columns are already set up.");
+  });
+});
+
+describe("Photos column", () => {
+  it("a sheet on the Q–AA layout gets the Photos header in AB", async () => {
+    expect((await setup()).status).toBe(200);
+    s.g.sheet.rows[0].splice(16, 12, ...STAGE_HEADERS.slice(0, 11));
+    await env.DB.prepare("UPDATE app_settings SET value = 'v2' WHERE key = 'production_columns'").run();
+    const res = await setup();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ archivedRows: 0, updated: true });
+    expect(s.g.sheet.rows[0][27]).toBe("Photos");
+  });
+
+  it("links the docket's photo folder from column AB", async () => {
+    await setup();
+    const d = await newDocket(s.manager, route("installer"));
+    const [c] = await cardsOf(d.workOrder);
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO docket_photo_folders (work_order, folder_id, link) VALUES (?, 'f1', 'https://drive.google.com/drive/folders/f1')").bind(d.workOrder),
+      env.DB.prepare("INSERT INTO card_photos (card_id, work_order, drive_file_id, link, name, created_at) VALUES (?, ?, 'p1', 'l', 'n', 't')").bind(c.id, d.workOrder),
+      env.DB.prepare("INSERT INTO card_photos (card_id, work_order, drive_file_id, link, name, created_at) VALUES (?, ?, 'p2', 'l', 'n', 't')").bind(c.id, d.workOrder),
+    ]);
+    await queueCardSheet(env.DB, d.workOrder);
+    await flushCardSheet(env, d.workOrder);
+    expect(sheetRow(d.workOrder)[27]).toBe('=HYPERLINK("https://drive.google.com/drive/folders/f1","Photos (2)")');
   });
 });
 
@@ -55,12 +81,13 @@ describe("Contour Cut column", () => {
     const res = await setup();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ archivedRows: 0, updated: true });
-    expect(s.g.sheet.rows[0].slice(16, 27)).toEqual(STAGE_HEADERS);
+    expect(s.g.sheet.rows[0].slice(16, 28)).toEqual(STAGE_HEADERS);
     expect(STAGE_HEADERS[5]).toBe("Contour Cut");
     expect(STAGE_HEADERS[10]).toBe("Assigned");
+    expect(STAGE_HEADERS[11]).toBe("Photos");
     expect(s.g.sheet.tabs["Legacy Q-Y"]).toBe(legacy);
     const flag = await env.DB.prepare("SELECT value FROM app_settings WHERE key = 'production_columns'").first();
-    expect(flag).toEqual({ value: "v2" });
+    expect(flag).toEqual({ value: PRODUCTION_COLUMNS_VERSION });
   });
 
   it("a Contour Cut step shows in column V", async () => {
@@ -104,6 +131,7 @@ describe("Stage columns", () => {
       "—",
       "—",
       "Team",
+      "",
     ]);
     const prod = s.g.sheet.tabs.Production.slice(1);
     expect(prod.map((r) => [r[0], r[2], r[3], r[5]])).toEqual([
@@ -127,7 +155,7 @@ describe("Stage columns", () => {
     // Create before the columns are ready, so no background flush races this test; then mark them ready.
     const d = await newDocket(s.manager, route("printer_roll"));
     await new Promise((r) => setTimeout(r, 100)); // let the save's background flush finish (it is a no-op: not ready)
-    await env.DB.prepare("INSERT INTO app_settings (key, value) VALUES ('production_columns', 'v2')").run();
+    await env.DB.prepare("INSERT INTO app_settings (key, value) VALUES ('production_columns', 'v3')").run();
     s.g.sheet.tabs.Production = [[...PRODUCTION_HEADERS]];
     await queueCardSheet(env.DB, d.workOrder);
     s.g.sheet.failNext("updateCells");

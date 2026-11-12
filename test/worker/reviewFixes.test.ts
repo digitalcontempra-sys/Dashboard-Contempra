@@ -26,7 +26,7 @@ async function editJobs(wo: string, version: number, jobs: Parameters<typeof new
 /** Columns ready without the setup route (no background flush races the test). */
 async function columnsReady() {
   await sleep(100);
-  await env.DB.prepare("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('production_columns', 'v2')").run();
+  await env.DB.prepare("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('production_columns', 'v3')").run();
   s.g.sheet.tabs.Production = [[...PRODUCTION_HEADERS]];
 }
 

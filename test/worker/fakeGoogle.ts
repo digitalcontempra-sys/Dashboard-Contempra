@@ -75,7 +75,7 @@ export class FakeSheet implements SheetGateway {
       vals.forEach((v, j) => (row[c0 + j] = v));
     });
   }
-  async writeRanges(data: { range: string; values: unknown[][] }[]) {
+  async writeRanges(data: { range: string; values: unknown[][] }[], _input?: "RAW" | "USER_ENTERED") {
     this.check("updateCells");
     for (const d of data) await this.write(d.range, d.values);
   }

@@ -72,6 +72,12 @@ describe("SheetGateway tabs and ranges", () => {
     expect(JSON.parse(calls[0].body).data).toHaveLength(2);
   });
 
+  it("writeRanges can send formulas (USER_ENTERED)", async () => {
+    google(() => ({}));
+    await realSheetGateway(env).writeRanges([{ range: "Contempra!AB7", values: [['=HYPERLINK("u","Photos (1)")']] }], "USER_ENTERED");
+    expect(JSON.parse(calls[0].body).valueInputOption).toBe("USER_ENTERED");
+  });
+
   it("ensureTab adds a missing tab only", async () => {
     google((c) => (c.method === "GET" ? { sheets: [{ properties: { title: "Contempra" } }, { properties: { title: "Production" } }] } : {}));
     await realSheetGateway(env).ensureTab("Production");

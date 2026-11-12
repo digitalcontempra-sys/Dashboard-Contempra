@@ -7,7 +7,7 @@ import type { Env } from "../env";
 import { getGateways } from "../google/gateways";
 import { tabRef, type RowCells } from "../google/sheets";
 
-/** Q..AA. Bump PRODUCTION_COLUMNS_VERSION whenever this layout changes. */
+/** Q..AB. Bump PRODUCTION_COLUMNS_VERSION whenever this layout changes. */
 export const STAGE_HEADERS = [
   "Stage",
   "Design",
@@ -20,9 +20,10 @@ export const STAGE_HEADERS = [
   "Finishing",
   "Install",
   "Assigned",
+  "Photos",
 ];
-/** app_settings.production_columns once the sheet has the current layout ("ready" was Q–Z, before Contour Cut). */
-export const PRODUCTION_COLUMNS_VERSION = "v2";
+/** app_settings.production_columns once the sheet has the current layout ("ready" = Q–Z, "v2" = Q–AA, "v3" = Q–AB with Photos). */
+export const PRODUCTION_COLUMNS_VERSION = "v3";
 export const PRODUCTION_HEADERS = [
   "Work Order",
   "Job",
@@ -182,7 +183,20 @@ export async function flushCardSheet(env: Env, wo: string): Promise<void> {
       const cards = await sheetCards(db, wo);
       const names = await userNames(db, [...new Set(cards.flatMap(assigneeIds))]);
       const { row } = await locateRow(env, wo);
-      await sheet.updateCells(row, stageRowCells(cards, names, q));
+      const photos = await db
+        .prepare(
+          `SELECT (SELECT count(*) FROM card_photos WHERE work_order = ?1) AS n,
+                  (SELECT link FROM docket_photo_folders WHERE work_order = ?1) AS link`,
+        )
+        .bind(wo)
+        .first<{ n: number; link: string | null }>();
+      const hasPhotos = (photos?.n ?? 0) > 0 && photos?.link;
+      await sheet.updateCells(row, { ...stageRowCells(cards, names, q), ...(hasPhotos ? {} : { AB: "" }) });
+      if (hasPhotos) {
+        // A clickable "Photos (n)" that opens the docket's Drive folder (a formula, so it is written USER_ENTERED).
+        const link = String(photos!.link).replace(/"/g, "");
+        await sheet.writeRanges([{ range: `Contempra!AB${row}`, values: [[`=HYPERLINK("${link}","Photos (${photos!.n})")`]] }], "USER_ENTERED");
+      }
 
       // Production tab: one row per (Work Order, Job, Step), updated in place in one request.
       const existing = await sheet.readRange(`${tabRef(PRODUCTION_TAB)}!A2:F`);
@@ -241,11 +255,11 @@ export async function setupProductionColumns(env: Env, _user: SessionUser): Prom
   const sheet = getGateways(env).sheet;
   const setting = await db.prepare("SELECT value FROM app_settings WHERE key = 'production_columns'").first<{ value: string }>();
   const archivedRows = await withLock(db, SHEET_LOCK, async () => {
-    const head = await sheet.readRange("Contempra!Q1:AA1");
+    const head = await sheet.readRange("Contempra!Q1:AB1");
     if (String(head[0]?.[0] ?? "").trim() === "Stage") {
       if (setting?.value === PRODUCTION_COLUMNS_VERSION) throw new ServiceError(409, "Production columns are already set up.");
       // Older layout: the stage cells are rewritten from the cards by the flushes queued below.
-      await sheet.clearColumns("Q", "AA", 2);
+      await sheet.clearColumns("Q", "AB", 2);
       await sheet.writeRange("Contempra!Q1", [STAGE_HEADERS]);
       return null;
     }
@@ -259,7 +273,7 @@ export async function setupProductionColumns(env: Env, _user: SessionUser): Prom
     }
     await sheet.ensureTab(LEGACY_TAB);
     await sheet.writeRange(`${tabRef(LEGACY_TAB)}!A1`, legacy);
-    await sheet.clearColumns("Q", "AA", 2);
+    await sheet.clearColumns("Q", "AB", 2);
     await sheet.writeRange("Contempra!Q1", [STAGE_HEADERS]);
     await sheet.ensureTab(PRODUCTION_TAB);
     await sheet.writeRange(`${tabRef(PRODUCTION_TAB)}!A1`, [PRODUCTION_HEADERS]);

@@ -114,11 +114,11 @@ Una tarjeta deja de contar como nueva cuando esa persona la abre.
 
 ## 8. Google Sheet
 
-### 8.1 Columnas Q–AA (resumen; las escribe solo el dashboard)
+### 8.1 Columnas Q–AB (resumen; las escribe solo el dashboard)
 
-| Q | R | S | T | U | V | W | X | Y | Z | AA |
+| Q | R | S | T | U | V | W | X | Y | Z | AA | AB |
 |---|---|---|---|---|---|---|---|---|---|
-| `Stage` | `Design` | `Print Roll` | `Print FB` | `Laminate` | `Contour Cut` | `Liquid Lam` | `Colex` | `Finishing` | `Install` | `Assigned` |
+| `Stage` | `Design` | `Print Roll` | `Print FB` | `Laminate` | `Contour Cut` | `Liquid Lam` | `Colex` | `Finishing` | `Install` | `Assigned` | `Photos` |
 
 - **`Stage`:** área o áreas activas (`Print Roll` o `Print Roll, Colex` si hay varios jobs), o `Done`.
 - **Columnas de área:**
@@ -134,7 +134,9 @@ Una tarjeta deja de contar como nueva cuando esa persona la abre.
 1. Copia las columnas Q–Y actuales a la pestaña `Legacy Q-Y`, con el Work Order de referencia.
 2. Escribe los nuevos encabezados Q–AA.
 
-Una hoja preparada con la distribución anterior (Q–Z, sin Contour Cut) se actualiza con el mismo botón: solo reescribe Q–AA y no toca `Legacy Q-Y`.
+Una hoja preparada con una distribución anterior (Q–Z o Q–AA) se actualiza con el mismo botón: solo reescribe Q–AB y no toca `Legacy Q-Y`.
+
+**`Photos` (AB, 2026-11-12):** link `Photos (n)` (fórmula `=HYPERLINK`) a la carpeta de fotos del docket en Drive; vacío si no hay fotos.
 
 SUB y QC se eliminan; su contenido queda en `Legacy Q-Y`.
 

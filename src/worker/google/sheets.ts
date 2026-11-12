@@ -15,8 +15,8 @@ export interface SheetGateway {
   ensureTab(title: string): Promise<void>;
   /** Writes raw values starting at the range's top-left cell (any tab). */
   writeRange(a1: string, values: unknown[][]): Promise<void>;
-  /** Several writeRange calls in one request. */
-  writeRanges(data: { range: string; values: unknown[][] }[]): Promise<void>;
+  /** Several writeRange calls in one request. USER_ENTERED lets Sheets read formulas (e.g. =HYPERLINK). */
+  writeRanges(data: { range: string; values: unknown[][] }[], input?: "RAW" | "USER_ENTERED"): Promise<void>;
   /** Appends raw rows after the last row of a tab. */
   appendRows(tab: string, values: unknown[][]): Promise<void>;
   /** Clears values and data validation (old checkboxes) of the Contempra tab's columns, from a row down. */
@@ -110,10 +110,10 @@ export function realSheetGateway(env: GoogleEnv): SheetGateway {
       await this.writeRanges([{ range: a1, values }]);
     },
 
-    async writeRanges(data) {
+    async writeRanges(data, input = "RAW") {
       if (data.length === 0) return;
       const { id } = await target();
-      await call(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchUpdate`, { valueInputOption: "RAW", data });
+      await call(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchUpdate`, { valueInputOption: input, data });
     },
 
     async appendRows(tab, values) {

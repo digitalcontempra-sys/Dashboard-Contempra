@@ -40,6 +40,7 @@ export async function setupCards() {
   __setTestGateways(g);
   await env.DB.batch([
     env.DB.prepare("DELETE FROM card_sheet_queue"),
+    env.DB.prepare("DELETE FROM docket_photo_folders"),
     env.DB.prepare("DELETE FROM app_settings"),
     env.DB.prepare("DELETE FROM job_steps"),
     env.DB.prepare("DELETE FROM docket_jobs"),
