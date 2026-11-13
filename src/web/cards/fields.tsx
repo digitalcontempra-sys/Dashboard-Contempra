@@ -1,15 +1,22 @@
 import { CARD_FIELDS, type CardFields, type FieldSpec } from "../../shared/cards";
 import { PhotoField } from "./PhotoField";
 import flatbedMaterials from "../../../data/catalogs/flatbed-materials.json";
+import laminateMaterials from "../../../data/catalogs/laminate-materials.json";
 import rollMaterials from "../../../data/catalogs/roll-print-materials.json";
 
 const MATERIALS = [...rollMaterials.items]
   .sort((a, b) => Number(b.favorite) - Number(a.favorite))
   .map((m) => m.name);
 const FLATBED_MATERIALS = flatbedMaterials.items.map((m) => m.name);
+const LAMINATE_MATERIALS = laminateMaterials.items.map((m) => m.name);
 
-/** Suggestions for a role's Material field: flatbed boards for Print FB, the roll list otherwise. */
-const materialsFor = (roleId: string) => (roleId === "printer_fb" ? FLATBED_MATERIALS : roleId === "liquid_lam" ? [] : MATERIALS);
+/** Suggestions for a role's Material field: each area has its own list (Print Roll uses the roll list). */
+const MATERIALS_BY_ROLE: Record<string, string[]> = {
+  printer_fb: FLATBED_MATERIALS,
+  laminate_roll: LAMINATE_MATERIALS,
+  liquid_lam: [],
+};
+const materialsFor = (roleId: string) => MATERIALS_BY_ROLE[roleId] ?? MATERIALS;
 
 type Props = {
   roleId: string;

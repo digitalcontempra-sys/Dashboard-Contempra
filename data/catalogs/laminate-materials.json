@@ -1,0 +1,15 @@
+{
+  "type": "Laminate Roll Material",
+  "source": "Owner list (provisional), 2026-11-13. Only for Laminate Roll.",
+  "items": [
+    { "name": "Gloss Lam" },
+    { "name": "Matte Lam" },
+    { "name": "1360 Lam" },
+    { "name": "Weed And Mask" },
+    { "name": "Sand UV" },
+    { "name": "Scuff" },
+    { "name": "Coat" },
+    { "name": "Back in white" },
+    { "name": "Double side decals" }
+  ]
+}

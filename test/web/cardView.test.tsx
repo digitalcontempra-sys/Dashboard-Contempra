@@ -99,6 +99,22 @@ describe("CardView", () => {
     expect(screen.getByLabelText("Reason")).toHaveValue("File missing");
   });
 
+  it("Laminate Roll suggests the laminate list", () => {
+    const optionValues = () => [...document.querySelectorAll("#card-field-material-list option")].map((o) => (o as HTMLOptionElement).value);
+    show(makeCard({ roleId: "laminate_roll", nextRoleId: null }));
+    expect(optionValues()).toEqual([
+      "Gloss Lam",
+      "Matte Lam",
+      "1360 Lam",
+      "Weed And Mask",
+      "Sand UV",
+      "Scuff",
+      "Coat",
+      "Back in white",
+      "Double side decals",
+    ]);
+  });
+
   it("Print FB suggests flatbed materials; Print Roll keeps the roll list", () => {
     const optionValues = () => [...document.querySelectorAll("#card-field-material-list option")].map((o) => (o as HTMLOptionElement).value);
     const { unmount } = show(makeCard({ roleId: "printer_fb", nextRoleId: null }));
