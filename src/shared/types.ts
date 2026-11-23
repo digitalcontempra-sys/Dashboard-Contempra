@@ -156,4 +156,6 @@ export type BoardCard = CardDTO & { noMembers: boolean };
 export type BoardDTO = {
   columns: { roleId: string; area: string; cards: BoardCard[] }[];
   productionColumnsReady: boolean;
+  /** The sheet was set up once before (an older layout): the next setup only updates it. */
+  productionColumnsSetUp: boolean;
 };

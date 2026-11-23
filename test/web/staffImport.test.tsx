@@ -50,7 +50,7 @@ describe("Import staff", () => {
     "GET /api/users": () => [],
     "GET /api/google/status": () => ({ status: "connected", email: "x@y.z", sheetId: "s", sheetTitle: "T", tabName: "Contempra", connectedAt: null }),
     "GET /api/sync/status": () => ({ lastRunAt: null, lastSuccessAt: null, lastError: null, rowsSeen: 0, rowsChanged: 0, rowsDeleted: 0, configured: true }),
-    "GET /api/production-board": () => ({ columns: [], productionColumnsReady: true }),
+    "GET /api/production-board": () => ({ columns: [], productionColumnsReady: true, productionColumnsSetUp: true }),
     "GET /api/admin/import-staff": () => roster,
     "POST /api/admin/import-staff": () => ({ created: ["kharash", "danni"], skipped: ["erin"] }),
   };

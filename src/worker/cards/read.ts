@@ -76,6 +76,10 @@ export async function setSound(env: Env, user: SessionUser, on: unknown): Promis
   await env.DB.prepare("UPDATE users SET sound_on = ? WHERE id = ?").bind(on ? 1 : 0, user.id).run();
 }
 
+export async function productionColumnsSetUp(db: D1Database): Promise<boolean> {
+  return (await db.prepare("SELECT 1 FROM app_settings WHERE key = 'production_columns'").first()) !== null;
+}
+
 export async function productionColumnsReady(db: D1Database): Promise<boolean> {
   const r = await db.prepare("SELECT value FROM app_settings WHERE key = 'production_columns'").first<{ value: string }>();
   return r?.value === PRODUCTION_COLUMNS_VERSION;
@@ -119,6 +123,7 @@ export async function board(
       cards: cards.filter((c) => c.roleId === roleId).map((c) => ({ ...c, noMembers: c.team && !hasMembers.has(roleId) })),
     })),
     productionColumnsReady: await productionColumnsReady(db),
+    productionColumnsSetUp: await productionColumnsSetUp(db),
   };
 }
 

@@ -25,6 +25,7 @@ const board = (over: Partial<BoardDTO> = {}): BoardDTO => ({
     },
   ],
   productionColumnsReady: true,
+  productionColumnsSetUp: true,
   ...over,
 });
 const base = {
@@ -141,16 +142,34 @@ describe("Set up production columns", () => {
       "GET /api/users": () => [],
       "GET /api/google/status": () => ({ status: "connected", email: "x@y.z", sheetId: "s", sheetTitle: "T", tabName: "Contempra", connectedAt: null }),
       "GET /api/sync/status": () => ({ lastRunAt: null, lastSuccessAt: null, lastError: null, rowsSeen: 0, rowsChanged: 0, rowsDeleted: 0, configured: true }),
-      "GET /api/production-board": () => board({ productionColumnsReady: false }),
+      "GET /api/production-board": () => board({ productionColumnsReady: false, productionColumnsSetUp: false }),
       "POST /api/admin/production-columns": () => ({ archivedRows: 12 }),
     });
     renderApp("/admin/users");
     await userEvent.click(await screen.findByRole("button", { name: "Set up production columns" }));
+    expect(screen.getByText(/copies columns Q–Y to a new "Legacy Q-Y" tab/)).toBeInTheDocument();
     const go = screen.getByRole("button", { name: "Set up" });
     expect(go).toBeDisabled();
     await userEvent.type(screen.getByLabelText("Type SET UP to continue"), "SET UP");
     await userEvent.click(go);
     expect(await screen.findByText("Done. 12 rows archived.")).toBeInTheDocument();
     expect(calls.find((c) => c.url.pathname === "/api/admin/production-columns")!.body).toEqual({ confirm: "SET UP" });
+  });
+
+  it("a sheet set up before says it only updates, leaving Legacy Q-Y alone", async () => {
+    mockApi({
+      ...base,
+      "GET /api/auth/me": () => adminUser,
+      "GET /api/roles": () => [],
+      "GET /api/users": () => [],
+      "GET /api/google/status": () => ({ status: "connected", email: "x@y.z", sheetId: "s", sheetTitle: "T", tabName: "Contempra", connectedAt: null }),
+      "GET /api/sync/status": () => ({ lastRunAt: null, lastSuccessAt: null, lastError: null, rowsSeen: 0, rowsChanged: 0, rowsDeleted: 0, configured: true }),
+      "GET /api/production-board": () => board({ productionColumnsReady: false, productionColumnsSetUp: true }),
+    });
+    renderApp("/admin/users");
+    expect(await screen.findByText("The Google Sheet needs the latest production columns.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Set up production columns" }));
+    expect(screen.getByText(/updates the production headers and rewrites them from the cards\. The "Legacy Q-Y" tab is not touched\./)).toBeInTheDocument();
+    expect(screen.queryByText(/copies columns Q–Y/)).not.toBeInTheDocument();
   });
 });

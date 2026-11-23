@@ -123,6 +123,12 @@ describe("Production Board", () => {
     expect(col("liquid_lam").cards[0].noMembers).toBe(true);
     expect(board.columns.map((c) => c.roleId)[0]).toBe("designer");
     expect(board.productionColumnsReady).toBe(false);
+    expect(board.productionColumnsSetUp).toBe(false);
+    // Set up with an older layout: not ready, but already set up once (the dialog offers an update).
+    await env.DB.prepare("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('production_columns', 'v3')").run();
+    const again = await getJson<BoardDTO>("/api/production-board", s.manager);
+    expect(again.productionColumnsReady).toBe(false);
+    expect(again.productionColumnsSetUp).toBe(true);
   });
 
   it("filters by area and person, and is closed to Staff", async () => {

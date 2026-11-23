@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { BoardDTO } from "../../shared/types";
 import { api } from "../api";
 
-/** Admin: one-time move of the sheet's old Q–Y columns to "Legacy Q-Y" and the new production headers. */
+/** Admin: one-time move of the sheet's old Q–Y columns to "Legacy Q-Y" and the new production headers, or an update to the latest layout. */
 export function ProductionColumns() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -23,13 +23,16 @@ export function ProductionColumns() {
     );
   }
   if (!status.data || status.data.productionColumnsReady) return null;
+  const update = status.data.productionColumnsSetUp;
 
   return (
     <section className="card p-4">
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="font-semibold">Production columns</h2>
-          <p className="text-sm text-text-2">The Google Sheet does not show the production stage yet.</p>
+          <p className="text-sm text-text-2">
+            {update ? "The Google Sheet needs the latest production columns." : "The Google Sheet does not show the production stage yet."}
+          </p>
         </div>
         {!open && (
           <button type="button" className="btn-ghost" onClick={() => setOpen(true)}>
@@ -40,7 +43,10 @@ export function ProductionColumns() {
       {open && (
         <div className="mt-3 rounded-2xl bg-surface-2 p-3.5">
           <p className="text-sm">
-            This copies columns Q–Y to a new "Legacy Q-Y" tab, clears them, and writes the new production headers. Type SET UP to continue.
+            {update
+              ? 'This updates the production headers and rewrites them from the cards. The "Legacy Q-Y" tab is not touched.'
+              : 'This copies columns Q–Y to a new "Legacy Q-Y" tab, clears them, and writes the new production headers.'}{" "}
+            Type SET UP to continue.
           </p>
           <label htmlFor="setup-confirm" className="sr-only">
             Type SET UP to continue
