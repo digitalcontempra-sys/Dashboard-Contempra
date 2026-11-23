@@ -203,6 +203,7 @@ export function stageRowCells(cards: SheetCard[], names: Map<number, string>, q:
   // K (ROLE): who has the docket now. A docket without cards keeps whatever K holds.
   if (allDone) cells.K = "Done";
   else if (active.length) cells.K = [...new Set(active.map((c) => holderText(c, names)))].join(", ");
+  else if (cards.length) cells.K = "";
   if (q.comp === 1) cells.D = true;
   if (q.hold !== null) cells.E = q.hold === 1;
   return cells;
@@ -279,7 +280,12 @@ export async function flushCardSheet(env: Env, wo: string): Promise<void> {
       let freshTracking: unknown[] | null = null;
       if (events.length) {
         const tracking = [wo, sheetValues[6] ?? "", trackingText(events, names)];
-        const wos = await sheet.readRange(`${tabRef(TRACKING_TAB)}!A2:A`);
+        const range = `${tabRef(TRACKING_TAB)}!A2:A`;
+        // A sheet set up before v4 (or a newly connected sheet) may lack the tab: create it rather than stay queued forever.
+        const wos = await sheet.readRange(range).catch(async () => {
+          await setupTrackingTab(sheet);
+          return sheet.readRange(range);
+        });
         const at = wos.findIndex((r) => String(r?.[0] ?? "") === wo);
         if (at >= 0) updates.push({ range: `${tabRef(TRACKING_TAB)}!A${at + 2}`, values: [tracking] });
         else freshTracking = tracking;

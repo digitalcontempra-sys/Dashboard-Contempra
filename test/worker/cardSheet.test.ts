@@ -7,6 +7,7 @@ import {
   queueCardSheet,
   retryCardSheet,
   STAGE_HEADERS,
+  stageRowCells,
   TRACKING_HEADERS,
   TRACKING_TAB,
   trackingLine,
@@ -218,6 +219,12 @@ describe("Stage columns", () => {
     expect(sheetRow(d.workOrder)[10]).toBe("ira, Colex");
   });
 
+  it("column K is cleared when no card is active and not all are done", () => {
+    const card = { status: "waiting", role_id: "colex", role_label: "Colex", assignee_ids: "[]", fields_json: "{}", claimed_name: null };
+    const cells = stageRowCells([card] as unknown as Parameters<typeof stageRowCells>[0], new Map(), { hold: null, comp: null });
+    expect(cells.K).toBe("");
+  });
+
   it("a docket without cards keeps its column K", async () => {
     await setup();
     s.g.sheet.rows[1][10] = "IN ship room";
@@ -286,6 +293,17 @@ describe("Docket Tracking tab", () => {
       ["Printer Roll", "received"],
       ["erin", "started"],
     ]);
+  });
+
+  it("a missing tab is created on the fly instead of blocking the docket's sheet writes", async () => {
+    await setup();
+    delete s.g.sheet.tabs[TRACKING_TAB];
+    const d = await newDocket(s.manager, route("colex"));
+    await queueCardSheet(env.DB, d.workOrder);
+    await flushCardSheet(env, d.workOrder);
+    expect(s.g.sheet.tabs[TRACKING_TAB][0]).toEqual(TRACKING_HEADERS);
+    expect(lines(d.workOrder)).toEqual([["Colex", "received"]]);
+    expect(await env.DB.prepare("SELECT count(*) AS n FROM card_sheet_queue").first()).toEqual({ n: 0 });
   });
 
   it("reassigning an active card in the route editor counts as received", async () => {
