@@ -247,6 +247,23 @@ describe("card moves", () => {
     expect(await errorOf(await post(`/api/cards/${mine.id}/restore`, t.admin))).toBe("Only a finished card can be restored.");
   });
 
+  it("a cancelled or trashed docket's cards cannot move or be restored", async () => {
+    const mine = await cardOf(wo, t.ids.ira);
+    expect((await post(`/api/virtual-dockets/${wo}/cancel`, t.manager)).status).toBe(200);
+    const res = await move(mine, "done", ira);
+    expect(res.status).toBe(409);
+    expect(await errorOf(res)).toBe("This docket is cancelled or in the Trash.");
+    await env.DB.prepare("UPDATE cards SET status = 'done' WHERE id = ?").bind(mine.id).run();
+    expect(await errorOf(await post(`/api/cards/${mine.id}/restore`, t.admin))).toBe("This docket is cancelled or in the Trash.");
+  });
+
+  it("a docket without a creator refuses Done and keeps the card open", async () => {
+    const mine = await cardOf(wo, t.ids.ira);
+    await env.DB.prepare("UPDATE virtual_dockets SET created_by = NULL, updated_by = NULL WHERE work_order = ?").bind(wo).run();
+    expect(await errorOf(await move(mine, "done", ira))).toBe("This docket has no creator to return to.");
+    expect((await all(wo)).find((c) => c.id === mine.id)!.status).toBe("active");
+  });
+
   it("an old route card continues with the new buttons; its waiting cards are dropped", async () => {
     const res = await post("/api/virtual-dockets", t.manager, { form: docketForm(), jobs: route("designer", "finishing") });
     const old = ((await res.json()) as VirtualDocketDTO).workOrder;

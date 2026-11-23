@@ -17,7 +17,20 @@ export async function loadForAction(db: D1Database, user: SessionUser, id: numbe
   const card = await db.prepare("SELECT * FROM cards WHERE id = ?").bind(id).first<CardRow>();
   if (!card) throw new ServiceError(404, "Card not found");
   if (!canAct(card, user)) throw new ServiceError(403, "You can't work on this card.");
+  await assertLive(db, card.work_order);
   return card;
+}
+
+/** Cards of a cancelled docket, or one in the Trash, stay as they are (same rule as the card lists). */
+export async function assertLive(db: D1Database, wo: string): Promise<void> {
+  const live = await db
+    .prepare(
+      `SELECT 1 FROM virtual_dockets v LEFT JOIN dockets d ON d.work_order = v.work_order
+       WHERE v.work_order = ? AND v.state = 'saved' AND v.deleted_at IS NULL AND coalesce(d.status, '') != 'cancelled'`,
+    )
+    .bind(wo)
+    .first();
+  if (!live) throw new ServiceError(409, "This docket is cancelled or in the Trash.");
 }
 
 async function movedError(db: D1Database, cardId: number): Promise<ServiceError> {

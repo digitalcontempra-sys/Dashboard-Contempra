@@ -179,7 +179,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
    5. Have a fresh reviewer check the whole branch, and fix what it finds that matters.
    6. Ask "¿Hago merge a main y publico?"
 3. **Verification before saying "done":**
-   - `npx vitest run` passes (today 431 tests).
+   - `npx vitest run` passes (today 433 tests).
    - `npm run typecheck` is clean.
    - For UI changes, check the page in the local preview, including phone width 375 px: no horizontal scroll.
 4. **Commit messages:**
@@ -320,7 +320,9 @@ Everything below is live and pushed to `main`:
   - Overdue dated tasks show "Rush / Today" instead of "Overdue".
   - Escape discards a draft in New Task Card.
   - Rare races: route edit vs. card action, and the two-step continue / send-back writes.
-  - Card actions still work on a cancelled docket if the card id is known.
+  - Hand-off moves are several D1 writes after the guarded update (not one batch): a crash mid-move can leave a done card with no receiver.
+  - Rare hand-off races: Close vs. a concurrent Continue on another branch; two Continues to the same person reusing one parked card; a send back onto a target card that is already active.
+  - A newer `waiting_*` approval replaces an older one on the creator's card (latest wins).
   - `claimCard` silently takes over another person's claim.
   - Production-tab rows are keyed by job name.
   - Queue rows of purged dockets are never cleaned.

@@ -4,7 +4,7 @@ import { approvalKind, GENERAL_ROLE, parseTargets, type CardStage, type HandoffT
 import type { CardDTO, SessionUser } from "../../shared/types";
 import { ServiceError } from "../dockets/errors";
 import type { Env } from "../env";
-import { assertComplete, assertFresh, guardedUpdate, loadForAction, sendBackRouteCard } from "./actions";
+import { assertComplete, assertFresh, assertLive, guardedUpdate, loadForAction, sendBackRouteCard } from "./actions";
 import { cardDTO } from "./dto";
 import { eventStmt, receivedDetail, type CardRow } from "./service";
 import { queueCardSheet } from "./sheetSync";
@@ -195,9 +195,11 @@ export async function finishCard(env: Env, user: SessionUser, id: number, kind: 
   if (kind !== "done" && approvalKind(card.role_id) !== kind) throw new ServiceError(400, `This card can't send a ${kind}.`);
   // A proof or sample goes out before it is approved, so only Done needs the area's fields.
   if (kind === "done") await assertComplete(db, card);
+  // Before the card is marked done: without someone to return to, it must stay open.
+  const creatorId = await creatorOf(db, card.work_order);
   const now = new Date().toISOString();
   await guardedUpdate(db, card, DONE_SQL, user.id, now, now);
-  await eventStmt(db, card, card.work_order, FINISH[kind].action, user.id, now, { back: await creatorOf(db, card.work_order) }).run();
+  await eventStmt(db, card, card.work_order, FINISH[kind].action, user.id, now, { back: creatorId }).run();
   await returnToCreator(db, card.work_order, FINISH[kind].stage, { userId: user.id, cardId: card.id }, now);
   await dropRouteWaiting(db, card.work_order, user.id, now);
   await queueCardSheet(db, card.work_order);
@@ -273,6 +275,7 @@ export async function restoreCard(env: Env, user: SessionUser, id: number): Prom
   if (user.accessLevel !== "admin") throw new ServiceError(403, "Only an admin can restore a card.");
   const card = await db.prepare("SELECT * FROM cards WHERE id = ?").bind(id).first<CardRow>();
   if (!card) throw new ServiceError(404, "Card not found");
+  await assertLive(db, card.work_order);
   if (card.status !== "done") throw new ServiceError(409, "Only a finished card can be restored.");
   const open = await db
     .prepare("SELECT count(*) AS n FROM cards WHERE work_order = ? AND status = 'active'")
