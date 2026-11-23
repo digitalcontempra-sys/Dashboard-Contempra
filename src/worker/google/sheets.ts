@@ -1,5 +1,5 @@
 import { readSheetRange, SheetFetchError, type GoogleEnv } from "../sheet/googleClient";
-import { colIndex, colName, STATUS_INDEX } from "../sheet/layout";
+import { colIndex, colName, STATUS_HEADER, STATUS_INDEX } from "../sheet/layout";
 import { getAccessToken, getConnection, googleFetch } from "./oauth";
 
 export type CellValue = string | number | boolean | null | undefined;
@@ -22,7 +22,7 @@ export interface SheetGateway {
   appendRows(tab: string, values: unknown[][]): Promise<void>;
   /** Clears values and data validation (old checkboxes) of the Contempra tab's columns, from a row down. */
   clearColumns(fromCol: string, toCol: string, fromRow: number): Promise<void>;
-  /** Inserts a real, empty column L in the Contempra tab (formats copied from K). Ignores the layout. */
+  /** Inserts a real column L headed STATUS in the Contempra tab (formats copied from K), in one request. Ignores the layout. */
   insertStatusColumn(): Promise<void>;
 }
 
@@ -131,6 +131,14 @@ export function realSheetGateway(env: GoogleEnv): SheetGateway {
       const { gid } = await target();
       await batchUpdate([
         { insertDimension: { range: { sheetId: gid, dimension: "COLUMNS", startIndex: STATUS_INDEX, endIndex: STATUS_INDEX + 1 }, inheritFromBefore: true } },
+        // Same request: the column and its header land together or not at all.
+        {
+          updateCells: {
+            start: { sheetId: gid, rowIndex: 0, columnIndex: STATUS_INDEX },
+            rows: [{ values: [cellData(STATUS_HEADER)] }],
+            fields: "userEnteredValue",
+          },
+        },
       ]);
     },
 

@@ -69,6 +69,15 @@ describe("STATUS column", () => {
     expect(flag).toEqual({ value: PRODUCTION_COLUMNS_VERSION });
   });
 
+  it("the column and its header are inserted in one request (no second blank column after a failure)", async () => {
+    const writes: string[] = [];
+    const orig = s.g.sheet.writeRange.bind(s.g.sheet);
+    s.g.sheet.writeRange = async (a1, v) => (writes.push(a1), orig(a1, v));
+    await setup();
+    expect(writes).not.toContain("Contempra!L1");
+    expect(s.g.sheet.rows[0][11]).toBe("STATUS");
+  });
+
   it("a newly connected sheet without the STATUS column asks for set up again", async () => {
     await setup();
     const ready = async () => ((await (await api("/api/production-board", { cookie: s.manager })).json()) as { productionColumnsReady: boolean }).productionColumnsReady;

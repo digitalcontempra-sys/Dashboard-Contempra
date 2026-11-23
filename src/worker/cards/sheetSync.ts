@@ -370,7 +370,6 @@ export async function setupProductionColumns(env: Env, _user: SessionUser): Prom
     const inserted = String(l1 ?? "").trim() !== STATUS_HEADER;
     if (inserted) {
       await raw.insertStatusColumn();
-      await raw.writeRange("Contempra!L1", [[STATUS_HEADER]]);
     }
     await markStatusColumn(db);
     const sheet = getGateways(env).sheet; // speaks the original letters from here on

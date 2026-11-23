@@ -18,10 +18,10 @@ import type { RowCells } from "../google/sheets";
 import { EXPECTED_HEADERS, mapSheet } from "../sheet/mapRows";
 import { UPSERT_SQL, upsertParams } from "../sync/syncDockets";
 import { ServiceError } from "./errors";
-import { withLock } from "./lock";
+import { SHEET_LOCK, withLock } from "./lock";
 
 /** All app writes to the sheet go through this lease. */
-export const SHEET_LOCK = "sheet";
+export { SHEET_LOCK } from "./lock";
 
 export const TRASH_DAYS = 30;
 const DAY_MS = 86_400_000;

@@ -148,3 +148,26 @@ describe("runNightlyReconcile", () => {
     expect(r).toMatchObject({ ok: false, error: "Header mismatch: C" });
   });
 });
+
+describe("sheet reads and the sheet lock", () => {
+  // Set up inserts the STATUS column under this lock: a read must never see a half-changed layout.
+  const lockHeld = async () => (await env.DB.prepare("SELECT 1 FROM locks WHERE name = 'sheet'").first()) !== null;
+
+  it("the incremental sync reads while holding the sheet lock, and releases it", async () => {
+    const { reader } = fakeSheet([HEADER, row(91487)]);
+    const held: boolean[] = [];
+    const watched: SheetReader = async (r) => (held.push(await lockHeld()), reader(r));
+    await runIncrementalSync(env, watched, opts);
+    expect(held).toEqual([true, true]);
+    expect(await lockHeld()).toBe(false);
+  });
+
+  it("the nightly reconcile reads while holding the sheet lock", async () => {
+    const { reader } = fakeSheet([HEADER, row(91487)]);
+    const held: boolean[] = [];
+    const watched: SheetReader = async (r) => (held.push(await lockHeld()), reader(r));
+    await runNightlyReconcile(env, watched);
+    expect(held.length).toBeGreaterThan(0);
+    expect(held.every(Boolean)).toBe(true);
+  });
+});

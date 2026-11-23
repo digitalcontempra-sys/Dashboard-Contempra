@@ -113,6 +113,7 @@ export class FakeSheet implements SheetGateway {
   }
   async insertStatusColumn() {
     for (const r of this.rows) if (r.length > 11) r.splice(11, 0, "");
+    this.rows[0][11] = "STATUS";
   }
   async deleteRow(row: number) {
     this.check("deleteRow");

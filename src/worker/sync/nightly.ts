@@ -1,3 +1,4 @@
+import { SHEET_LOCK, withLock } from "../dockets/lock";
 import type { Env } from "../env";
 import { HeaderMismatchError, parseWorkOrder, type ReviewItem } from "../sheet/mapRows";
 import { googleReader, type SheetReader } from "./incremental";
@@ -16,7 +17,7 @@ export async function runNightlyReconcile(env: Env, reader?: SheetReader): Promi
   const read = reader ?? googleReader(env);
 
   try {
-    const column = await read("Contempra!C1:C");
+    const column = await withLock(db, SHEET_LOCK, () => read("Contempra!C1:C"));
     if (String(column[0]?.[0] ?? "").trim() !== "Work Order") throw new HeaderMismatchError("C");
 
     const rowsByWo = new Map<string, number[]>();

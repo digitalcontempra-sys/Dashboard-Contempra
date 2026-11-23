@@ -1,5 +1,8 @@
 import { ServiceError } from "./errors";
 
+/** The lease every Google Sheet write takes (and the sync's reads, so a layout change is never seen half-done). */
+export const SHEET_LOCK = "sheet";
+
 const TTL_MS = 30_000;
 const WAIT_MS = 10_000;
 const POLL_MS = 80;

@@ -1,3 +1,4 @@
+import { SHEET_LOCK, withLock } from "../dockets/lock";
 import type { Env } from "../env";
 import { readContempra } from "../sheet/googleClient";
 import { mapSheet, type DocketRecord } from "../sheet/mapRows";
@@ -42,8 +43,11 @@ export async function runIncrementalSync(
       .first<{ page_cursor: number | null }>();
     const cursor = state?.page_cursor && state.page_cursor >= firstPageRow ? state.page_cursor : firstPageRow;
 
-    const top = await read(`Contempra!A1:P${opts.topRows + 1}`);
-    const page = await read(`Contempra!A${cursor}:P${cursor + opts.pageRows - 1}`);
+    // Under the sheet lock: Set up inserting the STATUS column can never land between these reads.
+    const [top, page] = await withLock(db, SHEET_LOCK, async () => [
+      await read(`Contempra!A1:P${opts.topRows + 1}`),
+      await read(`Contempra!A${cursor}:P${cursor + opts.pageRows - 1}`),
+    ]);
     const header = top[0] ?? [];
     const topMapped = await mapSheet(top, 2);
     const pageMapped = await mapSheet([header, ...page], cursor);

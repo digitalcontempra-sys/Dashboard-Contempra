@@ -83,7 +83,12 @@ export function layoutReader(read: Reader, on: () => Promise<boolean>): Reader {
 export function layoutAware(sheet: SheetGateway, isOn: () => Promise<boolean>): SheetGateway {
   let cached: Promise<boolean> | null = null;
   const on = () => (cached ??= isOn());
-  const range = async (a1: string) => physicalRange(a1, await on()).range;
+  const range = async (a1: string) => {
+    const p = physicalRange(a1, await on());
+    // A write spanning K..L would put its L value into STATUS: no caller does this; refuse it.
+    if (p.drop !== null) throw new Error(`Write across the STATUS column is not supported: ${a1}`);
+    return p.range;
+  };
   return {
     readRange: layoutReader((r) => sheet.readRange(r), on),
     findRow: (wo) => sheet.findRow(wo),
