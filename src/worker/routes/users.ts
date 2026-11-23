@@ -16,7 +16,8 @@ userRoutes.use("/users/*", requireAuth, requireLevel("admin"));
 class BadRequest extends Error {}
 
 async function listRoles(db: D1Database): Promise<RoleDTO[]> {
-  const { results } = await db.prepare("SELECT id, label FROM roles ORDER BY sort").all<RoleDTO>();
+  // "general" is the area of cards for people without one; it is never given to a user.
+  const { results } = await db.prepare("SELECT id, label FROM roles WHERE id != 'general' ORDER BY sort").all<RoleDTO>();
   return results;
 }
 

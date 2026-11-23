@@ -38,6 +38,7 @@ export const ROLE_LABEL: Record<string, string> = {
   colex: "Colex",
   finishing: "Finishing / Packaging",
   installer: "Installer",
+  general: "General",
 };
 
 /** CSS color token (without "--") of each area; the light background is color-mix of it. */
@@ -64,6 +65,7 @@ export const AREA_LABEL: Record<string, string> = {
   colex: "Colex",
   finishing: "Finishing",
   installer: "Install",
+  general: "General",
 };
 
 const check = (key: string, label: string, required = false): FieldSpec => ({ key, label, kind: "check", required });
