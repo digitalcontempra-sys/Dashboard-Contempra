@@ -1,3 +1,4 @@
+import { hasCards, parseHandoff, startHandoff } from "../cards/handoff";
 import { reconcileCards } from "../cards/service";
 import {
   cancelStamp,
@@ -125,10 +126,11 @@ function validateForm(form: DocketForm | undefined): DocketForm {
   return form;
 }
 
-function toDto(row: VirtualRow, jobs: ProductionJob[], actor: SessionUser): VirtualDocketDTO {
+async function toDto(db: D1Database, row: VirtualRow, jobs: ProductionJob[], actor: SessionUser): Promise<VirtualDocketDTO> {
   const form = JSON.parse(row.form_json) as DocketForm;
   return {
     workOrder: row.work_order,
+    inProduction: await hasCards(db, row.work_order),
     form: actor.accessLevel === "staff" ? stripPrices(form) : form,
     jobs,
     version: row.version,
@@ -155,11 +157,12 @@ export async function nextWorkOrder(env: Env): Promise<number> {
 export async function createDocket(
   env: Env,
   actor: SessionUser,
-  input: { form?: DocketForm; jobs?: ProductionJob[] },
+  input: { form?: DocketForm; jobs?: ProductionJob[]; handoff?: unknown },
 ): Promise<VirtualDocketDTO> {
   const db = env.DB;
   const form = validateForm(input.form);
   const jobs = await validateJobs(db, input.jobs);
+  const targets = input.handoff === undefined ? null : await parseHandoff(db, input.handoff);
   const now = new Date().toISOString();
 
   // Reserve the number in D1 first: the primary key makes two saves at once pick different numbers.
@@ -201,15 +204,17 @@ export async function createDocket(
     db.prepare("UPDATE virtual_dockets SET state = 'saved' WHERE work_order = ?").bind(wo),
     ...jobStatements(db, wo, jobs),
   ]);
-  await reconcileCards(db, wo, jobs, actor.id, now);
+  // An old fixed route (API only) still makes route cards; the app hands the docket to people.
+  if (targets) await startHandoff(db, wo, actor.id, targets, now);
+  else await reconcileCards(db, wo, jobs, actor.id, now);
   await upsertMirror(db, toRowValues(cells), 2);
-  return toDto((await loadVirtual(db, wo))!, jobs, actor);
+  return toDto(db, (await loadVirtual(db, wo))!, jobs, actor);
 }
 
 export async function getVirtualDocket(env: Env, actor: SessionUser, wo: string): Promise<VirtualDocketDTO> {
   const db = env.DB;
   const row = await loadVirtual(db, wo);
-  if (row && row.state === "saved") return toDto(row, await loadJobs(db, wo), actor);
+  if (row && row.state === "saved") return toDto(db, row, await loadJobs(db, wo), actor);
   const detail = await getDocket(db, wo, new Date());
   if (!detail) throw new ServiceError(404, "Work order not found");
   const form = formFromDocket(detail);
@@ -217,6 +222,7 @@ export async function getVirtualDocket(env: Env, actor: SessionUser, wo: string)
     workOrder: wo,
     form: actor.accessLevel === "staff" ? stripPrices(form) : form,
     jobs: [{ name: WHOLE_DOCKET, steps: [] }],
+    inProduction: false,
     version: 0,
     source: "sheet",
     pdf: { stored: false, driveLink: null, driveStatus: "none" },
@@ -252,11 +258,13 @@ export async function updateDocket(
   env: Env,
   actor: SessionUser,
   wo: string,
-  input: { form?: DocketForm; jobs?: ProductionJob[]; version?: number },
+  input: { form?: DocketForm; jobs?: ProductionJob[]; version?: number; handoff?: unknown },
 ): Promise<VirtualDocketDTO> {
   const db = env.DB;
   const form = validateForm(input.form);
-  const jobs = await validateJobs(db, input.jobs);
+  // Without a route the docket's cards are left alone (they move by hand-off).
+  const jobs = input.jobs === undefined ? null : await validateJobs(db, input.jobs);
+  const targets = input.handoff === undefined ? null : await parseHandoff(db, input.handoff);
   return withLock(db, SHEET_LOCK, async () => {
     // Inside the lock, read-check-write is atomic for the app's own saves.
     const existing = await loadVirtual(db, wo);
@@ -268,6 +276,7 @@ export async function updateDocket(
         : null;
       throw new ServiceError(409, `This docket was changed by ${who?.full_name ?? "someone else"}. Reload to see the latest version.`);
     }
+    if (targets && (await hasCards(db, wo))) throw new ServiceError(409, "This docket is already in production.");
     let baseline: DocketForm | null = existing ? (JSON.parse(existing.form_json) as DocketForm) : null;
     if (!baseline) {
       const detail = await getDocket(db, wo, new Date());
@@ -290,11 +299,12 @@ export async function updateDocket(
              updated_by = excluded.updated_by, updated_at = excluded.updated_at, state = 'saved'`,
         )
         .bind(wo, JSON.stringify(form), current + 1, actor.id, now, actor.id, now),
-      ...jobStatements(db, wo, jobs),
+      ...(jobs ? jobStatements(db, wo, jobs) : []),
     ]);
-    await reconcileCards(db, wo, jobs, actor.id, now);
+    if (jobs) await reconcileCards(db, wo, jobs, actor.id, now);
+    if (targets) await startHandoff(db, wo, actor.id, targets, now);
     await upsertMirror(db, await readRow(env, row), row).catch(() => undefined);
-    return toDto((await loadVirtual(db, wo))!, jobs, actor);
+    return toDto(db, (await loadVirtual(db, wo))!, jobs ?? (await loadJobs(db, wo)), actor);
   });
 }
 

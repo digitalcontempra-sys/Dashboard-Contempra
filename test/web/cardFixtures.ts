@@ -20,6 +20,11 @@ export const makeCard = (over: Partial<CardDTO> = {}): CardDTO => ({
     { step: 0, roleId: "designer" },
     { step: 1, roleId: "printer_roll" },
   ],
+  handoff: false,
+  instruction: null,
+  from: null,
+  stage: null,
+  approval: null,
   header: {
     customer: "Encore Lounge",
     accountManager: "JB",

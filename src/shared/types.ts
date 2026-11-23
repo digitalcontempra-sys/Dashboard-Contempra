@@ -5,6 +5,8 @@ export type VirtualDocketDTO = {
   workOrder: string;
   form: import("./docketForm").DocketForm;
   jobs: import("./docketForm").ProductionJob[];
+  /** The docket has cards: it was handed to someone (it cannot be handed over again from the editor). */
+  inProduction: boolean;
   version: number;
   source: "virtual" | "sheet";
   pdf: { stored: boolean; driveLink: string | null; driveStatus: string };
@@ -121,6 +123,16 @@ export type CardDTO = {
   isNew: boolean;
   nextRoleId: string | null;
   earlier: { step: number; roleId: string }[];
+  /** Hand-off card (1 person, from someone); false for a card of an old fixed route. */
+  handoff: boolean;
+  /** "What to do", written by whoever handed the docket over. */
+  instruction: string | null;
+  /** Who handed it over: Send back returns the docket to them. */
+  from: { id: number; name: string } | null;
+  /** Set on the creator's card: why the docket came back. */
+  stage: import("./handoff").CardStage | null;
+  /** Which approval this card can ask for (Proof sent / Sample sent). */
+  approval: "proof" | "sample" | null;
   header: {
     customer: string | null;
     accountManager: string | null;

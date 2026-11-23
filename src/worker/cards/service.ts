@@ -1,5 +1,6 @@
 import { AREA_LABEL, normalizeJob, type CardStatus } from "../../shared/cards";
 import type { ProductionJob } from "../../shared/docketForm";
+import type { CardStage } from "../../shared/handoff";
 import { queueCardSheet } from "./sheetSync";
 
 export type CardRow = {
@@ -20,6 +21,11 @@ export type CardRow = {
   done_at: string | null;
   done_by: number | null;
   updated_at: string;
+  instruction: string | null;
+  from_user_id: number | null;
+  from_card_id: number | null;
+  stage: CardStage | null;
+  handoff: number;
 };
 
 export async function loadCards(db: D1Database, wo: string): Promise<CardRow[]> {

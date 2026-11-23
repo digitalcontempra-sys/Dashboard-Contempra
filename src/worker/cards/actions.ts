@@ -8,9 +8,9 @@ import { queueCardSheet } from "./sheetSync";
 
 export function canAct(card: Pick<CardRow, "role_id" | "assignee_ids">, user: SessionUser): boolean {
   if (user.accessLevel === "admin" || user.accessLevel === "manager") return true;
-  if (!user.roles.includes(card.role_id)) return false;
   const assignees = JSON.parse(card.assignee_ids) as number[];
-  return assignees.length === 0 || assignees.includes(user.id);
+  // A card that names people is theirs (whatever their areas); a team card is for the area's people.
+  return assignees.length ? assignees.includes(user.id) : user.roles.includes(card.role_id);
 }
 
 async function loadForAction(db: D1Database, user: SessionUser, id: number): Promise<CardRow> {

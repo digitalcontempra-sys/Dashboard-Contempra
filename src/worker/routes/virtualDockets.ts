@@ -16,7 +16,7 @@ import {
 import { flushCardSheet } from "../cards/sheetSync";
 import { MAX_PDF_BYTES, pdfKey, storeDocketPdf, syncDocketPdfToDrive } from "../dockets/pdf";
 
-type Body = { form?: DocketForm; jobs?: ProductionJob[]; version?: number; confirm?: string };
+type Body = { form?: DocketForm; jobs?: ProductionJob[]; version?: number; confirm?: string; handoff?: unknown };
 
 export const virtualDocketRoutes = new Hono<AppEnv>();
 virtualDocketRoutes.use("/virtual-dockets", requireAuth);

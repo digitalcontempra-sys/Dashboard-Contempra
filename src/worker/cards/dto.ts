@@ -1,4 +1,5 @@
 import type { CardFields } from "../../shared/cards";
+import { approvalKind } from "../../shared/handoff";
 import { deriveTimeBucket, todayInBusinessTz } from "../../shared/rules";
 import type { CardDTO } from "../../shared/types";
 import { ServiceError } from "../dockets/errors";
@@ -33,7 +34,7 @@ export async function toCardDTOs(db: D1Database, userId: number, rows: CardRow[]
     .prepare(`SELECT work_order, job_sort, step, role_id FROM cards WHERE work_order IN (${marks(wos.length)}) ORDER BY step`)
     .bind(...wos)
     .all<{ work_order: string; job_sort: number; step: number; role_id: string }>();
-  const userIds = [...new Set(rows.flatMap((r) => [r.claimed_by, r.returned_by]).filter((x): x is number => x !== null))];
+  const userIds = [...new Set(rows.flatMap((r) => [r.claimed_by, r.returned_by, r.from_user_id]).filter((x): x is number => x !== null))];
   const names = new Map<number, string>();
   if (userIds.length) {
     const { results } = await db
@@ -72,7 +73,13 @@ export async function toCardDTOs(db: D1Database, userId: number, rows: CardRow[]
       activatedAt: r.activated_at,
       isNew: r.status === "active" && (!seenAt || (r.activated_at !== null && seenAt < r.activated_at)),
       nextRoleId: job.find((s) => s.step === r.step + 1)?.role_id ?? null,
-      earlier: job.filter((s) => s.step < r.step).map((s) => ({ step: s.step, roleId: s.role_id })),
+      // Only route cards go back by step; a hand-off card goes back to whoever handed it over.
+      earlier: r.handoff ? [] : job.filter((s) => s.step < r.step).map((s) => ({ step: s.step, roleId: s.role_id })),
+      handoff: r.handoff === 1,
+      instruction: r.instruction,
+      from: r.from_user_id ? { id: r.from_user_id, name: names.get(r.from_user_id) ?? "Someone" } : null,
+      stage: r.stage,
+      approval: r.stage ? null : approvalKind(r.role_id),
       header: {
         customer: h?.customer ?? null,
         accountManager: h?.account_manager ?? null,

@@ -14,13 +14,15 @@ const LIVE = `EXISTS (
   SELECT 1 FROM virtual_dockets v LEFT JOIN dockets d ON d.work_order = v.work_order
   WHERE v.work_order = c.work_order AND v.state = 'saved' AND v.deleted_at IS NULL AND coalesce(d.status, '') != 'cancelled')`;
 
-/** The user has the card's role, and the card is a team card or names the user. */
-const VISIBLE_TO = `c.role_id IN (SELECT role_id FROM user_roles WHERE user_id = ?1)
-  AND (c.assignee_ids = '[]' OR EXISTS (SELECT 1 FROM json_each(c.assignee_ids) WHERE value = ?1))`;
+/** The card names the user, or it is a team card of one of the user's areas (same rule as canAct). */
+const visibleTo = (p: string) => `(EXISTS (SELECT 1 FROM json_each(c.assignee_ids) WHERE value = ${p})
+  OR (c.assignee_ids = '[]' AND c.role_id IN (SELECT role_id FROM user_roles WHERE user_id = ${p})))`;
+const VISIBLE_TO = visibleTo("?1");
 
 export async function listMyCards(env: Env, user: SessionUser): Promise<CardDTO[]> {
+  // "Up next" is for old route cards only; a hand-off card parked after a send back stays hidden.
   const { results } = await env.DB.prepare(
-    `SELECT c.* FROM cards c WHERE c.status IN ('active', 'waiting') AND ${VISIBLE_TO} AND ${LIVE}
+    `SELECT c.* FROM cards c WHERE (c.status = 'active' OR (c.status = 'waiting' AND c.handoff = 0)) AND ${VISIBLE_TO} AND ${LIVE}
      ORDER BY c.status, c.activated_at, c.work_order, c.job_sort, c.step`,
   )
     .bind(user.id)
@@ -104,8 +106,7 @@ export async function board(
     params.push(f.area);
   }
   if (f.userId) {
-    where.push(`c.role_id IN (SELECT role_id FROM user_roles WHERE user_id = ?)
-      AND (c.assignee_ids = '[]' OR EXISTS (SELECT 1 FROM json_each(c.assignee_ids) WHERE value = ?))`);
+    where.push(visibleTo("?"));
     params.push(f.userId, f.userId);
   }
   const { results } = await db
