@@ -25,6 +25,22 @@ Igual que el papel: el jefe crea el docket y se lo da a una persona. Cada person
 | `Close docket` | Solo en la tarjeta `Ready to close` del creador (o Admin/Manager). Marca COMP y el docket pasa a historial. El creador también puede, en vez de cerrar, hacer `Continue` a otra persona. |
 | `Restore` | Solo Admin. En un docket cerrado: lo reabre como `Ready to close` para el creador. En una tarjeta hecha por error: la reabre para esa persona. |
 
+### Esperando aprobación (prueba de diseño o sample)
+
+Botones extra en algunas tarjetas:
+
+| Tarjeta | Botón | STATUS mientras espera |
+|---|---|---|
+| Designer | `Proof sent` | `Waiting for design approval` |
+| Printer Roll, Printer FB, Laminate Roll, Liquid Lam | `Sample sent` | `Waiting for sample approval` |
+
+- Al pulsarlo, mi tarjeta queda hecha y el docket vuelve a **quien lo creó**, con ese STATUS. ROLE muestra al creador.
+- El creador, cuando el cliente responde:
+  - **Aprobado:** `Approved → Continue`: elige la siguiente persona, el área y qué debe hacer (igual que Continue).
+  - **Pide cambios:** `← Send back` con motivo, a quien envió la prueba o el sample. STATUS → `Returned`.
+- Docket Tracking: `Ira - proof sent, back to Mike - …`, `Mike - approved - …`, `Mike - returned to Ira (Logo bigger) - …`, `Sebastian - sample sent, back to Mike - …`.
+- El botón viejo "Send to production →" del diseñador desaparece: todas las tarjetas usan `Continue →`.
+
 **Dividir:** si `Continue` se envía a varias personas, cada una tiene su propia tarjeta. Cada rama, al hacer `Done`, vuelve al creador. El docket solo puede cerrarse cuando ya no queda ninguna tarjeta abierta salvo la del creador.
 
 Se mantienen: 409 si dos personas mueven la misma tarjeta, notificaciones, historial de la tarjeta, Production Board (columnas por área).
@@ -32,6 +48,8 @@ Se mantienen: 409 si dos personas mueven la misma tarjeta, notificaciones, histo
 ## 4. Hoja de cálculo
 
 ### Nueva columna STATUS (columna real)
+
+> **Ya hecho y publicado el 2026-11-23** (layout `v5`, `src/worker/sheet/layout.ts`; ver CLAUDE.md). Esta sección y "Mover las columnas sin romper nada" quedan como referencia: la columna ya existe en la hoja TEST. Lo pendiente es el flujo de tarjetas (secciones 2–3), los nuevos estados y las líneas nuevas de Docket Tracking. La traducción de letras usa `sheet/layout.ts` en lugar del módulo `sheetLayout.ts` descrito abajo.
 
 Se inserta una columna **L = STATUS** justo después de K (ROLE). Todo lo que estaba de L en adelante se mueve una columna a la derecha:
 
@@ -87,6 +105,7 @@ Un test recorre esos archivos y falla si aparece una letra o rango de columna fi
   - `In progress`: pulsó `I'm on it`.
   - `Returned`: se lo devolvieron.
   - `Ready to close`: volvió al creador.
+  - `Waiting for design approval` / `Waiting for sample approval`: el creador espera la respuesta del cliente.
   - `Done`: docket cerrado.
 - Con varias personas: `Sebastian, Ira` / `In progress, Starting`.
 
