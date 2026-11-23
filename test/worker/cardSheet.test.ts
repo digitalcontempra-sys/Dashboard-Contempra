@@ -262,6 +262,8 @@ describe("Docket Tracking tab", () => {
     // Summer dates: Winnipeg is UTC-5 then.
     expect(trackingLine("Ira", "received", "2026-07-23T14:37:00.000Z")).toBe("Ira - received - July 23 2026 - 9:37 AM");
     expect(trackingLine("Erin", "started", "2026-07-24T18:05:00.000Z")).toBe("Erin - started - July 24 2026 - 1:05 PM");
+    // Owner-confirmed on 2026-11-23: Winnipeg clocks read 10:32 at 15:36 UTC (UTC-5 in November).
+    expect(trackingLine("Ira", "received", "2026-11-23T15:36:00.000Z")).toBe("Ira - received - November 23 2026 - 10:36 AM");
   });
 
   it("set up creates the tab with its headers; an older layout gets it too, keeping Legacy Q-Y", async () => {
