@@ -9,7 +9,7 @@ Igual que el papel: el jefe crea el docket y se lo da a una persona. Cada person
 
 ## 2. Crear un docket
 
-- Ya no se arma una ruta de áreas. Al crear el docket se elige **la primera persona** (o varias).
+- Ya no se arma una ruta de áreas. Al crear el docket se elige **la primera persona** (o varias) y, para cada una, **qué debe hacer** (`What to do`).
 - La lista de personas está agrupada por área. Quien no tiene área sale en el grupo **Other** (hoy: Ali, Kristy, Danni, Meinrad, Jeff, Diane).
 - Si la persona tiene varias áreas, se elige con cuál trabaja ese docket. Si no tiene ninguna, recibe una **tarjeta general** (solo notas).
 - La tarjeta muestra los campos (★) del área elegida, como hoy.
@@ -19,7 +19,7 @@ Igual que el papel: el jefe crea el docket y se lo da a una persona. Cada person
 | Botón | Qué hace |
 |---|---|
 | `I'm on it` | La persona toma el trabajo. STATUS → `In progress`. |
-| `Continue →` | Se cumplen los ★ del área, se elige **una o varias personas** de la lista completa (con área si aplica). Mi tarjeta queda hecha; cada persona elegida recibe una tarjeta nueva. |
+| `Continue →` | Se cumplen los ★ del área, se elige **una o varias personas** de la lista completa (con área si aplica). Mi tarjeta queda hecha; cada persona elegida recibe una tarjeta nueva. Se escribe **qué debe hacer** (`What to do`, texto obligatorio, uno por persona si se divide): sale arriba en la tarjeta de quien lo recibe y en Docket Tracking. |
 | `Done` | Termina **solo mi parte**. El docket vuelve automáticamente a **quien lo creó**, con STATUS `Ready to close`. |
 | `← Send back` | Con motivo. Devuelve el docket a la persona de quien lo recibí. STATUS → `Returned`. |
 | `Close docket` | Solo en la tarjeta `Ready to close` del creador (o Admin/Manager). Marca COMP y el docket pasa a historial. El creador también puede, en vez de cerrar, hacer `Continue` a otra persona. |
@@ -98,7 +98,7 @@ Una línea por momento, con fecha y hora de Winnipeg:
 Mike - created - November 23 2026 - 9:00 AM
 Ira - received from Mike - November 23 2026 - 9:00 AM
 Ira - started - November 23 2026 - 9:37 AM
-Ira - sent to Sebastian - November 23 2026 - 11:02 AM
+Ira - sent to Sebastian (Print 2 banners 3x6) - November 23 2026 - 11:02 AM
 Sebastian - received from Ira - November 23 2026 - 11:02 AM
 Sebastian - started - November 23 2026 - 11:10 AM
 Sebastian - returned to Ira (Wrong size) - November 23 2026 - 11:30 AM
