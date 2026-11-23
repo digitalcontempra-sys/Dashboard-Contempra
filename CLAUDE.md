@@ -35,13 +35,14 @@ A production dashboard for **Contempra Signs** (a sign shop in Winnipeg). It sit
 
 - **Main Dashboard.** Every work order (docket), grouped by time: Rush / Today, This Week, Coming, No Due Date. It also has On Hold and History views, an account-manager filter and search.
 - **Virtual Docket.** A replica of the paper docket form that writes the docket's row to the sheet, renders a PDF in the browser and stores it in R2 and Google Drive. Dockets can be cancelled, moved to Trash and restored.
-- **Production cards.** Each docket has a route of areas (jobs and steps). Each step is a card for that area's team, with:
+- **Production cards (hand to hand, like the paper docket).** The creator sends the new docket to one or more people, each with a `What to do` note. Each card belongs to one person, in one area (or `General` for people without one), with:
   - required fields (★);
-  - `Continue → <next area>` and `← Send back` (with a reason);
-  - `I'm on it`;
-  - team or person assignment;
+  - `I'm on it`, `Continue →` (to one or more people, each with `What to do`), `Done` (back to the creator), `← Send back` (with a reason, to whoever handed it over);
+  - `Proof sent` (Designer) / `Sample sent` (Printer Roll, Printer FB, Laminate Roll, Liquid Lam): back to the creator, waiting for the client;
+  - on the creator's card: `Close docket` (when `Ready to close`) or `Approved → Continue`;
+  - Admin `Restore` (Production tab of a docket);
   - a full history.
-- **Production Board** (managers): one column per area.
+- **Production Board** (managers): one column per area, plus `General`.
 - **Notifications.** A chime, a pulsing badge and the tab title. On iPhone, sound needs a tap first, so the app shows "Tap anywhere to turn on sound".
 - **Task Cards.** Yellow sticky notes from one person to another, with Done. My Cards has the filter All / Docket cards / Task cards / Sent by me.
 - **Installer photos.** Taken with the phone camera, resized in the browser, uploaded to one Drive folder per docket. Thumbnails are kept in R2.
@@ -119,7 +120,7 @@ src/web/
   tasks/               NewTaskCard, TaskCards (tile, view, Sent by me)
   components/          Layout (nav, badge, sound toggle), DocketList, DocketDetail (tabs), DocketHistory, AreaChip/AreaLegend, BucketChip
   docket/              DocketPaper (paper replica), ProductionPanel (route editor), DocketPdf, afterSave
-migrations/            0001–0008 (D1). Add new ones as 0009_*.sql; never edit an applied one
+migrations/            0001–0009 (D1). Add new ones as 0010_*.sql; never edit an applied one
 data/catalogs/         material lists: roll-print, flatbed (Print FB), laminate (Laminate Roll)
 scripts/               publish.ps1, set-google-secrets.ps1, dev-setup.mjs, create-admin.mjs, import-fixture.mjs, xlsx_to_values.py
 test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), web/ (jsdom + mockApi)
@@ -142,16 +143,20 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
   - **If you change this layout:** bump `PRODUCTION_COLUMNS_VERSION` in `src/worker/cards/sheetSync.ts` and keep the in-place upgrade path. After publishing, the owner must press **Admin → Set up production columns** again; until then, sheet writes stay queued.
   - The first setup copies the old Q–Y to the tab `Legacy Q-Y`.
 - **STATUS column (v5).** Set up inserts a real column **L = STATUS** after ROLE; Inv…LINK move to M–Q and Stage…Photos to R–AC. The code still uses the original letters (A–P, Q–AB): `src/worker/sheet/layout.ts` translates them when the connected sheet has the column (`app_settings.status_column` = that sheet's id). `getGateways(env).sheet` and the sync reader (`readContempra`) translate; `getRawGateways` does not (only for inserting the column). The logical cell key `STATUS` writes L. Never hard-code the shifted letters.
-- **Column K (ROLE) + STATUS** show who has the docket now and in what state, in the same order: per active card, whoever pressed `I'm on it` (`In progress`), else its assignees, else its area label (`Starting`, or `Returned` after a send back). All cards done → K is whoever finished last, STATUS `Done`. A docket without cards keeps its K. Staff no longer type in K.
+- **Column K (ROLE) + STATUS** show who has the docket now and in what state, in the same order: per active card, whoever pressed `I'm on it` (`In progress`), else its assignees, else its area label (`Starting`, or `Returned` after a send back). The creator's card shows `Ready to close`, `Waiting for design approval` or `Waiting for sample approval`. All cards done (closed) → K is whoever closed it, STATUS `Done`. A docket without cards keeps its K. Staff no longer type in K.
 - **`Production` tab:** one row per card (Work Order, Job, Step, Role, Assigned To, Status, Fields, Returned Reason, Updated By, Updated At).
-- **`Docket Tracking` tab** (from `v4`): one row per docket (Work Order, Customer, Tracking). Tracking is one cell, one line per event, Winnipeg time: `Ira - received - November 23 2026 - 9:37 AM` (`activated` events, including reassigning an active card) `Ira - started - …` (`claimed`), `sent to <area>` (`continued`), `returned to <area> (<reason>)` (`sent_back`) and `done` (`completed`). `activated` events store `assignees` in `detail_json`; older ones show the area. `Legacy Q-Y` is never touched again.
+- **`Docket Tracking` tab** (from `v4`): one row per docket (Work Order, Customer, Tracking). Tracking is one cell, one line per event, Winnipeg time, e.g. `Ira - received from Mike - November 23 2026 - 9:37 AM`. Lines: `created` (from `virtual_dockets`), `received from <name>` (`activated`), `started` (`claimed`), `sent to <name> (<what to do>)` (`continued`), `returned to <name> (<reason>)` (`sent_back`), `done, back to <creator>`, `proof sent, back to …`, `sample sent, back to …`, `approved`, `closed`, `restored`. Old-route events keep their old text (`received`, `sent to <area>`, `done`). `Legacy Q-Y` is never touched again.
 - **Card → sheet writes go through a queue (`card_sheet_queue`).** D1 commits first. Then `flushCardSheet` runs in `waitUntil`, and the cron retries failures. Google being down never blocks production.
-- **Route rules:**
-  - Done cards stay done when a route is edited.
-  - Cards are matched by job name, then by role + occurrence.
+- **Hand-off rules** (`src/worker/cards/handoff.ts`, pure rules in `src/shared/handoff.ts`, spec `2026-11-23-docket-handoff-flow-design.md`):
+  - Hand-off cards have `handoff = 1`, one person in `assignee_ids`, `from_user_id` / `from_card_id` (who handed it over) and `instruction`. New cards use `job_sort = 0`, `step = max + 1`.
+  - One **creator card** per docket (`stage` not null, role `general`, assigned to `virtual_dockets.created_by`): Done / Proof sent / Sample sent reactivate it. `ready_to_close` never hides a waiting approval.
+  - Send back parks my card (`waiting`) and reopens the `from_card`; a later Continue to the same person + area reuses the parked card (fields kept).
+  - Close docket: only on `ready_to_close`, only when no other card is active; sets COMP. Restore (Admin) reopens a done card; on a closed docket it clears COMP (`queue comp: 0`).
+  - A card naming people is theirs whatever their areas (`canAct`, `visibleTo`); a team card (`[]`, old routes) is for the area's people.
   - Every move bumps the card's `version`. A second concurrent move gets 409 `This card was already moved by <name>.`
-- **Continue blockers** live in `src/shared/cards.ts` (`continueBlocker`). The server enforces them; the UI shows the same message.
-- **Docket completion:** when every card of a docket is done, the dashboard sets COMP (column D). Designer `On hold` sets HOLD (column E).
+  - **Old routes:** the API still accepts `jobs` (route cards, `handoff = 0`), only for old data and tests; the app sends `handoff` instead. Editing a docket without `jobs` leaves its cards alone. Old `waiting` route cards are dropped at the first hand-off move.
+- **Continue blockers** live in `src/shared/cards.ts` (`continueBlocker`). The server enforces them on Continue and Done (not on Proof/Sample sent, not on the creator's card); the UI shows the same message.
+- **Docket completion:** only `Close docket` sets COMP (column D). Designer `On hold` sets HOLD (column E).
 - **Field saves** are debounced 1 s in the UI. They reach the sheet on the 5-minute cron; moves (claim, continue, send back) write at once.
 - **Dates:** always calendar inputs (`type="date"`, stored as YYYY-MM-DD). The server rejects free-text dates.
 - **Passwords:** PBKDF2-SHA256 hashes in D1 `users.password_hash`. Nobody can read them.
@@ -174,7 +179,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
    5. Have a fresh reviewer check the whole branch, and fix what it finds that matters.
    6. Ask "¿Hago merge a main y publico?"
 3. **Verification before saying "done":**
-   - `npx vitest run` passes (today 396 tests).
+   - `npx vitest run` passes (today 431 tests).
    - `npm run typecheck` is clean.
    - For UI changes, check the page in the local preview, including phone width 375 px: no horizontal scroll.
 4. **Commit messages:**

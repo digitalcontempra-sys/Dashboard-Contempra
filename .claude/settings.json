@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(npx vitest *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(npx wrangler *)",
+      "Bash(grep -v \"^\\\\s*$\")",
+      "Bash(node -e \"const r=JSON.parse\\(require\\('fs'\\).readFileSync\\(0\\)\\);console.log\\(JSON.stringify\\(r.map\\(x=>x.results\\)\\)\\)\")",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "mcp__claude-in-chrome__select_browser",
+      "mcp__claude-in-chrome__tabs_create_mcp",
+      "ClaudeInChromeDomain(localhost:5173)"
     ]
   }
 }

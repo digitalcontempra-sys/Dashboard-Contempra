@@ -1,6 +1,6 @@
 # Flujo de mano en mano (como el docket de papel), STATUS y tracking completo
 
-Fecha: 2026-11-23. Estado: **aprobado por el dueño** (implementar en un chat nuevo).
+Fecha: 2026-11-23. Estado: **aprobado por el dueño**; implementado en la rama `feature/handoff-flow` (plan `docs/superpowers/plans/2026-11-23-docket-handoff-flow.md`).
 Reemplaza la ruta fija de áreas del spec `2026-11-09-production-cards-design.md` y amplía `2026-11-23-docket-holder-and-tracking-design.md`.
 
 ## 1. Idea
