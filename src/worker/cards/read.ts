@@ -1,3 +1,4 @@
+import { statusColumnOn } from "../sheet/layout";
 import { AREA_LABEL, CARD_FIELDS, ROLE_ORDER } from "../../shared/cards";
 import type { TimeBucket } from "../../shared/rules";
 import type { BoardDTO, CardDTO, CardEventDTO, MyCardsSummary, SessionUser } from "../../shared/types";
@@ -82,7 +83,8 @@ export async function productionColumnsSetUp(db: D1Database): Promise<boolean> {
 
 export async function productionColumnsReady(db: D1Database): Promise<boolean> {
   const r = await db.prepare("SELECT value FROM app_settings WHERE key = 'production_columns'").first<{ value: string }>();
-  return r?.value === PRODUCTION_COLUMNS_VERSION;
+  // A newly connected sheet without the STATUS column needs the setup again.
+  return r?.value === PRODUCTION_COLUMNS_VERSION && (await statusColumnOn(db));
 }
 
 export async function board(

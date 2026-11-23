@@ -26,7 +26,9 @@ beforeEach(async () => {
 afterEach(teardownCards);
 
 const setup = () => post("/api/admin/production-columns", s.admin, { confirm: "SET UP" });
-const sheetRow = (wo: string) => s.g.sheet.rowOf(wo)!;
+/** A row as the code sees it (A–P, Q–AB), without the STATUS column. */
+const logical = (r: unknown[]) => (s.g.sheet.rows[0][11] === "STATUS" ? [...r.slice(0, 11), ...r.slice(12)] : r);
+const sheetRow = (wo: string) => logical(s.g.sheet.rowOf(wo)!);
 const stageCells = (wo: string) => sheetRow(wo).slice(16, 28);
 const today = new Intl.DateTimeFormat("en-US", { timeZone: "America/Winnipeg", month: "2-digit", day: "2-digit" }).format(new Date());
 
@@ -39,8 +41,8 @@ describe("Set up production columns", () => {
       ["Work Order", ...OLD],
       [91487, "x", "", "", "", "", "", "", "", "old"],
     ]);
-    expect(s.g.sheet.rows[0].slice(16, 28)).toEqual(STAGE_HEADERS);
-    expect(s.g.sheet.rows[1].slice(16, 25).every((v) => v === "")).toBe(true);
+    expect(logical(s.g.sheet.rows[0]).slice(16, 28)).toEqual(STAGE_HEADERS);
+    expect(logical(s.g.sheet.rows[1]).slice(16, 25).every((v) => v === "")).toBe(true);
     expect(s.g.sheet.tabs.Production).toEqual([PRODUCTION_HEADERS]);
     const flag = await env.DB.prepare("SELECT value FROM app_settings WHERE key = 'production_columns'").first();
     expect(flag).toEqual({ value: PRODUCTION_COLUMNS_VERSION });
@@ -59,12 +61,12 @@ describe("Set up production columns", () => {
 describe("Photos column", () => {
   it("a sheet on the Q–AA layout gets the Photos header in AB", async () => {
     expect((await setup()).status).toBe(200);
-    s.g.sheet.rows[0].splice(16, 12, ...STAGE_HEADERS.slice(0, 11));
+    s.g.sheet.rows[0].splice(17, 12, ...STAGE_HEADERS.slice(0, 11));
     await env.DB.prepare("UPDATE app_settings SET value = 'v2' WHERE key = 'production_columns'").run();
     const res = await setup();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ archivedRows: 0, updated: true });
-    expect(s.g.sheet.rows[0][27]).toBe("Photos");
+    expect(logical(s.g.sheet.rows[0])[27]).toBe("Photos");
   });
 
   it("links the docket's photo folder from column AB", async () => {
@@ -86,13 +88,13 @@ describe("Contour Cut column", () => {
   it("a sheet set up before Contour Cut existed gets the new headers, keeping its legacy tab", async () => {
     expect((await setup()).status).toBe(200);
     // Simulate the first layout (Q–Z, no Contour Cut) and its settings value.
-    s.g.sheet.rows[0].splice(16, 11, "Stage", "Design", "Print Roll", "Print FB", "Laminate", "Liquid Lam", "Colex", "Finishing", "Install", "Assigned");
+    s.g.sheet.rows[0].splice(17, 11, "Stage", "Design", "Print Roll", "Print FB", "Laminate", "Liquid Lam", "Colex", "Finishing", "Install", "Assigned");
     await env.DB.prepare("UPDATE app_settings SET value = 'ready' WHERE key = 'production_columns'").run();
     const legacy = s.g.sheet.tabs["Legacy Q-Y"];
     const res = await setup();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ archivedRows: 0, updated: true });
-    expect(s.g.sheet.rows[0].slice(16, 28)).toEqual(STAGE_HEADERS);
+    expect(logical(s.g.sheet.rows[0]).slice(16, 28)).toEqual(STAGE_HEADERS);
     expect(STAGE_HEADERS[5]).toBe("Contour Cut");
     expect(STAGE_HEADERS[10]).toBe("Assigned");
     expect(STAGE_HEADERS[11]).toBe("Photos");
@@ -204,7 +206,7 @@ describe("Stage columns", () => {
     await put(`/api/cards/${p.id}/fields`, s.manager, { fields: { printed: true, file: "ok" }, version: p.version });
     await post(`/api/cards/${p.id}/continue`, s.manager, { version: p.version + 1 });
     await flushCardSheet(env, d.workOrder);
-    expect(sheetRow(d.workOrder)[10]).toBe("Done");
+    expect(sheetRow(d.workOrder)[10]).toBe("mgr"); // whoever finished it
   });
 
   it("column K lists parallel holders once each, comma separated", async () => {
@@ -252,7 +254,7 @@ describe("Stage columns", () => {
 });
 
 describe("Docket Tracking tab", () => {
-  const WHEN = /^(.+) - (received|started) - [A-Z][a-z]+ \d{1,2} \d{4} - \d{1,2}:\d{2} (AM|PM)$/;
+  const WHEN = /^(.+?) - (.+) - [A-Z][a-z]+ \d{1,2} \d{4} - \d{1,2}:\d{2} (AM|PM)$/;
   const lines = (wo: string) => {
     const r = s.g.sheet.tabs[TRACKING_TAB].find((x) => String(x[0]) === wo)!;
     return String(r[2]).split("\n").map((l) => l.match(WHEN)!.slice(1, 3));
@@ -292,8 +294,26 @@ describe("Docket Tracking tab", () => {
     expect(rows[0][1]).toBe(sheetRow(d.workOrder)[6]);
     expect(lines(d.workOrder)).toEqual([
       ["ira", "received"],
+      ["mgr", "sent to Print Roll"],
       ["Printer Roll", "received"],
       ["erin", "started"],
+    ]);
+
+    // Send back and the last Continue are stamped too.
+    let p2 = (await cardsOf(d.workOrder))[1];
+    await post(`/api/cards/${p2.id}/send-back`, s.manager, { toStep: 0, reason: "Wrong size", version: p2.version });
+    const c2 = (await cardsOf(d.workOrder))[0];
+    await post(`/api/cards/${c2.id}/continue`, s.manager, { version: c2.version });
+    p2 = (await cardsOf(d.workOrder))[1];
+    await put(`/api/cards/${p2.id}/fields`, s.manager, { fields: { printed: true, file: "ok" }, version: p2.version });
+    await post(`/api/cards/${p2.id}/continue`, s.manager, { version: p2.version + 1 });
+    await flushCardSheet(env, d.workOrder);
+    expect(lines(d.workOrder).slice(4)).toEqual([
+      ["mgr", "returned to Design (Wrong size)"],
+      ["ira", "received"],
+      ["mgr", "sent to Print Roll"],
+      ["Printer Roll", "received"],
+      ["mgr", "done"],
     ]);
   });
 

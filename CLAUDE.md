@@ -132,7 +132,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
 - **Sheet columns A–P (tab `Contempra`):** Date, Due Date, Work Order, COMP, HOLD, #, Customer, Project, Address, Account Manager, ROLE, Inv, Inv/Date, Quote/PO/Deposit, Notes, LINK.
   - Rows are always located by Work Order (column C), never by a cached row number.
   - Every app write to the sheet runs inside `withLock(db, "sheet")`. The row is re-read before writing.
-- **Columns Q–AB** (written only by the dashboard). Layout version `v4`, stored in `app_settings.production_columns`:
+- **Columns Q–AB** (written only by the dashboard). Layout version `v5`, stored in `app_settings.production_columns`:
 
   | Q | R | S | T | U | V | W | X | Y | Z | AA | AB |
   |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -141,9 +141,10 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
   - AB holds `=HYPERLINK(folder,"Photos (n)")`, written with USER_ENTERED.
   - **If you change this layout:** bump `PRODUCTION_COLUMNS_VERSION` in `src/worker/cards/sheetSync.ts` and keep the in-place upgrade path. After publishing, the owner must press **Admin → Set up production columns** again; until then, sheet writes stay queued.
   - The first setup copies the old Q–Y to the tab `Legacy Q-Y`.
-- **Column K (ROLE)** shows who has the docket now: per active card, whoever pressed `I'm on it`, else its assignees, else its area label; comma separated, no repeats. All cards done → `Done`. A docket without cards keeps its K. Staff no longer type in K.
+- **STATUS column (v5).** Set up inserts a real column **L = STATUS** after ROLE; Inv…LINK move to M–Q and Stage…Photos to R–AC. The code still uses the original letters (A–P, Q–AB): `src/worker/sheet/layout.ts` translates them when the connected sheet has the column (`app_settings.status_column` = that sheet's id). `getGateways(env).sheet` and the sync reader (`readContempra`) translate; `getRawGateways` does not (only for inserting the column). The logical cell key `STATUS` writes L. Never hard-code the shifted letters.
+- **Column K (ROLE) + STATUS** show who has the docket now and in what state, in the same order: per active card, whoever pressed `I'm on it` (`In progress`), else its assignees, else its area label (`Starting`, or `Returned` after a send back). All cards done → K is whoever finished last, STATUS `Done`. A docket without cards keeps its K. Staff no longer type in K.
 - **`Production` tab:** one row per card (Work Order, Job, Step, Role, Assigned To, Status, Fields, Returned Reason, Updated By, Updated At).
-- **`Docket Tracking` tab** (from `v4`): one row per docket (Work Order, Customer, Tracking). Tracking is one cell, one line per event, Winnipeg time: `Ira - received - November 23 2026 - 9:37 AM` (`activated` events, including reassigning an active card) and `Ira - started - …` (`claimed`). `activated` events store `assignees` in `detail_json`; older ones show the area. `Legacy Q-Y` is never touched again.
+- **`Docket Tracking` tab** (from `v4`): one row per docket (Work Order, Customer, Tracking). Tracking is one cell, one line per event, Winnipeg time: `Ira - received - November 23 2026 - 9:37 AM` (`activated` events, including reassigning an active card) `Ira - started - …` (`claimed`), `sent to <area>` (`continued`), `returned to <area> (<reason>)` (`sent_back`) and `done` (`completed`). `activated` events store `assignees` in `detail_json`; older ones show the area. `Legacy Q-Y` is never touched again.
 - **Card → sheet writes go through a queue (`card_sheet_queue`).** D1 commits first. Then `flushCardSheet` runs in `waitUntil`, and the cron retries failures. Google being down never blocks production.
 - **Route rules:**
   - Done cards stay done when a route is edited.
@@ -173,7 +174,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
    5. Have a fresh reviewer check the whole branch, and fix what it finds that matters.
    6. Ask "¿Hago merge a main y publico?"
 3. **Verification before saying "done":**
-   - `npx vitest run` passes (today 384 tests).
+   - `npx vitest run` passes (today 393 tests).
    - `npm run typecheck` is clean.
    - For UI changes, check the page in the local preview, including phone width 375 px: no horizontal scroll.
 4. **Commit messages:**

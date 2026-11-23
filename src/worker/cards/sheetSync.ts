@@ -4,7 +4,8 @@ import { ServiceError } from "../dockets/errors";
 import { withLock } from "../dockets/lock";
 import { locateRow, readRow, SHEET_LOCK, upsertMirror } from "../dockets/service";
 import type { Env } from "../env";
-import { getGateways } from "../google/gateways";
+import { getGateways, getRawGateways } from "../google/gateways";
+import { markStatusColumn, STATUS_HEADER, STATUS_KEY } from "../sheet/layout";
 import { tabRef, type RowCells } from "../google/sheets";
 
 /** Q..AB. Bump PRODUCTION_COLUMNS_VERSION whenever this layout changes. */
@@ -23,8 +24,11 @@ export const STAGE_HEADERS = [
   "Photos",
 ];
 /** app_settings.production_columns once the sheet has the current layout ("ready" = Q–Z, "v2" = Q–AA, "v3" = Q–AB with Photos). */
-/** v4: column K shows who has the docket, and the "Docket Tracking" tab exists. */
-export const PRODUCTION_COLUMNS_VERSION = "v4";
+/**
+ * v4: column K shows who has the docket, and the "Docket Tracking" tab exists.
+ * v5: a real STATUS column is inserted after ROLE (see sheet/layout.ts).
+ */
+export const PRODUCTION_COLUMNS_VERSION = "v5";
 export const PRODUCTION_HEADERS = [
   "Work Order",
   "Job",
@@ -54,7 +58,7 @@ const WHEN = new Intl.DateTimeFormat("en-US", {
 });
 
 /** "Ira - received - November 23 2026 - 9:37 AM" (Winnipeg time). */
-export function trackingLine(name: string, kind: "received" | "started", iso: string): string {
+export function trackingLine(name: string, kind: string, iso: string): string {
   const p = Object.fromEntries(WHEN.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
   return `${name} - ${kind} - ${p.month} ${p.day} ${p.year} - ${p.hour}:${p.minute} ${String(p.dayPeriod).toUpperCase()}`;
 }
@@ -138,14 +142,36 @@ function holderText(c: SheetCard, names: Map<number, string>): string {
   return ids.length ? ids.map((id) => names.get(id) ?? "?").join(", ") : c.role_label;
 }
 
-type TrackingEvent = { action: "activated" | "claimed"; role_label: string; detail_json: string; at: string; actor: string | null };
+/** STATUS of an active card. */
+const holderStatus = (c: SheetCard) => (c.claimed_name ? "In progress" : c.returned_reason ? "Returned" : "Starting");
+
+/** ROLE (K) and STATUS: who has the docket now and in what state, in the same order. */
+function holderCells(cards: SheetCard[], names: Map<number, string>): RowCells {
+  if (!cards.length) return {}; // a docket without cards keeps whatever K holds
+  const active = cards.filter((c) => c.status === "active");
+  if (active.length) {
+    const pairs = new Map<string, string>();
+    for (const c of active) {
+      const who = holderText(c, names);
+      if (!pairs.has(who)) pairs.set(who, holderStatus(c));
+    }
+    return { K: [...pairs.keys()].join(", "), [STATUS_KEY]: [...pairs.values()].join(", ") };
+  }
+  if (cards.every((c) => c.status === "done")) {
+    const last = [...cards].sort((a, b) => String(b.done_at ?? "").localeCompare(String(a.done_at ?? "")))[0];
+    return { K: last.done_name ?? "", [STATUS_KEY]: "Done" };
+  }
+  return { K: "", [STATUS_KEY]: "" };
+}
+
+type TrackingEvent = { action: "activated" | "claimed" | "continued" | "sent_back" | "completed"; role_label: string; detail_json: string; at: string; actor: string | null };
 
 async function trackingEvents(db: D1Database, wo: string): Promise<TrackingEvent[]> {
   const { results } = await db
     .prepare(
       `SELECT e.action, r.label AS role_label, e.detail_json, e.at, u.full_name AS actor
        FROM card_events e JOIN roles r ON r.id = e.role_id LEFT JOIN users u ON u.id = e.user_id
-       WHERE e.work_order = ? AND e.action IN ('activated', 'claimed') ORDER BY e.at, e.id`,
+       WHERE e.work_order = ? AND e.action IN ('activated', 'claimed', 'continued', 'sent_back', 'completed') ORDER BY e.at, e.id`,
     )
     .bind(wo)
     .all<TrackingEvent>();
@@ -157,11 +183,18 @@ const receivedIds = (e: TrackingEvent) => ((JSON.parse(e.detail_json) as { assig
 export function trackingText(events: TrackingEvent[], names: Map<number, string>): string {
   return events
     .map((e) => {
-      if (e.action === "claimed") return trackingLine(e.actor ?? "?", "started", e.at);
+      const actor = e.actor ?? "?";
+      const d = JSON.parse(e.detail_json) as { to?: string; reason?: string };
+      if (e.action === "claimed") return trackingLine(actor, "started", e.at);
+      if (e.action === "completed") return trackingLine(actor, "done", e.at);
+      // The last Continue is logged as "completed" too: one "done" line is enough.
+      if (e.action === "continued") return d.to && d.to !== "Done" ? trackingLine(actor, `sent to ${d.to}`, e.at) : null;
+      if (e.action === "sent_back") return trackingLine(actor, `returned to ${d.to ?? "?"}${d.reason ? ` (${d.reason})` : ""}`, e.at);
       const ids = receivedIds(e);
       const who = ids.length ? ids.map((id) => names.get(id) ?? "?").join(", ") : e.role_label;
       return trackingLine(who, "received", e.at);
     })
+    .filter((l): l is string => l !== null)
     .join("\n");
 }
 
@@ -200,10 +233,7 @@ export function stageRowCells(cards: SheetCard[], names: Map<number, string>, q:
       : "—";
   });
   cells.AA = active.length ? [...new Set(active.map((c) => assignedText(c, names)))].join(", ") : "";
-  // K (ROLE): who has the docket now. A docket without cards keeps whatever K holds.
-  if (allDone) cells.K = "Done";
-  else if (active.length) cells.K = [...new Set(active.map((c) => holderText(c, names)))].join(", ");
-  else if (cards.length) cells.K = "";
+  Object.assign(cells, holderCells(cards, names));
   if (q.comp === 1) cells.D = true;
   if (q.hold !== null) cells.E = q.hold === 1;
   return cells;
@@ -332,12 +362,21 @@ async function setupTrackingTab(sheet: ReturnType<typeof getGateways>["sheet"]):
  */
 export async function setupProductionColumns(env: Env, _user: SessionUser): Promise<{ archivedRows: number; updated?: true }> {
   const db = env.DB;
-  const sheet = getGateways(env).sheet;
   const setting = await db.prepare("SELECT value FROM app_settings WHERE key = 'production_columns'").first<{ value: string }>();
   const archivedRows = await withLock(db, SHEET_LOCK, async () => {
+    // A real STATUS column after ROLE, inserted once (a sheet that already has it is left as is).
+    const raw = getRawGateways(env).sheet;
+    const l1 = (await raw.readRange("Contempra!L1:L1"))[0]?.[0];
+    const inserted = String(l1 ?? "").trim() !== STATUS_HEADER;
+    if (inserted) {
+      await raw.insertStatusColumn();
+      await raw.writeRange("Contempra!L1", [[STATUS_HEADER]]);
+    }
+    await markStatusColumn(db);
+    const sheet = getGateways(env).sheet; // speaks the original letters from here on
     const head = await sheet.readRange("Contempra!Q1:AB1");
     if (String(head[0]?.[0] ?? "").trim() === "Stage") {
-      if (setting?.value === PRODUCTION_COLUMNS_VERSION) throw new ServiceError(409, "Production columns are already set up.");
+      if (!inserted && setting?.value === PRODUCTION_COLUMNS_VERSION) throw new ServiceError(409, "Production columns are already set up.");
       // Older layout: the stage cells are rewritten from the cards by the flushes queued below.
       await sheet.clearColumns("Q", "AB", 2);
       await sheet.writeRange("Contempra!Q1", [STAGE_HEADERS]);

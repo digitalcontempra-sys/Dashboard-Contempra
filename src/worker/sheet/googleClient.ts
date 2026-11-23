@@ -1,5 +1,6 @@
 import type { Env } from "../env";
 import { getAccessToken, getConnection, googleFetch } from "../google/oauth";
+import { layoutReader, statusColumnOn } from "./layout";
 
 const TIMEOUT_MS = 20_000;
 
@@ -13,8 +14,11 @@ export class SheetFetchError extends Error {
 export type GoogleEnv = Pick<Env, "DB" | "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET" | "TOKEN_KEY">;
 
 export async function fetchContempraValues(env: GoogleEnv): Promise<unknown[][]> {
-  return readSheetRange(env, "Contempra!A1:P");
+  return readContempra(env)("Contempra!A1:P");
 }
+
+/** Reads ranges in the original column letters, whether or not the sheet has the STATUS column. */
+export const readContempra = (env: GoogleEnv) => layoutReader((r) => readSheetRange(env, r), () => statusColumnOn(env.DB));
 
 /** Reads one A1 range (e.g. `Contempra!A1:P601`) of the connected sheet as unformatted values with date serials. */
 export async function readSheetRange(env: GoogleEnv, range: string): Promise<unknown[][]> {

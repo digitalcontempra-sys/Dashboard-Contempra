@@ -1,4 +1,5 @@
 import { readSheetRange, SheetFetchError, type GoogleEnv } from "../sheet/googleClient";
+import { colIndex, colName, STATUS_INDEX } from "../sheet/layout";
 import { getAccessToken, getConnection, googleFetch } from "./oauth";
 
 export type CellValue = string | number | boolean | null | undefined;
@@ -21,6 +22,8 @@ export interface SheetGateway {
   appendRows(tab: string, values: unknown[][]): Promise<void>;
   /** Clears values and data validation (old checkboxes) of the Contempra tab's columns, from a row down. */
   clearColumns(fromCol: string, toCol: string, fromRow: number): Promise<void>;
+  /** Inserts a real, empty column L in the Contempra tab (formats copied from K). Ignores the layout. */
+  insertStatusColumn(): Promise<void>;
 }
 
 /** A1 tab prefix, quoted so names with spaces or dashes work: 'Legacy Q-Y'!A1. */
@@ -28,8 +31,6 @@ export const tabRef = (tab: string) => `'${tab.replace(/'/g, "''")}'`;
 
 const TAB = "Contempra";
 const WIDTH = 16; // A..P
-/** "A" -> 0, "Z" -> 25, "AA" -> 26. */
-const colIndex = (col: string) => [...col].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
 
 function cellData(v: CellValue) {
   if (v === null || v === undefined || v === "") return {};
@@ -71,7 +72,8 @@ export function realSheetGateway(env: GoogleEnv): SheetGateway {
 
     async insertTopRow(cells) {
       const { gid } = await target();
-      const values = Array.from({ length: WIDTH }, (_, i) => cellData(cells[String.fromCharCode(65 + i)]));
+      const width = Math.max(WIDTH, ...Object.keys(cells).map((c) => colIndex(c) + 1));
+      const values = Array.from({ length: width }, (_, i) => cellData(cells[colName(i)]));
       await batchUpdate([
         // Insert below the header; the new row takes formats/checkboxes from the row under it.
         { insertDimension: { range: { sheetId: gid, dimension: "ROWS", startIndex: 1, endIndex: 2 }, inheritFromBefore: false } },
@@ -123,6 +125,13 @@ export function realSheetGateway(env: GoogleEnv): SheetGateway {
         `https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
         { values },
       );
+    },
+
+    async insertStatusColumn() {
+      const { gid } = await target();
+      await batchUpdate([
+        { insertDimension: { range: { sheetId: gid, dimension: "COLUMNS", startIndex: STATUS_INDEX, endIndex: STATUS_INDEX + 1 }, inheritFromBefore: true } },
+      ]);
     },
 
     async clearColumns(fromCol, toCol, fromRow) {

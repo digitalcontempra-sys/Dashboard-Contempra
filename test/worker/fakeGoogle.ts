@@ -1,6 +1,7 @@
 import { DriveFileNotFoundError, type DriveGateway } from "../../src/worker/google/drive";
 import type { Gateways } from "../../src/worker/google/gateways";
 import type { RowCells, SheetGateway } from "../../src/worker/google/sheets";
+import { colName } from "../../src/worker/sheet/layout";
 import { HEADER } from "./fixtures";
 
 /** "A" -> 0, "Z" -> 25, "AA" -> 26. */
@@ -101,13 +102,17 @@ export class FakeSheet implements SheetGateway {
   }
   async insertTopRow(cells: RowCells) {
     this.check("insertTopRow");
-    const row = Array.from({ length: 16 }, (_, i) => cells[String.fromCharCode(65 + i)] ?? "");
+    const width = Math.max(16, ...Object.keys(cells).map((c) => col(c) + 1));
+    const row = Array.from({ length: width }, (_, i) => cells[colName(i)] ?? "");
     this.rows.splice(1, 0, row);
     this.lost("insertTopRow");
   }
   async updateCells(row: number, cells: RowCells) {
     this.check("updateCells");
     for (const [c, v] of Object.entries(cells)) this.rows[row - 1][col(c)] = v ?? "";
+  }
+  async insertStatusColumn() {
+    for (const r of this.rows) if (r.length > 11) r.splice(11, 0, "");
   }
   async deleteRow(row: number) {
     this.check("deleteRow");

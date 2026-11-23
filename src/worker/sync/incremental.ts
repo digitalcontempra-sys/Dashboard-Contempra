@@ -1,5 +1,5 @@
 import type { Env } from "../env";
-import { readSheetRange } from "../sheet/googleClient";
+import { readContempra } from "../sheet/googleClient";
 import { mapSheet, type DocketRecord } from "../sheet/mapRows";
 import {
   isSheetConfigured,
@@ -21,10 +21,7 @@ export type IncrementalOptions = { topRows: number; pageRows: number };
  */
 export const DEFAULT_INCREMENTAL: IncrementalOptions = { topRows: 600, pageRows: 600 };
 
-export const googleReader =
-  (env: Env): SheetReader =>
-  (range) =>
-    readSheetRange(env, range);
+export const googleReader = (env: Env): SheetReader => readContempra(env);
 
 const message = (e: unknown) => (e as Error)?.message || String(e);
 
