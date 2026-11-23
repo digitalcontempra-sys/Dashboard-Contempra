@@ -1,7 +1,17 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { flushCardSheet, PRODUCTION_COLUMNS_VERSION, PRODUCTION_HEADERS, queueCardSheet, retryCardSheet, STAGE_HEADERS } from "../../src/worker/cards/sheetSync";
-import { cardsOf, errorOf, newDocket, post, put, route, setupCards, teardownCards } from "./cardHelpers";
+import {
+  flushCardSheet,
+  PRODUCTION_COLUMNS_VERSION,
+  PRODUCTION_HEADERS,
+  queueCardSheet,
+  retryCardSheet,
+  STAGE_HEADERS,
+  TRACKING_HEADERS,
+  TRACKING_TAB,
+  trackingLine,
+} from "../../src/worker/cards/sheetSync";
+import { cardsOf, docketForm, errorOf, newDocket, post, put, route, setupCards, step, teardownCards } from "./cardHelpers";
 
 let s: Awaited<ReturnType<typeof setupCards>>;
 const OLD = ["SUB", "QC", "Design", "Print", "Lam", "Cut", "Fin", "Inst", "Notes2"];
@@ -155,8 +165,9 @@ describe("Stage columns", () => {
     // Create before the columns are ready, so no background flush races this test; then mark them ready.
     const d = await newDocket(s.manager, route("printer_roll"));
     await new Promise((r) => setTimeout(r, 100)); // let the save's background flush finish (it is a no-op: not ready)
-    await env.DB.prepare("INSERT INTO app_settings (key, value) VALUES ('production_columns', 'v3')").run();
+    await env.DB.prepare("INSERT INTO app_settings (key, value) VALUES ('production_columns', ?)").bind(PRODUCTION_COLUMNS_VERSION).run();
     s.g.sheet.tabs.Production = [[...PRODUCTION_HEADERS]];
+    s.g.sheet.tabs[TRACKING_TAB] = [[...TRACKING_HEADERS]];
     await queueCardSheet(env.DB, d.workOrder);
     s.g.sheet.failNext("updateCells");
     await flushCardSheet(env, d.workOrder);
@@ -169,6 +180,50 @@ describe("Stage columns", () => {
     await retryCardSheet(env);
     expect(stageCells(d.workOrder)[0]).toBe("Print Roll");
     expect(await env.DB.prepare("SELECT count(*) AS n FROM card_sheet_queue").first()).toEqual({ n: 0 });
+  });
+
+  it("column K shows who has the docket now: claimer, assignees, area, or Done", async () => {
+    await setup();
+    await s.staffWith("ira", "designer");
+    const erin = await s.staffWith("erin", "printer_roll");
+    const d = await newDocket(s.manager, [{ name: "Whole docket", steps: [step("designer", [s.ids.ira]), step("printer_roll")] }]);
+    await flushCardSheet(env, d.workOrder);
+    expect(sheetRow(d.workOrder)[10]).toBe("ira");
+
+    let [c, p] = await cardsOf(d.workOrder);
+    await post(`/api/cards/${c.id}/continue`, s.manager, { version: c.version });
+    await flushCardSheet(env, d.workOrder);
+    expect(sheetRow(d.workOrder)[10]).toBe("Printer Roll");
+
+    await post(`/api/cards/${p.id}/claim`, erin);
+    await flushCardSheet(env, d.workOrder);
+    expect(sheetRow(d.workOrder)[10]).toBe("erin");
+
+    p = (await cardsOf(d.workOrder))[1];
+    await put(`/api/cards/${p.id}/fields`, s.manager, { fields: { printed: true, file: "ok" }, version: p.version });
+    await post(`/api/cards/${p.id}/continue`, s.manager, { version: p.version + 1 });
+    await flushCardSheet(env, d.workOrder);
+    expect(sheetRow(d.workOrder)[10]).toBe("Done");
+  });
+
+  it("column K lists parallel holders once each, comma separated", async () => {
+    await setup();
+    await s.staffWith("ira", "designer");
+    const d = await newDocket(s.manager, [
+      { name: "Banner", steps: [step("designer", [s.ids.ira])] },
+      { name: "Decals", steps: [step("designer", [s.ids.ira])] },
+      { name: "Signs", steps: [step("colex")] },
+    ]);
+    await flushCardSheet(env, d.workOrder);
+    expect(sheetRow(d.workOrder)[10]).toBe("ira, Colex");
+  });
+
+  it("a docket without cards keeps its column K", async () => {
+    await setup();
+    s.g.sheet.rows[1][10] = "IN ship room";
+    await queueCardSheet(env.DB, "91487");
+    await flushCardSheet(env, "91487");
+    expect(sheetRow("91487")[10]).toBe("IN ship room");
   });
 
   it("the last Continue marks COMP; designer On hold marks HOLD", async () => {
@@ -186,5 +241,68 @@ describe("Stage columns", () => {
     await put(`/api/cards/${dc.id}/fields`, s.manager, { fields: { onHold: true }, version: dc.version });
     await flushCardSheet(env, b.workOrder);
     expect(sheetRow(b.workOrder)[4]).toBe(true);
+  });
+});
+
+describe("Docket Tracking tab", () => {
+  const WHEN = /^(.+) - (received|started) - [A-Z][a-z]+ \d{1,2} \d{4} - \d{1,2}:\d{2} (AM|PM)$/;
+  const lines = (wo: string) => {
+    const r = s.g.sheet.tabs[TRACKING_TAB].find((x) => String(x[0]) === wo)!;
+    return String(r[2]).split("\n").map((l) => l.match(WHEN)!.slice(1, 3));
+  };
+
+  it("formats a line in Winnipeg time", () => {
+    // Summer dates: Winnipeg is UTC-5 then.
+    expect(trackingLine("Ira", "received", "2026-07-23T14:37:00.000Z")).toBe("Ira - received - July 23 2026 - 9:37 AM");
+    expect(trackingLine("Erin", "started", "2026-07-24T18:05:00.000Z")).toBe("Erin - started - July 24 2026 - 1:05 PM");
+  });
+
+  it("set up creates the tab with its headers; an older layout gets it too, keeping Legacy Q-Y", async () => {
+    await setup();
+    expect(s.g.sheet.tabs[TRACKING_TAB]).toEqual([TRACKING_HEADERS]);
+    delete s.g.sheet.tabs[TRACKING_TAB];
+    await env.DB.prepare("UPDATE app_settings SET value = 'v3' WHERE key = 'production_columns'").run();
+    const legacy = s.g.sheet.tabs["Legacy Q-Y"];
+    expect((await setup()).status).toBe(200);
+    expect(s.g.sheet.tabs[TRACKING_TAB]).toEqual([TRACKING_HEADERS]);
+    expect(s.g.sheet.tabs["Legacy Q-Y"]).toBe(legacy);
+  });
+
+  it("records who received work and who started it, one row per docket updated in place", async () => {
+    await setup();
+    await s.staffWith("ira", "designer");
+    const erin = await s.staffWith("erin", "printer_roll");
+    const d = await newDocket(s.manager, [{ name: "Whole docket", steps: [step("designer", [s.ids.ira]), step("printer_roll")] }]);
+    const [c, p] = await cardsOf(d.workOrder);
+    await post(`/api/cards/${c.id}/continue`, s.manager, { version: c.version });
+    await post(`/api/cards/${p.id}/claim`, erin);
+    await flushCardSheet(env, d.workOrder);
+    await flushCardSheet(env, d.workOrder);
+    const rows = s.g.sheet.tabs[TRACKING_TAB].filter((x) => String(x[0]) === d.workOrder);
+    expect(rows).toHaveLength(1);
+    expect(rows[0][1]).toBe(sheetRow(d.workOrder)[6]);
+    expect(lines(d.workOrder)).toEqual([
+      ["ira", "received"],
+      ["Printer Roll", "received"],
+      ["erin", "started"],
+    ]);
+  });
+
+  it("reassigning an active card in the route editor counts as received", async () => {
+    await setup();
+    await s.staffWith("ira", "designer");
+    await s.staffWith("ana", "designer");
+    const d = await newDocket(s.manager, [{ name: "Whole docket", steps: [step("designer", [s.ids.ira])] }]);
+    const res = await put(`/api/virtual-dockets/${d.workOrder}`, s.manager, {
+      form: docketForm(),
+      jobs: [{ name: "Whole docket", steps: [step("designer", [s.ids.ana])] }],
+      version: d.version,
+    });
+    expect(res.status).toBe(200);
+    await flushCardSheet(env, d.workOrder);
+    expect(lines(d.workOrder)).toEqual([
+      ["ira", "received"],
+      ["ana", "received"],
+    ]);
   });
 });

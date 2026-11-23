@@ -41,6 +41,9 @@ export function eventStmt(
     .bind(card.id, card.role_id, wo, action, JSON.stringify(detail), userId, at);
 }
 
+/** Detail of an "activated" event: who the card reached (empty = the whole area team). */
+export const receivedDetail = (c: { assignee_ids: string }) => ({ assignees: JSON.parse(c.assignee_ids) as number[] });
+
 type Planned = { existing: CardRow | null; jobSort: number; jobName: string; step: number; roleId: string; assignees: number[]; status: CardStatus };
 
 /**
@@ -160,11 +163,16 @@ export async function reconcileCards(db: D1Database, wo: string, jobs: Productio
   const after = await loadCards(db, wo);
   const activated: number[] = [];
   const events: D1PreparedStatement[] = [];
+  const sameIds = (a: number[], b: number[]) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
   for (const p of planned) {
-    if (p.status === "active" && p.existing?.status !== "active") {
-      const c = after.find((x) => x.job_sort === p.jobSort && x.step === p.step)!;
+    if (p.status !== "active") continue;
+    const c = after.find((x) => x.job_sort === p.jobSort && x.step === p.step)!;
+    if (p.existing?.status !== "active") {
       activated.push(c.id);
-      events.push(eventStmt(db, c, wo, "activated", actorId, now));
+      events.push(eventStmt(db, c, wo, "activated", actorId, now, receivedDetail(c)));
+    } else if (!sameIds(JSON.parse(p.existing.assignee_ids) as number[], p.assignees)) {
+      // Handing an active card to other people counts as them receiving it (Docket Tracking tab).
+      events.push(eventStmt(db, c, wo, "activated", actorId, now, { ...receivedDetail(c), reassigned: true }));
     }
   }
   if (events.length) await db.batch(events);

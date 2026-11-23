@@ -3,7 +3,7 @@ import type { CardDTO, SessionUser } from "../../shared/types";
 import { ServiceError } from "../dockets/errors";
 import type { Env } from "../env";
 import { cardDTO } from "./dto";
-import { eventStmt, loadCards, type CardRow } from "./service";
+import { eventStmt, loadCards, receivedDetail, type CardRow } from "./service";
 import { queueCardSheet } from "./sheetSync";
 
 export function canAct(card: Pick<CardRow, "role_id" | "assignee_ids">, user: SessionUser): boolean {
@@ -65,7 +65,7 @@ async function settleJob(db: D1Database, wo: string, jobSort: number, actorId: n
         )
         .bind(c.status, activating ? 1 : 0, now, now, c.id),
     );
-    if (activating) stmts.push(eventStmt(db, c, wo, "activated", actorId, now));
+    if (activating) stmts.push(eventStmt(db, c, wo, "activated", actorId, now, receivedDetail(c)));
   }
   if (stmts.length) await db.batch(stmts);
 }
@@ -168,7 +168,7 @@ export async function sendBackCard(
       )
       .bind(why, user.id, now, now, target.id),
     eventStmt(db, card, card.work_order, "sent_back", user.id, now, { to: AREA_LABEL[target.role_id], reason: why }),
-    eventStmt(db, target, card.work_order, "activated", user.id, now),
+    eventStmt(db, target, card.work_order, "activated", user.id, now, receivedDetail(target)),
   ]);
   await queueCardSheet(db, card.work_order);
   return cardDTO(db, user.id, id);

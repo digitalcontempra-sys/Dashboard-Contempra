@@ -1,7 +1,15 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CardEventDTO } from "../../src/shared/types";
-import { flushCardSheet, PRODUCTION_HEADERS, queueCardSheet, retryCardSheet } from "../../src/worker/cards/sheetSync";
+import {
+  flushCardSheet,
+  PRODUCTION_COLUMNS_VERSION,
+  PRODUCTION_HEADERS,
+  queueCardSheet,
+  retryCardSheet,
+  TRACKING_HEADERS,
+  TRACKING_TAB,
+} from "../../src/worker/cards/sheetSync";
 import { withLock } from "../../src/worker/dockets/lock";
 import { SHEET_LOCK } from "../../src/worker/dockets/service";
 import { cardsOf, newDocket, post, put, route, setupCards, step, teardownCards } from "./cardHelpers";
@@ -26,8 +34,9 @@ async function editJobs(wo: string, version: number, jobs: Parameters<typeof new
 /** Columns ready without the setup route (no background flush races the test). */
 async function columnsReady() {
   await sleep(100);
-  await env.DB.prepare("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('production_columns', 'v3')").run();
+  await env.DB.prepare("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('production_columns', ?)").bind(PRODUCTION_COLUMNS_VERSION).run();
   s.g.sheet.tabs.Production = [[...PRODUCTION_HEADERS]];
+  s.g.sheet.tabs[TRACKING_TAB] = [[...TRACKING_HEADERS]];
 }
 
 describe("review fixes", () => {
@@ -120,7 +129,7 @@ describe("review fixes", () => {
     expect(s.g.sheet.rowOf(d.workOrder)![16]).toBe("Print Roll");
   });
 
-  it("Production tab rows are written in one batch", async () => {
+  it("Production and Docket Tracking rows are written in one batch", async () => {
     const d = await newDocket(s.manager, route("designer", "printer_roll", "laminate_roll"));
     await columnsReady();
     await queueCardSheet(env.DB, d.workOrder);
@@ -131,6 +140,6 @@ describe("review fixes", () => {
     await flushCardSheet(env, d.workOrder); // updates the 3 rows in place
     expect(single).not.toHaveBeenCalled();
     expect(batch).toHaveBeenCalledTimes(1);
-    expect(batch.mock.calls[0][0]).toHaveLength(3);
+    expect(batch.mock.calls[0][0]).toHaveLength(4);
   });
 });

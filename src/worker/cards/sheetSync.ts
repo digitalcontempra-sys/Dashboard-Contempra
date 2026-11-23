@@ -23,7 +23,8 @@ export const STAGE_HEADERS = [
   "Photos",
 ];
 /** app_settings.production_columns once the sheet has the current layout ("ready" = Q–Z, "v2" = Q–AA, "v3" = Q–AB with Photos). */
-export const PRODUCTION_COLUMNS_VERSION = "v3";
+/** v4: column K shows who has the docket, and the "Docket Tracking" tab exists. */
+export const PRODUCTION_COLUMNS_VERSION = "v4";
 export const PRODUCTION_HEADERS = [
   "Work Order",
   "Job",
@@ -38,6 +39,25 @@ export const PRODUCTION_HEADERS = [
 ];
 const PRODUCTION_TAB = "Production";
 const LEGACY_TAB = "Legacy Q-Y";
+/** One row per docket: who received work in it and who started it, with date and time. */
+export const TRACKING_TAB = "Docket Tracking";
+export const TRACKING_HEADERS = ["Work Order", "Customer", "Tracking"];
+
+const WHEN = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Winnipeg",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
+/** "Ira - received - November 23 2026 - 9:37 AM" (Winnipeg time). */
+export function trackingLine(name: string, kind: "received" | "started", iso: string): string {
+  const p = Object.fromEntries(WHEN.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+  return `${name} - ${kind} - ${p.month} ${p.day} ${p.year} - ${p.hour}:${p.minute} ${String(p.dayPeriod).toUpperCase()}`;
+}
 /** Sheet columns R..Z, one per area, in role order; AA is Assigned. */
 const AREA_COLS = ["R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
 const RETRY_BATCH = 20;
@@ -111,6 +131,40 @@ function assignedText(c: SheetCard, names: Map<number, string>): string {
   return ids.length ? ids.map((id) => names.get(id) ?? "?").join(", ") : "Team";
 }
 
+/** Who has an active card: whoever took it, else its assignees, else its area. */
+function holderText(c: SheetCard, names: Map<number, string>): string {
+  if (c.claimed_name) return c.claimed_name;
+  const ids = assigneeIds(c);
+  return ids.length ? ids.map((id) => names.get(id) ?? "?").join(", ") : c.role_label;
+}
+
+type TrackingEvent = { action: "activated" | "claimed"; role_label: string; detail_json: string; at: string; actor: string | null };
+
+async function trackingEvents(db: D1Database, wo: string): Promise<TrackingEvent[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT e.action, r.label AS role_label, e.detail_json, e.at, u.full_name AS actor
+       FROM card_events e JOIN roles r ON r.id = e.role_id LEFT JOIN users u ON u.id = e.user_id
+       WHERE e.work_order = ? AND e.action IN ('activated', 'claimed') ORDER BY e.at, e.id`,
+    )
+    .bind(wo)
+    .all<TrackingEvent>();
+  return results;
+}
+
+const receivedIds = (e: TrackingEvent) => ((JSON.parse(e.detail_json) as { assignees?: number[] }).assignees ?? []);
+
+export function trackingText(events: TrackingEvent[], names: Map<number, string>): string {
+  return events
+    .map((e) => {
+      if (e.action === "claimed") return trackingLine(e.actor ?? "?", "started", e.at);
+      const ids = receivedIds(e);
+      const who = ids.length ? ids.map((id) => names.get(id) ?? "?").join(", ") : e.role_label;
+      return trackingLine(who, "received", e.at);
+    })
+    .join("\n");
+}
+
 const AT = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Winnipeg",
   year: "numeric",
@@ -146,6 +200,9 @@ export function stageRowCells(cards: SheetCard[], names: Map<number, string>, q:
       : "—";
   });
   cells.AA = active.length ? [...new Set(active.map((c) => assignedText(c, names)))].join(", ") : "";
+  // K (ROLE): who has the docket now. A docket without cards keeps whatever K holds.
+  if (allDone) cells.K = "Done";
+  else if (active.length) cells.K = [...new Set(active.map((c) => holderText(c, names)))].join(", ");
   if (q.comp === 1) cells.D = true;
   if (q.hold !== null) cells.E = q.hold === 1;
   return cells;
@@ -181,8 +238,9 @@ export async function flushCardSheet(env: Env, wo: string): Promise<void> {
         .first<{ hold: number | null; comp: number | null; queued_at: string }>();
       if (!q) return;
       const cards = await sheetCards(db, wo);
-      const names = await userNames(db, [...new Set(cards.flatMap(assigneeIds))]);
-      const { row } = await locateRow(env, wo);
+      const events = await trackingEvents(db, wo);
+      const names = await userNames(db, [...new Set([...cards.flatMap(assigneeIds), ...events.flatMap(receivedIds)])]);
+      const { row, values: sheetValues } = await locateRow(env, wo);
       const photos = await db
         .prepare(
           `SELECT (SELECT count(*) FROM card_photos WHERE work_order = ?1) AS n,
@@ -217,8 +275,18 @@ export async function flushCardSheet(env: Env, wo: string): Promise<void> {
           updates.push({ range: `${tabRef(PRODUCTION_TAB)}!F${i + 2}`, values: [["Removed"]] });
         }
       }
+      // Docket Tracking tab: this docket's row, located by Work Order and rewritten whole (same batch).
+      let freshTracking: unknown[] | null = null;
+      if (events.length) {
+        const tracking = [wo, sheetValues[6] ?? "", trackingText(events, names)];
+        const wos = await sheet.readRange(`${tabRef(TRACKING_TAB)}!A2:A`);
+        const at = wos.findIndex((r) => String(r?.[0] ?? "") === wo);
+        if (at >= 0) updates.push({ range: `${tabRef(TRACKING_TAB)}!A${at + 2}`, values: [tracking] });
+        else freshTracking = tracking;
+      }
       if (updates.length) await sheet.writeRanges(updates);
       if (fresh.length) await sheet.appendRows(PRODUCTION_TAB, fresh);
+      if (freshTracking) await sheet.appendRows(TRACKING_TAB, [freshTracking]);
       await upsertMirror(db, await readRow(env, row), row).catch(() => undefined);
       // A change queued while we were writing keeps its row for the next flush.
       await db.prepare("DELETE FROM card_sheet_queue WHERE work_order = ? AND queued_at = ?").bind(wo, q.queued_at).run();
@@ -245,6 +313,12 @@ export async function retryCardSheet(env: Env): Promise<void> {
   for (const r of results) await flushCardSheet(env, r.work_order);
 }
 
+/** Creates the Docket Tracking tab (if missing) and writes its headers; its rows are left alone. */
+async function setupTrackingTab(sheet: ReturnType<typeof getGateways>["sheet"]): Promise<void> {
+  await sheet.ensureTab(TRACKING_TAB);
+  await sheet.writeRange(`${tabRef(TRACKING_TAB)}!A1`, [TRACKING_HEADERS]);
+}
+
 /**
  * One-time: archives Q–Y to "Legacy Q-Y", clears them, and writes the production headers.
  * A sheet set up with an older layout (before Contour Cut) only gets its stage columns and headers
@@ -261,6 +335,7 @@ export async function setupProductionColumns(env: Env, _user: SessionUser): Prom
       // Older layout: the stage cells are rewritten from the cards by the flushes queued below.
       await sheet.clearColumns("Q", "AB", 2);
       await sheet.writeRange("Contempra!Q1", [STAGE_HEADERS]);
+      await setupTrackingTab(sheet);
       return null;
     }
     const wos = await sheet.readRange("Contempra!C1:C");
@@ -277,6 +352,7 @@ export async function setupProductionColumns(env: Env, _user: SessionUser): Prom
     await sheet.writeRange("Contempra!Q1", [STAGE_HEADERS]);
     await sheet.ensureTab(PRODUCTION_TAB);
     await sheet.writeRange(`${tabRef(PRODUCTION_TAB)}!A1`, [PRODUCTION_HEADERS]);
+    await setupTrackingTab(sheet);
     return legacy.length - 1;
   });
   await db

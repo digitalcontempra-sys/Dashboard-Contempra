@@ -84,7 +84,7 @@ A production dashboard for **Contempra Signs** (a sign shop in Winnipeg). It sit
   - Tokens live in `src/web/index.css`: primitives → semantic → component.
   - Custom utilities use `@utility`, not `@apply` of custom classes.
 - **Data:** D1 (SQLite) holds the app's own data plus a mirror of the sheet (`dockets` table).
-  - The Google Sheet stays the shop's source of truth for columns A–P.
+  - The Google Sheet stays the shop's source of truth for columns A–P, except K (ROLE), which the dashboard writes for dockets with cards.
   - Columns Q–AB are written only by the dashboard.
 - **Google:** OAuth with the sheet owner's Gmail.
   - Scopes: `openid email spreadsheets drive.file`.
@@ -132,7 +132,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
 - **Sheet columns A–P (tab `Contempra`):** Date, Due Date, Work Order, COMP, HOLD, #, Customer, Project, Address, Account Manager, ROLE, Inv, Inv/Date, Quote/PO/Deposit, Notes, LINK.
   - Rows are always located by Work Order (column C), never by a cached row number.
   - Every app write to the sheet runs inside `withLock(db, "sheet")`. The row is re-read before writing.
-- **Columns Q–AB** (written only by the dashboard). Layout version `v3`, stored in `app_settings.production_columns`:
+- **Columns Q–AB** (written only by the dashboard). Layout version `v4`, stored in `app_settings.production_columns`:
 
   | Q | R | S | T | U | V | W | X | Y | Z | AA | AB |
   |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -141,7 +141,9 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
   - AB holds `=HYPERLINK(folder,"Photos (n)")`, written with USER_ENTERED.
   - **If you change this layout:** bump `PRODUCTION_COLUMNS_VERSION` in `src/worker/cards/sheetSync.ts` and keep the in-place upgrade path. After publishing, the owner must press **Admin → Set up production columns** again; until then, sheet writes stay queued.
   - The first setup copies the old Q–Y to the tab `Legacy Q-Y`.
+- **Column K (ROLE)** shows who has the docket now: per active card, whoever pressed `I'm on it`, else its assignees, else its area label; comma separated, no repeats. All cards done → `Done`. A docket without cards keeps its K. Staff no longer type in K.
 - **`Production` tab:** one row per card (Work Order, Job, Step, Role, Assigned To, Status, Fields, Returned Reason, Updated By, Updated At).
+- **`Docket Tracking` tab** (from `v4`): one row per docket (Work Order, Customer, Tracking). Tracking is one cell, one line per event, Winnipeg time: `Ira - received - November 23 2026 - 9:37 AM` (`activated` events, including reassigning an active card) and `Ira - started - …` (`claimed`). `activated` events store `assignees` in `detail_json`; older ones show the area. `Legacy Q-Y` is never touched again.
 - **Card → sheet writes go through a queue (`card_sheet_queue`).** D1 commits first. Then `flushCardSheet` runs in `waitUntil`, and the cron retries failures. Google being down never blocks production.
 - **Route rules:**
   - Done cards stay done when a route is edited.
@@ -171,7 +173,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
    5. Have a fresh reviewer check the whole branch, and fix what it finds that matters.
    6. Ask "¿Hago merge a main y publico?"
 3. **Verification before saying "done":**
-   - `npx vitest run` passes (today 374 tests).
+   - `npx vitest run` passes (today 381 tests).
    - `npm run typecheck` is clean.
    - For UI changes, check the page in the local preview, including phone width 375 px: no horizontal scroll.
 4. **Commit messages:**
@@ -281,7 +283,7 @@ git push origin main
 Everything below is live and pushed to `main`:
 - dashboard, sync, Virtual Docket, PDF / Drive;
 - production cards with all 9 areas, Board, history, notifications;
-- sheet columns Q–AB (v3, set up on the TEST sheet);
+- sheet columns Q–AB (v3, set up on the TEST sheet; v4 adds column K holder + `Docket Tracking` tab, needs **Set up production columns** once after publishing);
 - Task Cards, installer photos (AB link), area colors;
 - calendar-only dates;
 - material lists per area (Roll, Print FB, Laminate Roll);
