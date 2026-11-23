@@ -24,6 +24,9 @@ afterEach(() => {
   teardownCards();
 });
 
+/** An old route card finished before the hand-off flow existed. */
+const finishRouteCard = (id: number) => env.DB.prepare("UPDATE cards SET status = 'done', version = version + 1 WHERE id = ?").bind(id).run();
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function editJobs(wo: string, version: number, jobs: Parameters<typeof newDocket>[1]) {
   const f = (await (await api(`/api/virtual-dockets/${wo}`, { cookie: s.manager })).json()) as { form: unknown };
@@ -63,11 +66,10 @@ describe("review fixes", () => {
       { name: "Decals", steps: [step("colex")] },
     ]);
     const [c0] = await cardsOf(d.workOrder);
-    await post(`/api/cards/${c0.id}/continue`, s.manager, { version: c0.version });
+    await finishRouteCard(c0.id);
     await editJobs(d.workOrder, d.version, [{ name: "Decals", steps: [step("colex")] }]);
     const h = (await (await api(`/api/virtual-dockets/${d.workOrder}/history`, { cookie: s.manager })).json()) as CardEventDTO[];
     const lines = h.map((e) => `${e.area} · ${e.detail}`);
-    expect(lines).toContain("Design · Send to production → Print Roll");
     expect(lines).toContain("Design · Removed Design from the route");
     expect(lines).toContain("Print Roll · Removed Print Roll from the route");
   });
@@ -75,7 +77,7 @@ describe("review fixes", () => {
   it("a step inserted before done work leaves that work done", async () => {
     const d = await newDocket(s.manager, route("designer", "printer_roll"));
     const [c0] = await cardsOf(d.workOrder);
-    await post(`/api/cards/${c0.id}/continue`, s.manager, { version: c0.version });
+    await finishRouteCard(c0.id);
     await editJobs(d.workOrder, d.version, route("colex", "designer", "printer_roll"));
     const after = await cardsOf(d.workOrder);
     expect(after.map((c) => [c.role_id, c.status])).toEqual([

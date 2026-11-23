@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { flushCardSheet, PRODUCTION_COLUMNS_VERSION, STAGE_HEADERS } from "../../src/worker/cards/sheetSync";
 import { layoutReader, physicalCells, physicalRange } from "../../src/worker/sheet/layout";
-import { cardsOf, docketForm, newDocket, post, put, route, setupCards, step, teardownCards } from "./cardHelpers";
+import { cardOf, docketForm, handDocket, move, newDocket, post, put, route, setupCards, teardownCards } from "./cardHelpers";
 import { HEADER } from "./fixtures";
 import { api } from "./helpers";
 
@@ -90,35 +90,49 @@ describe("STATUS column", () => {
 
   it("ROLE shows the person and STATUS the state, through to Done", async () => {
     await setup();
-    await s.staffWith("ira", "designer");
-    const d = await newDocket(s.manager, [{ name: "Whole docket", steps: [step("designer", [s.ids.ira])] }]);
-    expect(row(d.workOrder)[12]).toBe(false); // Inv checkbox, now in M
-    await flushCardSheet(env, d.workOrder);
-    expect(row(d.workOrder).slice(10, 12)).toEqual(["ira", "Starting"]);
+    const ira = await s.staffWith("ira", "designer");
+    const d = await handDocket(s.manager, [{ userId: s.ids.ira, instruction: "Logo" }]);
+    const wo = d.workOrder;
+    expect(row(wo)[12]).toBe(false); // Inv checkbox, now in M
+    await flushCardSheet(env, wo);
+    expect(row(wo).slice(10, 12)).toEqual(["ira", "Starting"]);
 
-    const ira = await (await import("./helpers")).login("ira");
-    let [c] = await cardsOf(d.workOrder);
-    await post(`/api/cards/${c.id}/claim`, ira);
-    await flushCardSheet(env, d.workOrder);
-    expect(row(d.workOrder).slice(10, 12)).toEqual(["ira", "In progress"]);
+    await post(`/api/cards/${(await cardOf(wo, s.ids.ira)).id}/claim`, ira);
+    await flushCardSheet(env, wo);
+    expect(row(wo).slice(10, 12)).toEqual(["ira", "In progress"]);
 
-    c = (await cardsOf(d.workOrder))[0];
-    const res = await post(`/api/cards/${c.id}/continue`, ira, { version: c.version });
-    expect(res.status).toBe(200);
-    await flushCardSheet(env, d.workOrder);
-    expect(row(d.workOrder).slice(10, 12)).toEqual(["ira", "Done"]);
-    expect(row(d.workOrder)[17]).toBe("Done"); // Stage, now in R
+    expect((await move(await cardOf(wo, s.ids.ira), "proof-sent", ira)).status).toBe(200);
+    await flushCardSheet(env, wo);
+    expect(row(wo).slice(10, 12)).toEqual(["mgr", "Waiting for design approval"]);
+
+    await move(await cardOf(wo, s.ids.mgr, { creator: true }), "continue", s.manager, { to: [{ userId: s.ids.ira, instruction: "Final" }] });
+    await move(await cardOf(wo, s.ids.ira), "done", ira);
+    await flushCardSheet(env, wo);
+    expect(row(wo).slice(10, 12)).toEqual(["mgr", "Ready to close"]);
+
+    await move(await cardOf(wo, s.ids.mgr, { creator: true }), "close", s.manager);
+    await flushCardSheet(env, wo);
+    expect(row(wo).slice(10, 12)).toEqual(["mgr", "Done"]);
+    expect(row(wo)[17]).toBe("Done"); // Stage, now in R
   });
 
-  it("a returned card says Returned", async () => {
+  it("a returned card says Returned; split holders list in the same order", async () => {
     await setup();
-    const d = await newDocket(s.manager, route("designer", "colex"));
-    let [c] = await cardsOf(d.workOrder);
-    await post(`/api/cards/${c.id}/continue`, s.manager, { version: c.version });
-    const colex = (await cardsOf(d.workOrder))[1];
-    await post(`/api/cards/${colex.id}/send-back`, s.manager, { toStep: 0, reason: "Wrong size", version: colex.version });
+    const ira = await s.staffWith("ira", "designer");
+    const cole = await s.staffWith("cole", "colex");
+    const d = await handDocket(s.manager, [{ userId: s.ids.ira, instruction: "Logo" }]);
+    await move(await cardOf(d.workOrder, s.ids.ira), "continue", ira, { to: [{ userId: s.ids.cole, instruction: "Cut" }] });
+    await move(await cardOf(d.workOrder, s.ids.cole), "send-back", cole, { reason: "Wrong size" });
     await flushCardSheet(env, d.workOrder);
-    expect(row(d.workOrder).slice(10, 12)).toEqual(["Designer", "Returned"]);
+    expect(row(d.workOrder).slice(10, 12)).toEqual(["ira", "Returned"]);
+
+    const e = await handDocket(s.manager, [
+      { userId: s.ids.cole, instruction: "Cut" },
+      { userId: s.ids.ira, instruction: "Logo" },
+    ]);
+    await post(`/api/cards/${(await cardOf(e.workOrder, s.ids.cole)).id}/claim`, cole);
+    await flushCardSheet(env, e.workOrder);
+    expect(row(e.workOrder).slice(10, 12)).toEqual(["cole, ira", "In progress, Starting"]);
   });
 
   it("saving and editing a docket keep working after the column is inserted", async () => {

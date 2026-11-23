@@ -156,11 +156,13 @@ const put = (path: string, cookie: string, json: unknown) => api(path, { method:
 const errorOf = async (res: Response) => ((await res.json()) as { error: string }).error;
 
 describe("card actions", () => {
-  it("Continue is blocked until required fields are set, then moves to the next area", async () => {
+  it("Continue is blocked until required fields are set, then hands the docket on", async () => {
     const lam = await staffWith("lee", "laminate_roll");
+    await staffWith("pat", "finishing");
     const d = await createDocket(manager, route("laminate_roll", "finishing"));
     const [c] = await cardsOf(d.workOrder);
-    let res = await post(`/api/cards/${c.id}/continue`, lam, { version: c.version });
+    const to = [{ userId: ids.pat, instruction: "Pack it" }];
+    let res = await post(`/api/cards/${c.id}/continue`, lam, { version: c.version, to });
     expect(res.status).toBe(409);
     expect(await errorOf(res)).toBe('Mark "Laminated" to continue');
 
@@ -169,14 +171,18 @@ describe("card actions", () => {
     const saved = (await res.json()) as { version: number; fields: Record<string, unknown> };
     expect(saved.fields).toEqual({ laminated: true });
 
-    res = await post(`/api/cards/${c.id}/continue`, lam, { version: saved.version });
+    res = await post(`/api/cards/${c.id}/continue`, lam, { version: saved.version, to });
     expect(res.status).toBe(200);
     const cards = await cardsOf(d.workOrder);
-    expect(cards.map((x) => x.status)).toEqual(["done", "active"]);
+    // The old route's waiting Finishing card is replaced by Pat's own card.
+    expect(cards.map((x) => [x.role_id, x.status])).toEqual([
+      ["laminate_roll", "done"],
+      ["finishing", "active"],
+    ]);
     const actions = (await eventsOf(d.workOrder)).map((e) => e.action);
-    expect(actions.slice(-2)).toEqual(["continued", "activated"]);
+    expect(actions.slice(-3)).toEqual(["continued", "activated", "removed"]);
     const cont = (await eventsOf(d.workOrder)).find((e) => e.action === "continued");
-    expect(JSON.parse(cont!.detail_json)).toEqual({ to: "Finishing" });
+    expect(JSON.parse(cont!.detail_json)).toEqual({ to: [{ userId: ids.pat, roleId: "finishing", instruction: "Pack it" }] });
   });
 
   it("Send back returns the job to an earlier area with a reason", async () => {
@@ -213,12 +219,11 @@ describe("card actions", () => {
   });
 
   it("two Continues at once: one wins, the other is told who moved it", async () => {
+    await staffWith("erin", "printer_roll");
     const d = await createDocket(manager, route("designer", "printer_roll"));
     const [c] = await cardsOf(d.workOrder);
-    const [a, b] = await Promise.all([
-      post(`/api/cards/${c.id}/continue`, manager, { version: c.version }),
-      post(`/api/cards/${c.id}/continue`, manager, { version: c.version }),
-    ]);
+    const body = { version: c.version, to: [{ userId: ids.erin, instruction: "Print" }] };
+    const [a, b] = await Promise.all([post(`/api/cards/${c.id}/continue`, manager, body), post(`/api/cards/${c.id}/continue`, manager, body)]);
     expect([a.status, b.status].sort()).toEqual([200, 409]);
     const loser = a.status === 409 ? a : b;
     expect(await errorOf(loser)).toBe("This card was already moved by mgr.");
@@ -245,17 +250,19 @@ describe("card actions", () => {
     expect((await post(`/api/cards/${c.id}/claim`, erin)).status).toBe(200);
   });
 
-  it("the last Continue completes the docket and queues COMP", async () => {
+  it("Done on the last route card returns the docket to its creator; it does not complete it", async () => {
     const d = await createDocket(manager, route("colex"));
     const [c] = await cardsOf(d.workOrder);
-    const res = await post(`/api/cards/${c.id}/continue`, manager, { version: c.version });
+    const res = await post(`/api/cards/${c.id}/done`, manager, { version: c.version });
     expect(res.status).toBe(409); // colex needs Completed
     await put(`/api/cards/${c.id}/fields`, manager, { fields: { completed: true }, version: c.version });
-    const ok = await post(`/api/cards/${c.id}/continue`, manager, { version: c.version + 1 });
+    const ok = await post(`/api/cards/${c.id}/done`, manager, { version: c.version + 1 });
     expect(ok.status).toBe(200);
-    expect((await eventsOf(d.workOrder)).map((e) => e.action)).toContain("completed");
+    expect((await eventsOf(d.workOrder)).map((e) => e.action)).not.toContain("completed");
+    const creator = await env.DB.prepare("SELECT stage, status FROM cards WHERE work_order = ? AND stage IS NOT NULL").bind(d.workOrder).first();
+    expect(creator).toEqual({ stage: "ready_to_close", status: "active" });
     const q = await env.DB.prepare("SELECT comp FROM card_sheet_queue WHERE work_order = ?").bind(d.workOrder).first();
-    expect(q).toEqual({ comp: 1 });
+    expect(q).toEqual({ comp: null });
   });
 
   it("saving fields with an old version is refused", async () => {

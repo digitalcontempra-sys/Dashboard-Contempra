@@ -12,7 +12,21 @@ import {
   TRACKING_TAB,
   trackingLine,
 } from "../../src/worker/cards/sheetSync";
-import { cardsOf, docketForm, errorOf, newDocket, post, put, route, setupCards, step, teardownCards } from "./cardHelpers";
+import {
+  cardOf,
+  cardsOf,
+  docketForm,
+  errorOf,
+  handDocket,
+  move,
+  newDocket,
+  post,
+  put,
+  route,
+  setupCards,
+  step,
+  teardownCards,
+} from "./cardHelpers";
 
 let s: Awaited<ReturnType<typeof setupCards>>;
 const OLD = ["SUB", "QC", "Design", "Print", "Lam", "Cut", "Fin", "Inst", "Notes2"];
@@ -125,25 +139,27 @@ describe("Stage columns", () => {
 
   it("show the stage of every area and the Production tab rows", async () => {
     await setup();
-    const d = await newDocket(s.manager, route("designer", "printer_roll", "laminate_roll"));
-    let [c] = await cardsOf(d.workOrder);
-    await post(`/api/cards/${c.id}/continue`, s.manager, { version: c.version });
-    c = (await cardsOf(d.workOrder))[1];
-    await put(`/api/cards/${c.id}/fields`, s.manager, { fields: { printed: true, file: "ok" }, version: c.version });
-    await post(`/api/cards/${c.id}/continue`, s.manager, { version: c.version + 1 });
+    const ira = await s.staffWith("ira", "designer");
+    const erin = await s.staffWith("erin", "printer_roll");
+    const lee = await s.staffWith("lee", "laminate_roll");
+    const d = await handDocket(s.manager, [{ userId: s.ids.ira, instruction: "Logo" }]);
+    await move(await cardOf(d.workOrder, s.ids.ira), "continue", ira, { to: [{ userId: s.ids.erin, instruction: "Print" }] });
+    let c = await cardOf(d.workOrder, s.ids.erin);
+    await put(`/api/cards/${c.id}/fields`, erin, { fields: { printed: true, file: "ok" }, version: c.version });
+    await move({ ...c, version: c.version + 1 }, "continue", erin, { to: [{ userId: s.ids.lee, instruction: "Laminate" }] });
     await flushCardSheet(env, d.workOrder);
     expect(stageCells(d.workOrder)).toEqual([
       "Laminate",
-      `✓ mgr ${today}`,
-      `✓ mgr ${today}`,
+      `✓ ira ${today}`,
+      `✓ erin ${today}`,
       "—",
-      "Active · Team",
-      "—",
-      "—",
+      "Active · lee",
       "—",
       "—",
       "—",
-      "Team",
+      "—",
+      "—",
+      "lee",
       "",
     ]);
     const prod = s.g.sheet.tabs.Production.slice(1);
@@ -156,12 +172,12 @@ describe("Stage columns", () => {
     expect(await env.DB.prepare("SELECT count(*) AS n FROM card_sheet_queue").first()).toEqual({ n: 0 });
 
     // A second flush updates rows in place.
-    c = (await cardsOf(d.workOrder))[2];
-    await post(`/api/cards/${c.id}/send-back`, s.manager, { toStep: 0, reason: "New logo", version: c.version });
+    c = await cardOf(d.workOrder, s.ids.lee);
+    await move(c, "send-back", lee, { reason: "New logo" });
     await flushCardSheet(env, d.workOrder);
     expect(s.g.sheet.tabs.Production).toHaveLength(4);
-    expect(stageCells(d.workOrder)[1]).toBe("Returned · New logo");
-    expect(s.g.sheet.tabs.Production[1][5]).toBe("Returned");
+    expect(stageCells(d.workOrder)[2]).toBe("Returned · New logo");
+    expect(s.g.sheet.tabs.Production[2][5]).toBe("Returned");
   });
 
   it("a failed write stays queued and the cron retries it", async () => {
@@ -185,28 +201,28 @@ describe("Stage columns", () => {
     expect(await env.DB.prepare("SELECT count(*) AS n FROM card_sheet_queue").first()).toEqual({ n: 0 });
   });
 
-  it("column K shows who has the docket now: claimer, assignees, area, or Done", async () => {
+  it("column K shows who has the docket now: the person, the creator, or who closed it", async () => {
     await setup();
-    await s.staffWith("ira", "designer");
+    const ira = await s.staffWith("ira", "designer");
     const erin = await s.staffWith("erin", "printer_roll");
-    const d = await newDocket(s.manager, [{ name: "Whole docket", steps: [step("designer", [s.ids.ira]), step("printer_roll")] }]);
+    const d = await handDocket(s.manager, [{ userId: s.ids.ira, instruction: "Logo" }]);
     await flushCardSheet(env, d.workOrder);
     expect(sheetRow(d.workOrder)[10]).toBe("ira");
 
-    let [c, p] = await cardsOf(d.workOrder);
-    await post(`/api/cards/${c.id}/continue`, s.manager, { version: c.version });
-    await flushCardSheet(env, d.workOrder);
-    expect(sheetRow(d.workOrder)[10]).toBe("Printer Roll");
-
-    await post(`/api/cards/${p.id}/claim`, erin);
+    await move(await cardOf(d.workOrder, s.ids.ira), "continue", ira, { to: [{ userId: s.ids.erin, instruction: "Print" }] });
+    await post(`/api/cards/${(await cardOf(d.workOrder, s.ids.erin)).id}/claim`, erin);
     await flushCardSheet(env, d.workOrder);
     expect(sheetRow(d.workOrder)[10]).toBe("erin");
 
-    p = (await cardsOf(d.workOrder))[1];
-    await put(`/api/cards/${p.id}/fields`, s.manager, { fields: { printed: true, file: "ok" }, version: p.version });
-    await post(`/api/cards/${p.id}/continue`, s.manager, { version: p.version + 1 });
+    const p = await cardOf(d.workOrder, s.ids.erin);
+    await put(`/api/cards/${p.id}/fields`, erin, { fields: { printed: true, file: "ok" }, version: p.version });
+    await move({ ...p, version: p.version + 1 }, "done", erin);
     await flushCardSheet(env, d.workOrder);
-    expect(sheetRow(d.workOrder)[10]).toBe("mgr"); // whoever finished it
+    expect(sheetRow(d.workOrder)[10]).toBe("mgr"); // back with its creator
+
+    await move(await cardOf(d.workOrder, s.ids.mgr, { creator: true }), "close", s.manager);
+    await flushCardSheet(env, d.workOrder);
+    expect(sheetRow(d.workOrder)[10]).toBe("mgr"); // whoever closed it
   });
 
   it("column K lists parallel holders once each, comma separated", async () => {
@@ -235,15 +251,21 @@ describe("Stage columns", () => {
     expect(sheetRow("91487")[10]).toBe("IN ship room");
   });
 
-  it("the last Continue marks COMP; designer On hold marks HOLD", async () => {
+  it("Close docket marks COMP and Restore clears it; designer On hold marks HOLD", async () => {
     await setup();
-    const a = await newDocket(s.manager, route("colex"));
-    const [c] = await cardsOf(a.workOrder);
-    await put(`/api/cards/${c.id}/fields`, s.manager, { fields: { completed: true }, version: c.version });
-    await post(`/api/cards/${c.id}/continue`, s.manager, { version: c.version + 1 });
+    const col = await s.staffWith("cole", "colex");
+    const a = await handDocket(s.manager, [{ userId: s.ids.cole, instruction: "Cut" }]);
+    const c = await cardOf(a.workOrder, s.ids.cole);
+    await put(`/api/cards/${c.id}/fields`, col, { fields: { completed: true }, version: c.version });
+    await move({ ...c, version: c.version + 1 }, "done", col);
+    const creator = await cardOf(a.workOrder, s.ids.mgr, { creator: true });
+    await move(creator, "close", s.manager);
     await flushCardSheet(env, a.workOrder);
     expect(sheetRow(a.workOrder)[3]).toBe(true);
     expect(stageCells(a.workOrder)[0]).toBe("Done");
+    await post(`/api/cards/${creator.id}/restore`, s.admin);
+    await flushCardSheet(env, a.workOrder);
+    expect(sheetRow(a.workOrder)[3]).toBe(false);
 
     const b = await newDocket(s.manager, route("designer"));
     const [dc] = await cardsOf(b.workOrder);
@@ -279,41 +301,52 @@ describe("Docket Tracking tab", () => {
     expect(s.g.sheet.tabs["Legacy Q-Y"]).toBe(legacy);
   });
 
-  it("records who received work and who started it, one row per docket updated in place", async () => {
+  it("stamps every hand-off, one row per docket updated in place", async () => {
     await setup();
-    await s.staffWith("ira", "designer");
+    const ira = await s.staffWith("ira", "designer");
     const erin = await s.staffWith("erin", "printer_roll");
-    const d = await newDocket(s.manager, [{ name: "Whole docket", steps: [step("designer", [s.ids.ira]), step("printer_roll")] }]);
-    const [c, p] = await cardsOf(d.workOrder);
-    await post(`/api/cards/${c.id}/continue`, s.manager, { version: c.version });
-    await post(`/api/cards/${p.id}/claim`, erin);
-    await flushCardSheet(env, d.workOrder);
-    await flushCardSheet(env, d.workOrder);
-    const rows = s.g.sheet.tabs[TRACKING_TAB].filter((x) => String(x[0]) === d.workOrder);
+    const d = await handDocket(s.manager, [{ userId: s.ids.ira, instruction: "Logo" }]);
+    const wo = d.workOrder;
+    await post(`/api/cards/${(await cardOf(wo, s.ids.ira)).id}/claim`, ira);
+    await move(await cardOf(wo, s.ids.ira), "continue", ira, { to: [{ userId: s.ids.erin, instruction: "Print 2 banners 3x6" }] });
+    await post(`/api/cards/${(await cardOf(wo, s.ids.erin)).id}/claim`, erin);
+    await flushCardSheet(env, wo);
+    await flushCardSheet(env, wo);
+    const rows = s.g.sheet.tabs[TRACKING_TAB].filter((x) => String(x[0]) === wo);
     expect(rows).toHaveLength(1);
-    expect(rows[0][1]).toBe(sheetRow(d.workOrder)[6]);
-    expect(lines(d.workOrder)).toEqual([
-      ["ira", "received"],
-      ["mgr", "sent to Print Roll"],
-      ["Printer Roll", "received"],
+    expect(rows[0][1]).toBe(sheetRow(wo)[6]);
+    expect(lines(wo)).toEqual([
+      ["mgr", "created"],
+      ["ira", "received from mgr"],
+      ["ira", "started"],
+      ["ira", "sent to erin (Print 2 banners 3x6)"],
+      ["erin", "received from ira"],
       ["erin", "started"],
     ]);
 
-    // Send back and the last Continue are stamped too.
-    let p2 = (await cardsOf(d.workOrder))[1];
-    await post(`/api/cards/${p2.id}/send-back`, s.manager, { toStep: 0, reason: "Wrong size", version: p2.version });
-    const c2 = (await cardsOf(d.workOrder))[0];
-    await post(`/api/cards/${c2.id}/continue`, s.manager, { version: c2.version });
-    p2 = (await cardsOf(d.workOrder))[1];
-    await put(`/api/cards/${p2.id}/fields`, s.manager, { fields: { printed: true, file: "ok" }, version: p2.version });
-    await post(`/api/cards/${p2.id}/continue`, s.manager, { version: p2.version + 1 });
-    await flushCardSheet(env, d.workOrder);
-    expect(lines(d.workOrder).slice(4)).toEqual([
-      ["mgr", "returned to Design (Wrong size)"],
-      ["ira", "received"],
-      ["mgr", "sent to Print Roll"],
-      ["Printer Roll", "received"],
-      ["mgr", "done"],
+    await move(await cardOf(wo, s.ids.erin), "send-back", erin, { reason: "Wrong size" });
+    await move(await cardOf(wo, s.ids.ira), "proof-sent", ira);
+    await move(await cardOf(wo, s.ids.mgr, { creator: true }), "continue", s.manager, { to: [{ userId: s.ids.erin, instruction: "Print" }] });
+    const p = await cardOf(wo, s.ids.erin);
+    await put(`/api/cards/${p.id}/fields`, erin, { fields: { printed: true, file: "ok" }, version: p.version });
+    await move({ ...p, version: p.version + 1 }, "sample-sent", erin);
+    await move(await cardOf(wo, s.ids.mgr, { creator: true }), "send-back", s.manager, { reason: "Too dark" });
+    await move(await cardOf(wo, s.ids.erin), "done", erin);
+    const creator = await cardOf(wo, s.ids.mgr, { creator: true });
+    await move(creator, "close", s.manager);
+    await post(`/api/cards/${creator.id}/restore`, s.admin);
+    await flushCardSheet(env, wo);
+    expect(lines(wo).slice(6)).toEqual([
+      ["erin", "returned to ira (Wrong size)"],
+      ["ira", "proof sent, back to mgr"],
+      ["mgr", "approved"],
+      ["mgr", "sent to erin (Print)"],
+      ["erin", "received from mgr"],
+      ["erin", "sample sent, back to mgr"],
+      ["mgr", "returned to erin (Too dark)"],
+      ["erin", "done, back to mgr"],
+      ["mgr", "closed"],
+      ["boss", "restored"],
     ]);
   });
 
@@ -324,7 +357,10 @@ describe("Docket Tracking tab", () => {
     await queueCardSheet(env.DB, d.workOrder);
     await flushCardSheet(env, d.workOrder);
     expect(s.g.sheet.tabs[TRACKING_TAB][0]).toEqual(TRACKING_HEADERS);
-    expect(lines(d.workOrder)).toEqual([["Colex", "received"]]);
+    expect(lines(d.workOrder)).toEqual([
+      ["mgr", "created"],
+      ["Colex", "received"],
+    ]);
     expect(await env.DB.prepare("SELECT count(*) AS n FROM card_sheet_queue").first()).toEqual({ n: 0 });
   });
 
@@ -341,6 +377,7 @@ describe("Docket Tracking tab", () => {
     expect(res.status).toBe(200);
     await flushCardSheet(env, d.workOrder);
     expect(lines(d.workOrder)).toEqual([
+      ["mgr", "created"],
       ["ira", "received"],
       ["ana", "received"],
     ]);

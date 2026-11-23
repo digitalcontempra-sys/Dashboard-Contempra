@@ -1,5 +1,6 @@
 import { statusColumnOn } from "../sheet/layout";
 import { AREA_LABEL, CARD_FIELDS, ROLE_ORDER } from "../../shared/cards";
+import { GENERAL_ROLE } from "../../shared/handoff";
 import type { TimeBucket } from "../../shared/rules";
 import type { BoardDTO, CardDTO, CardEventDTO, MyCardsSummary, SessionUser } from "../../shared/types";
 import { ServiceError } from "../dockets/errors";
@@ -120,7 +121,8 @@ export async function board(
   let cards = await toCardDTOs(db, viewer.id, results);
   if (f.bucket) cards = cards.filter((c) => c.header.bucket === f.bucket);
   return {
-    columns: ROLE_ORDER.map((roleId) => ({
+    // Last column: cards of people without an area and the creators' cards.
+    columns: [...ROLE_ORDER, GENERAL_ROLE].map((roleId) => ({
       roleId,
       area: AREA_LABEL[roleId],
       cards: cards.filter((c) => c.roleId === roleId).map((c) => ({ ...c, noMembers: c.team && !hasMembers.has(roleId) })),
@@ -133,16 +135,31 @@ export async function board(
 const TIME = new Intl.DateTimeFormat("en-US", { timeZone: "America/Winnipeg", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 export const formatEventTime = (iso: string) => TIME.format(new Date(iso));
 
-function describe(action: string, roleId: string, d: Record<string, unknown>): string {
+function describe(action: string, roleId: string, d: Record<string, unknown>, names: Map<number, string>): string {
+  const name = (id: unknown) => names.get(Number(id)) ?? "?";
   switch (action) {
     case "activated":
       return "Arrived";
     case "claimed":
       return "I'm on it";
     case "continued":
+      // Hand-off: the people it went to. Old route: the next area.
+      if (Array.isArray(d.to)) return `Continue → ${(d.to as { userId: number }[]).map((t) => name(t.userId)).join(", ")}`;
       return `${roleId === "designer" ? "Send to production →" : "Continue →"} ${String(d.to ?? "")}`;
     case "sent_back":
-      return `Sent back to ${String(d.to ?? "")} · ${String(d.reason ?? "")}`;
+      return `Sent back to ${d.toUser !== undefined ? name(d.toUser) : String(d.to ?? "")} · ${String(d.reason ?? "")}`;
+    case "done":
+      return `Done, back to ${name(d.back)}`;
+    case "proof_sent":
+      return "Proof sent";
+    case "sample_sent":
+      return "Sample sent";
+    case "approved":
+      return "Approved";
+    case "closed":
+      return "Docket closed";
+    case "restored":
+      return "Restored";
     case "completed":
       return "Docket completed";
     case "removed":
@@ -165,11 +182,13 @@ export async function docketHistory(env: Env, wo: string): Promise<CardEventDTO[
   )
     .bind(wo)
     .all<{ action: string; detail_json: string; at: string; role_id: string; full_name: string | null }>();
+  const { results: people } = await env.DB.prepare("SELECT id, full_name FROM users").all<{ id: number; full_name: string }>();
+  const names = new Map(people.map((u) => [u.id, u.full_name]));
   return results.map((r) => ({
     at: r.at,
     area: AREA_LABEL[r.role_id] ?? r.role_id,
     user: r.full_name,
     action: r.action,
-    detail: describe(r.action, r.role_id, JSON.parse(r.detail_json) as Record<string, unknown>),
+    detail: describe(r.action, r.role_id, JSON.parse(r.detail_json) as Record<string, unknown>, names),
   }));
 }

@@ -29,6 +29,41 @@ export async function newDocket(cookie: string, jobs: ProductionJob[], f = docke
   return (await res.json()) as { workOrder: string; version: number };
 }
 
+export type Target = { userId: number; roleId?: string | null; instruction: string };
+
+/** Creates a docket handed to the given people. */
+export async function handDocket(cookie: string, handoff: Target[], f = docketForm()) {
+  const res = await api("/api/virtual-dockets", { method: "POST", cookie, json: { form: f, handoff } });
+  expect(res.status).toBe(200);
+  return (await res.json()) as { workOrder: string; version: number; inProduction: boolean };
+}
+
+export type HandoffCard = {
+  id: number;
+  role_id: string;
+  status: string;
+  version: number;
+  stage: string | null;
+  assignee_ids: string;
+  instruction: string | null;
+  from_user_id: number | null;
+  returned_reason: string | null;
+  fields_json: string;
+};
+
+export const allCards = async (wo: string) =>
+  (await env.DB.prepare("SELECT * FROM cards WHERE work_order = ? ORDER BY id").bind(wo).all<HandoffCard>()).results;
+
+/** The open card of one person (the creator's card is the one with a stage). */
+export const cardOf = async (wo: string, userId: number, opts: { creator?: boolean } = {}) =>
+  (await allCards(wo)).find(
+    (c) => c.status === "active" && JSON.parse(c.assignee_ids).includes(userId) && (opts.creator ? c.stage !== null : c.stage === null),
+  )!;
+
+/** POSTs a card action with the card's current version. */
+export const move = (c: { id: number; version: number }, action: string, cookie: string, json: Record<string, unknown> = {}) =>
+  api(`/api/cards/${c.id}/${action}`, { method: "POST", cookie, json: { version: c.version, ...json } });
+
 export const post = (path: string, cookie: string, json: unknown = {}) => api(path, { method: "POST", cookie, json });
 export const put = (path: string, cookie: string, json: unknown) => api(path, { method: "PUT", cookie, json });
 export const errorOf = async (res: Response) => ((await res.json()) as { error: string }).error;

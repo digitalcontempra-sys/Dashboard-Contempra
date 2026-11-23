@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { BoardDTO, CardDTO, CardEventDTO, MyCardsSummary } from "../../src/shared/types";
-import { cardsOf, newDocket, post, put, route, setupCards, step, teardownCards } from "./cardHelpers";
+import { cardOf, handDocket, move, newDocket, post, put, route, setupCards, step, teardownCards } from "./cardHelpers";
 import { api } from "./helpers";
 
 let s: Awaited<ReturnType<typeof setupCards>>;
@@ -59,7 +59,8 @@ describe("My Cards", () => {
 
   it("a card is new until opened, and new again after a send-back", async () => {
     const erin = await s.staffWith("erin", "printer_roll");
-    const d = await newDocket(s.manager, route("printer_roll", "laminate_roll"));
+    const lee = await s.staffWith("lee", "laminate_roll");
+    const d = await handDocket(s.manager, [{ userId: s.ids.erin, instruction: "Print" }]);
     let [card] = await myCards(erin);
     expect(card.isNew).toBe(true);
     expect((await summary(erin)).newCount).toBe(1);
@@ -69,13 +70,16 @@ describe("My Cards", () => {
     expect((await summary(erin)).newCount).toBe(0);
 
     await put(`/api/cards/${card.id}/fields`, erin, { fields: { printed: true, file: "ok" }, version: card.version });
-    await post(`/api/cards/${card.id}/continue`, erin, { version: card.version + 1 });
-    const lamCard = (await cardsOf(d.workOrder))[1];
+    await post(`/api/cards/${card.id}/continue`, erin, { version: card.version + 1, to: [{ userId: s.ids.lee, instruction: "Laminate" }] });
+    const [lamCard] = await myCards(lee);
+    expect([lamCard.instruction, lamCard.from?.name, lamCard.handoff]).toEqual(["Laminate", "erin", true]);
     await new Promise((r) => setTimeout(r, 5));
-    await post(`/api/cards/${lamCard.id}/send-back`, s.manager, { toStep: 0, reason: "Wrong size", version: lamCard.version });
+    await post(`/api/cards/${lamCard.id}/send-back`, lee, { reason: "Wrong size", version: lamCard.version });
+    expect(await myCards(lee)).toHaveLength(0); // parked until it is handed back
     [card] = await myCards(erin);
     expect(card.isNew).toBe(true);
-    expect(card.returned).toEqual({ reason: "Wrong size", by: "mgr" });
+    expect(card.returned).toEqual({ reason: "Wrong size", by: "lee" });
+    expect(card.approval).toBe("sample");
   });
 
   it("cancelled and trashed dockets drop out; restore brings them back", async () => {
@@ -122,6 +126,8 @@ describe("Production Board", () => {
     expect(col("printer_roll").cards[0].noMembers).toBe(false);
     expect(col("liquid_lam").cards[0].noMembers).toBe(true);
     expect(board.columns.map((c) => c.roleId)[0]).toBe("designer");
+    // Cards of people without an area, and the creator's cards, have their own column.
+    expect(board.columns.at(-1)).toMatchObject({ roleId: "general", area: "General" });
     expect(board.productionColumnsReady).toBe(false);
     expect(board.productionColumnsSetUp).toBe(false);
     // Set up with an older layout: not ready, but already set up once (the dialog offers an update).
@@ -145,19 +151,35 @@ describe("Production Board", () => {
 
 describe("History", () => {
   it("managers see the docket's journey; Staff cannot", async () => {
+    const ira = await s.staffWith("ira", "designer");
     const erin = await s.staffWith("erin", "laminate_roll");
-    const d = await newDocket(s.manager, route("designer", "laminate_roll"));
-    const [c0] = await cardsOf(d.workOrder);
-    await post(`/api/cards/${c0.id}/continue`, s.manager, { version: c0.version });
-    const lam = (await cardsOf(d.workOrder))[1];
-    await post(`/api/cards/${lam.id}/send-back`, erin, { toStep: 0, reason: "Cut file missing", version: lam.version });
-    const h = await getJson<CardEventDTO[]>(`/api/virtual-dockets/${d.workOrder}/history`, s.manager);
+    const d = await handDocket(s.manager, [{ userId: s.ids.ira, instruction: "Logo" }]);
+    const wo = d.workOrder;
+    await move(await cardOf(wo, s.ids.ira), "continue", ira, { to: [{ userId: s.ids.erin, instruction: "Laminate" }] });
+    await move(await cardOf(wo, s.ids.erin), "send-back", erin, { reason: "Cut file missing" });
+    await move(await cardOf(wo, s.ids.ira), "proof-sent", ira);
+    await move(await cardOf(wo, s.ids.mgr, { creator: true }), "continue", s.manager, { to: [{ userId: s.ids.erin, instruction: "Go" }] });
+    await env.DB.prepare(`UPDATE cards SET fields_json = '{"laminated":true}' WHERE role_id = 'laminate_roll'`).run();
+    await move(await cardOf(wo, s.ids.erin), "done", erin);
+    const creator = await cardOf(wo, s.ids.mgr, { creator: true });
+    await move(creator, "close", s.manager);
+    await post(`/api/cards/${creator.id}/restore`, s.admin);
+    const h = await getJson<CardEventDTO[]>(`/api/virtual-dockets/${wo}/history`, s.manager);
     expect(h.map((e) => `${e.area} · ${e.user} · ${e.detail}`)).toEqual([
       "Design · mgr · Arrived",
-      "Design · mgr · Send to production → Laminate",
-      "Laminate · mgr · Arrived",
-      "Laminate · erin · Sent back to Design · Cut file missing",
+      "Design · ira · Continue → erin",
+      "Laminate · ira · Arrived",
+      "Laminate · erin · Sent back to ira · Cut file missing",
       "Design · erin · Arrived",
+      "Design · ira · Proof sent",
+      "General · ira · Arrived",
+      "General · mgr · Approved",
+      "General · mgr · Continue → erin",
+      "Laminate · mgr · Arrived",
+      "Laminate · erin · Done, back to mgr",
+      "General · erin · Arrived",
+      "General · mgr · Docket closed",
+      "General · boss · Restored",
     ]);
     expect((await api(`/api/virtual-dockets/${d.workOrder}/history`, { cookie: erin })).status).toBe(403);
   });

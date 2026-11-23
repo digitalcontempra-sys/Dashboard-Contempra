@@ -1,4 +1,5 @@
 import { areaCellText, fieldsSummary, ROLE_ORDER, stageText, type CardFields } from "../../shared/cards";
+import { STAGE_STATUS, type CardStage } from "../../shared/handoff";
 import type { SessionUser } from "../../shared/types";
 import { ServiceError } from "../dockets/errors";
 import { withLock } from "../dockets/lock";
@@ -67,7 +68,7 @@ const AREA_COLS = ["R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
 const RETRY_BATCH = 20;
 
 /** Marks a docket's sheet columns as needing a rewrite. hold/comp: a later non-null value wins. */
-export async function queueCardSheet(db: D1Database, wo: string, patch: { hold?: 0 | 1; comp?: 1 } = {}): Promise<void> {
+export async function queueCardSheet(db: D1Database, wo: string, patch: { hold?: 0 | 1; comp?: 0 | 1 } = {}): Promise<void> {
   await db
     .prepare(
       `INSERT INTO card_sheet_queue (work_order, hold, comp, queued_at) VALUES (?, ?, ?, ?)
@@ -99,13 +100,14 @@ type SheetCard = {
   claimed_name: string | null;
   done_name: string | null;
   last_actor: string | null;
+  stage: CardStage | null;
 };
 
 async function sheetCards(db: D1Database, wo: string): Promise<SheetCard[]> {
   const { results } = await db
     .prepare(
       `SELECT c.id, c.job_name, c.job_sort, c.step, c.role_id, r.label AS role_label, c.status, c.assignee_ids, c.fields_json,
-         c.returned_reason, c.done_at, c.updated_at, uc.full_name AS claimed_name, ud.full_name AS done_name,
+         c.returned_reason, c.done_at, c.updated_at, c.stage, uc.full_name AS claimed_name, ud.full_name AS done_name,
          (SELECT u.full_name FROM card_events e JOIN users u ON u.id = e.user_id WHERE e.card_id = c.id ORDER BY e.id DESC LIMIT 1) AS last_actor
        FROM cards c JOIN roles r ON r.id = c.role_id
        LEFT JOIN users uc ON uc.id = c.claimed_by LEFT JOIN users ud ON ud.id = c.done_by
@@ -142,8 +144,11 @@ function holderText(c: SheetCard, names: Map<number, string>): string {
   return ids.length ? ids.map((id) => names.get(id) ?? "?").join(", ") : c.role_label;
 }
 
-/** STATUS of an active card. */
-const holderStatus = (c: SheetCard) => (c.claimed_name ? "In progress" : c.returned_reason ? "Returned" : "Starting");
+/** STATUS of an active card. The creator's card says why the docket came back, unless it was returned to them. */
+function holderStatus(c: SheetCard): string {
+  if (c.stage && !c.returned_reason) return STAGE_STATUS[c.stage];
+  return c.claimed_name ? "In progress" : c.returned_reason ? "Returned" : "Starting";
+}
 
 /** ROLE (K) and STATUS: who has the docket now and in what state, in the same order. */
 function holderCells(cards: SheetCard[], names: Map<number, string>): RowCells {
@@ -164,35 +169,90 @@ function holderCells(cards: SheetCard[], names: Map<number, string>): RowCells {
   return { K: "", [STATUS_KEY]: "" };
 }
 
-type TrackingEvent = { action: "activated" | "claimed" | "continued" | "sent_back" | "completed"; role_label: string; detail_json: string; at: string; actor: string | null };
+const TRACKED = ["activated", "claimed", "continued", "sent_back", "completed", "done", "proof_sent", "sample_sent", "approved", "closed", "restored"];
+type TrackingEvent = { action: string; role_label: string; detail_json: string; at: string; actor: string | null };
 
+/** The docket's tracked events, starting with a "created" one from the docket itself. */
 async function trackingEvents(db: D1Database, wo: string): Promise<TrackingEvent[]> {
   const { results } = await db
     .prepare(
       `SELECT e.action, r.label AS role_label, e.detail_json, e.at, u.full_name AS actor
        FROM card_events e JOIN roles r ON r.id = e.role_id LEFT JOIN users u ON u.id = e.user_id
-       WHERE e.work_order = ? AND e.action IN ('activated', 'claimed', 'continued', 'sent_back', 'completed') ORDER BY e.at, e.id`,
+       WHERE e.work_order = ? AND e.action IN (${TRACKED.map(() => "?").join(",")}) ORDER BY e.at, e.id`,
     )
-    .bind(wo)
+    .bind(wo, ...TRACKED)
     .all<TrackingEvent>();
-  return results;
+  if (!results.length) return results;
+  const created = await db
+    .prepare("SELECT v.created_at AS at, u.full_name AS actor FROM virtual_dockets v LEFT JOIN users u ON u.id = v.created_by WHERE v.work_order = ?")
+    .bind(wo)
+    .first<{ at: string; actor: string | null }>();
+  return created?.actor ? [{ action: "created", role_label: "", detail_json: "{}", at: created.at, actor: created.actor }, ...results] : results;
 }
 
-const receivedIds = (e: TrackingEvent) => ((JSON.parse(e.detail_json) as { assignees?: number[] }).assignees ?? []);
+type Detail = {
+  assignees?: number[];
+  from?: number;
+  returned?: boolean;
+  toCreator?: boolean;
+  to?: string | { userId: number; instruction: string }[];
+  toUser?: number;
+  back?: number;
+  reason?: string;
+};
+const detailOf = (e: TrackingEvent) => JSON.parse(e.detail_json) as Detail;
+
+/** Every person an event names, so their names can be looked up at once. */
+export const trackingIds = (e: TrackingEvent): number[] => {
+  const d = detailOf(e);
+  return [...(d.assignees ?? []), ...(Array.isArray(d.to) ? d.to.map((t) => t.userId) : []), d.from, d.toUser, d.back].filter(
+    (x): x is number => typeof x === "number",
+  );
+};
 
 export function trackingText(events: TrackingEvent[], names: Map<number, string>): string {
+  const name = (id: number | undefined) => (id === undefined ? "?" : (names.get(id) ?? "?"));
+  const back = (d: Detail) => `back to ${name(d.back)}`;
   return events
     .map((e) => {
       const actor = e.actor ?? "?";
-      const d = JSON.parse(e.detail_json) as { to?: string; reason?: string };
-      if (e.action === "claimed") return trackingLine(actor, "started", e.at);
-      if (e.action === "completed") return trackingLine(actor, "done", e.at);
-      // The last Continue is logged as "completed" too: one "done" line is enough.
-      if (e.action === "continued") return d.to && d.to !== "Done" ? trackingLine(actor, `sent to ${d.to}`, e.at) : null;
-      if (e.action === "sent_back") return trackingLine(actor, `returned to ${d.to ?? "?"}${d.reason ? ` (${d.reason})` : ""}`, e.at);
-      const ids = receivedIds(e);
-      const who = ids.length ? ids.map((id) => names.get(id) ?? "?").join(", ") : e.role_label;
-      return trackingLine(who, "received", e.at);
+      const d = detailOf(e);
+      const line = (kind: string) => trackingLine(actor, kind, e.at);
+      switch (e.action) {
+        case "created":
+          return line("created");
+        case "claimed":
+          return line("started");
+        case "completed": // old route: the last Continue finished the docket
+          return line("done");
+        case "done":
+          return line(`done, ${back(d)}`);
+        case "proof_sent":
+          return line(`proof sent, ${back(d)}`);
+        case "sample_sent":
+          return line(`sample sent, ${back(d)}`);
+        case "approved":
+          return line("approved");
+        case "closed":
+          return line("closed");
+        case "restored":
+          return line("restored");
+        case "continued":
+          if (Array.isArray(d.to)) return line(`sent to ${d.to.map((t) => `${name(t.userId)} (${t.instruction})`).join(", ")}`);
+          // Old route: its last Continue is logged as "completed" too, one "done" line is enough.
+          return d.to && d.to !== "Done" ? line(`sent to ${d.to}`) : null;
+        case "sent_back": {
+          const to = d.toUser !== undefined ? name(d.toUser) : (d.to as string | undefined) ?? "?";
+          return line(`returned to ${to}${d.reason ? ` (${d.reason})` : ""}`);
+        }
+        default: {
+          // activated: someone received the docket. A return already has its own line.
+          if (d.returned || d.toCreator) return null;
+          const ids = d.assignees ?? [];
+          const who = ids.length ? ids.map((id) => name(id)).join(", ") : e.role_label;
+          return trackingLine(who, d.from !== undefined ? `received from ${name(d.from)}` : "received", e.at);
+        }
+      }
     })
     .filter((l): l is string => l !== null)
     .join("\n");
@@ -222,7 +282,8 @@ export function stageRowCells(cards: SheetCard[], names: Map<number, string>, q:
             areaCellText({
               status: c.status,
               returnedReason: c.returned_reason,
-              claimedByName: c.claimed_name,
+              // A card for named people shows them; a team card says "Team".
+              claimedByName: c.claimed_name ?? (assigneeIds(c).length ? assignedText(c, names) : null),
               doneByName: c.done_name,
               doneAt: c.done_at,
               fields: JSON.parse(c.fields_json) as CardFields,
@@ -235,12 +296,14 @@ export function stageRowCells(cards: SheetCard[], names: Map<number, string>, q:
   cells.AA = active.length ? [...new Set(active.map((c) => assignedText(c, names)))].join(", ") : "";
   Object.assign(cells, holderCells(cards, names));
   if (q.comp === 1) cells.D = true;
+  if (q.comp === 0) cells.D = false; // restored
   if (q.hold !== null) cells.E = q.hold === 1;
   return cells;
 }
 
 function productionRow(wo: string, c: SheetCard, names: Map<number, string>): unknown[] {
-  const status = c.status === "done" ? "Done" : c.status === "waiting" ? "Waiting" : c.returned_reason ? "Returned" : "Active";
+  const status =
+    c.status === "done" ? "Done" : c.status === "waiting" ? "Waiting" : c.returned_reason ? "Returned" : c.stage ? STAGE_STATUS[c.stage] : "Active";
   return [
     wo,
     c.job_name,
@@ -270,7 +333,7 @@ export async function flushCardSheet(env: Env, wo: string): Promise<void> {
       if (!q) return;
       const cards = await sheetCards(db, wo);
       const events = await trackingEvents(db, wo);
-      const names = await userNames(db, [...new Set([...cards.flatMap(assigneeIds), ...events.flatMap(receivedIds)])]);
+      const names = await userNames(db, [...new Set([...cards.flatMap(assigneeIds), ...events.flatMap(trackingIds)])]);
       const { row, values: sheetValues } = await locateRow(env, wo);
       const photos = await db
         .prepare(

@@ -3,12 +3,13 @@ import type { TimeBucket } from "../../shared/rules";
 import type { CardDTO } from "../../shared/types";
 import type { AppEnv } from "../app";
 import { requireAuth, requireLevel } from "../auth/sessions";
-import { claimCard, continueCard, saveCardFields, sendBackCard } from "../cards/actions";
+import { claimCard, saveCardFields } from "../cards/actions";
+import { closeDocket, continueTo, finishCard, restoreCard, sendBackCard } from "../cards/handoff";
 import { board, docketHistory, getCard, listMyCards, markSeen, myCardsSummary, setSound } from "../cards/read";
 import { flushCardSheet, retryCardSheet, setupProductionColumns } from "../cards/sheetSync";
 import { ServiceError } from "../dockets/errors";
 
-type Body = { fields?: unknown; version?: unknown; toStep?: unknown; reason?: unknown };
+type Body = { fields?: unknown; version?: unknown; toStep?: unknown; reason?: unknown; to?: unknown };
 
 export const cardRoutes = new Hono<AppEnv>();
 cardRoutes.use("/cards/*", requireAuth);
@@ -85,8 +86,14 @@ cardRoutes.put("/cards/:id/fields", async (c) => {
 
 cardRoutes.post("/cards/:id/continue", async (c) => {
   const b = await body(c);
-  return reply(c, await continueCard(c.env, c.get("user"), cardId(c), b.version));
+  return reply(c, await continueTo(c.env, c.get("user"), cardId(c), b.to, b.version));
 });
+
+cardRoutes.post("/cards/:id/done", async (c) => reply(c, await finishCard(c.env, c.get("user"), cardId(c), "done", (await body(c)).version)));
+cardRoutes.post("/cards/:id/proof-sent", async (c) => reply(c, await finishCard(c.env, c.get("user"), cardId(c), "proof", (await body(c)).version)));
+cardRoutes.post("/cards/:id/sample-sent", async (c) => reply(c, await finishCard(c.env, c.get("user"), cardId(c), "sample", (await body(c)).version)));
+cardRoutes.post("/cards/:id/close", async (c) => reply(c, await closeDocket(c.env, c.get("user"), cardId(c), (await body(c)).version)));
+cardRoutes.post("/cards/:id/restore", async (c) => reply(c, await restoreCard(c.env, c.get("user"), cardId(c))));
 
 cardRoutes.post("/cards/:id/send-back", async (c) => {
   const b = await body(c);
