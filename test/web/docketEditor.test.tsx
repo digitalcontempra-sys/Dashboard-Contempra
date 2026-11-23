@@ -23,6 +23,7 @@ const saved = (form: unknown) => ({
   workOrder: "91488",
   form,
   jobs: [{ name: "Whole docket", steps: [] }],
+  inProduction: true,
   version: 1,
   source: "virtual",
   pdf: { stored: false, driveLink: null, driveStatus: "none" },
@@ -30,7 +31,7 @@ const saved = (form: unknown) => ({
 });
 
 describe("New Docket", () => {
-  it("posts what was typed on the paper and the default job", async () => {
+  it("posts what was typed on the paper and who gets it first, with what to do", async () => {
     const { calls } = mockApi({
       ...lists,
       "GET /api/auth/me": () => managerUser,
@@ -41,12 +42,26 @@ describe("New Docket", () => {
     renderApp("/dockets/new");
     await userEvent.type(await screen.findByLabelText("FOR"), "Encore Lounge");
     await userEvent.type(screen.getByLabelText("Job details"), "exterior letters?");
+    expect(screen.queryByRole("region", { name: "Production" })).toBeNull();
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Person 1" }), "7:designer");
+    // A person without a note cannot be saved.
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    await userEvent.type(screen.getByRole("textbox", { name: "What to do 1" }), "Logo proof");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(calls.some((c) => c.method === "POST")).toBe(true));
-    const body = calls.find((c) => c.method === "POST")!.body as { form: { forName: string; body: string }; jobs: { name: string }[] };
+    const body = calls.find((c) => c.method === "POST")!.body as Record<string, unknown> & { form: { forName: string; body: string } };
     expect(body.form.forName).toBe("Encore Lounge");
     expect(body.form.body).toBe("exterior letters?");
-    expect(body.jobs[0].name).toBe("Whole docket");
+    expect(body.handoff).toEqual([{ userId: 7, roleId: "designer", instruction: "Logo proof" }]);
+    expect(body.jobs).toBeUndefined();
+  });
+
+  it("a docket already in production is not handed over again from the editor", async () => {
+    mockApi({ ...lists, "GET /api/auth/me": () => managerUser, "GET /api/virtual-dockets/91488": () => saved(emptyForm("2026-11-05", "x")) });
+    renderApp("/dockets/91488");
+    expect(await screen.findByLabelText("Job details")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Person 1" })).toBeNull();
+    expect(screen.getByText("In production: it moves from card to card.")).toBeInTheDocument();
   });
 
   it("Save takes you back to the Main Dashboard and says it was saved", async () => {

@@ -4,7 +4,6 @@ import {
   ROLE_ORDER,
   areaCellText,
   continueBlocker,
-  continueLabel,
   fieldsSummary,
   normalizeJob,
   sanitizeFields,
@@ -64,16 +63,7 @@ describe("Contour Cut", () => {
     });
   });
   it("is named Contour Cut and sorts after Laminate", () => {
-    expect(continueLabel("laminate_roll", "contour_cut")).toBe("Continue → Contour Cut");
     expect(stageText([{ roleId: "liquid_lam" }, { roleId: "contour_cut" }], false)).toBe("Contour Cut, Liquid Lam");
-  });
-});
-
-describe("continueLabel", () => {
-  it("names the next area", () => {
-    expect(continueLabel("printer_roll", "laminate_roll")).toBe("Continue → Laminate");
-    expect(continueLabel("finishing", null)).toBe("Continue → Done");
-    expect(continueLabel("designer", "printer_roll")).toBe("Send to production →");
   });
 });
 

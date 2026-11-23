@@ -3,11 +3,11 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { emptyForm, WHOLE_DOCKET, type DocketForm, type ProductionJob } from "../../shared/docketForm";
 import { todayInBusinessTz } from "../../shared/rules";
-import type { AccountManagerCount, AssigneeDTO, RoleDTO, VirtualDocketDTO } from "../../shared/types";
+import type { AccountManagerCount, AssigneeDTO, VirtualDocketDTO } from "../../shared/types";
 import { api } from "../api";
 import { useAuth } from "../auth";
+import { emptyRow, HandoffPicker, rowsComplete, toTargets, type HandoffRow } from "../cards/HandoffPicker";
 import { DocketPaper } from "../docket/DocketPaper";
-import { ProductionPanel } from "../docket/ProductionPanel";
 import { draftKey, useDraft, type Draft } from "../docket/useDraft";
 import { afterDocketSaved } from "../docket/afterSave";
 import { DocketActions } from "../docket/DocketActions";
@@ -23,7 +23,8 @@ export function DocketEditor() {
   const isNew = !wo;
 
   const [form, setForm] = useState<DocketForm>(() => emptyForm(todayInBusinessTz(new Date()), user?.fullName ?? ""));
-  const [jobs, setJobs] = useState<ProductionJob[]>(DEFAULT_JOBS);
+  // Who gets the docket first; an untouched single row means "not sent to anyone yet".
+  const [rows, setRows] = useState<HandoffRow[]>([emptyRow()]);
   const [version, setVersion] = useState(0);
   const [loaded, setLoaded] = useState(isNew);
   const [dirty, setDirty] = useState(false);
@@ -31,7 +32,6 @@ export function DocketEditor() {
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
 
-  const roles = useQuery({ queryKey: ["roles"], queryFn: () => api<RoleDTO[]>("/api/roles"), staleTime: Infinity });
   const assignees = useQuery({
     queryKey: ["assignees"],
     queryFn: () => api<AssigneeDTO[]>("/api/assignees"),
@@ -55,12 +55,11 @@ export function DocketEditor() {
     enabled: !isNew,
   });
 
-  const { restore, clear } = useDraft(draftKey(wo), { form, jobs, version }, canEdit && dirty);
+  const { restore, clear } = useDraft(draftKey(wo), { form, jobs: DEFAULT_JOBS, version }, canEdit && dirty);
 
   useEffect(() => {
     if (existing.data && !loaded) {
       setForm(existing.data.form);
-      setJobs(existing.data.jobs.length ? existing.data.jobs : DEFAULT_JOBS);
       setVersion(existing.data.version);
       setLoaded(true);
       // A saved docket without its PDF (e.g. the upload failed) gets one now.
@@ -76,16 +75,20 @@ export function DocketEditor() {
     setForm(f);
     setDirty(true);
   };
-  const changeJobs = (j: ProductionJob[]) => {
-    setJobs(j);
+  const changeRows = (r: HandoffRow[]) => {
+    setRows(r);
     setDirty(true);
   };
+  // The editor hands a docket over only until it is in production; then it moves card to card.
+  const canHandOff = canEdit && (isNew || existing.data?.inProduction === false);
+  const untouched = rows.length === 1 && rows[0].pick === "" && rows[0].instruction.trim() === "";
+  const handoffReady = !canHandOff || untouched || rowsComplete(rows);
 
   async function save(andNew: boolean) {
     setSaving(true);
     setError(null);
     try {
-      const body = { form, jobs, version };
+      const body = { form, version, ...(canHandOff && !untouched ? { handoff: toTargets(rows) } : {}) };
       const dto = isNew
         ? await api<VirtualDocketDTO>("/api/virtual-dockets", { method: "POST", json: body })
         : await api<VirtualDocketDTO>(`/api/virtual-dockets/${encodeURIComponent(wo!)}`, { method: "PUT", json: body });
@@ -97,7 +100,7 @@ export function DocketEditor() {
       void afterDocketSaved(dto, qc);
       if (andNew) {
         setForm(emptyForm(todayInBusinessTz(new Date()), user?.fullName ?? ""));
-        setJobs(DEFAULT_JOBS);
+        setRows([emptyRow()]);
         setVersion(0);
         navigate("/dockets/new");
       } else {
@@ -143,11 +146,11 @@ export function DocketEditor() {
               Cancel
             </button>
             {isNew && (
-              <button className="btn-ghost" type="button" disabled={saving} onClick={() => save(true)}>
+              <button className="btn-ghost" type="button" disabled={saving || !handoffReady} onClick={() => save(true)}>
                 Save &amp; New
               </button>
             )}
-            <button className="btn-primary" type="button" disabled={saving} onClick={() => save(false)}>
+            <button className="btn-primary" type="button" disabled={saving || !handoffReady} onClick={() => save(false)}>
               Save
             </button>
           </>
@@ -170,7 +173,6 @@ export function DocketEditor() {
               setForm(draft.form);
               // Keep the version the draft was written against, so a stale draft still gets the conflict warning.
               if (typeof draft.version === "number") setVersion(draft.version);
-              setJobs(draft.jobs.length ? draft.jobs : DEFAULT_JOBS);
               setDirty(true);
               setDraft(null);
             }}
@@ -206,13 +208,19 @@ export function DocketEditor() {
           salespeople={ams.data?.map((a) => a.accountManager) ?? []}
         />
         <div className="min-[1180px]:sticky min-[1180px]:top-24">
-          <ProductionPanel
-            jobs={jobs}
-            onChange={changeJobs}
-            roles={roles.data ?? []}
-            assignees={assignees.data ?? []}
-            readOnly={!canEdit}
-          />
+          <section className="card p-4" aria-label="Send to">
+            <h2 className="text-base font-bold tracking-tight">Send to</h2>
+            {canHandOff ? (
+              <>
+                <p className="mt-1 mb-3 text-xs text-text-3">Not printed on the docket. Who gets it first, and what they must do.</p>
+                <HandoffPicker people={assignees.data ?? []} rows={rows} onChange={changeRows} disabled={saving} />
+              </>
+            ) : (
+              <p className="mt-1 text-sm text-text-2">
+                {canEdit ? "In production: it moves from card to card." : "Only managers send a docket to production."}
+              </p>
+            )}
+          </section>
         </div>
       </div>
     </div>

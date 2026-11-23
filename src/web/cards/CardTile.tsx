@@ -1,4 +1,5 @@
 import { AREA_LABEL } from "../../shared/cards";
+import { STAGE_STATUS } from "../../shared/handoff";
 import type { CardDTO } from "../../shared/types";
 import { useAuth } from "../auth";
 import { AreaChip, areaColor } from "../components/AreaChip";
@@ -31,8 +32,10 @@ export function CardTile({ card, onOpen, noMembers }: { card: CardDTO; onOpen: (
         </span>
       </div>
       <p className="mt-2 line-clamp-2 text-[15px] font-bold leading-tight">{card.header.customer ?? "—"}</p>
-      <p className="mt-1 line-clamp-2 text-[13px] text-text-2">{card.jobName}</p>
+      {/* A hand-off card shows what to do; an old route card its job. */}
+      <p className="mt-1 line-clamp-2 text-[13px] text-text-2">{card.instruction ?? (card.handoff ? "" : card.jobName)}</p>
       <div className="mt-auto flex flex-col items-start gap-1">
+        {card.stage && <span className="text-[11px] font-bold text-accent">{STAGE_STATUS[card.stage]}</span>}
         {waiting ? (
           <span className="text-[11px] font-semibold text-text-3">Up next</span>
         ) : (

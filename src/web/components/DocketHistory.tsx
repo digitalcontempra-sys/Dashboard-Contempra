@@ -1,6 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { AREA_LABEL } from "../../shared/cards";
+import { STAGE_STATUS } from "../../shared/handoff";
 import type { BoardDTO, CardDTO, CardEventDTO } from "../../shared/types";
 import { api, withQuery } from "../api";
+import { useAuth } from "../auth";
 import { AreaChip } from "./AreaChip";
 
 /** Some ICU versions put a narrow no-break space before AM/PM. */
@@ -34,10 +38,32 @@ export function DocketHistory({ workOrder }: { workOrder: string }) {
 }
 
 const STEP_STATUS = (c: CardDTO) =>
-  c.status === "done" ? "Done ✓" : c.status === "waiting" ? "Pending" : c.returned ? "Returned" : "Active";
+  c.status === "done"
+    ? "Done ✓"
+    : c.status === "waiting"
+      ? c.handoff
+        ? "Sent back"
+        : "Pending"
+      : c.returned
+        ? "Returned"
+        : c.stage
+          ? STAGE_STATUS[c.stage]
+          : "Active";
 
-/** Managers: each job's route with the state of every step. */
+/** Managers: every card of the docket with its state. Admins can reopen a finished one. */
 export function DocketProduction({ workOrder }: { workOrder: string }) {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const restore = useMutation({
+    mutationFn: (id: number) => api<CardDTO>(`/api/cards/${id}/restore`, { method: "POST" }),
+    onSuccess: () => {
+      setRestoreError(null);
+      void qc.invalidateQueries({ queryKey: ["board"] });
+      void qc.invalidateQueries({ queryKey: ["history", workOrder] });
+    },
+    onError: (e) => setRestoreError((e as Error).message),
+  });
   const { data, isPending, error } = useQuery({
     queryKey: ["board", "wo", workOrder],
     queryFn: () => api<BoardDTO>(withQuery("/api/production-board", { wo: workOrder })),
@@ -55,6 +81,11 @@ export function DocketProduction({ workOrder }: { workOrder: string }) {
   const jobs = [...new Set(cards.map((c) => c.jobName))];
   return (
     <div className="mt-4 space-y-4">
+      {restoreError && (
+        <p role="alert" className="rounded-xl bg-danger-soft px-3.5 py-2 text-sm font-medium text-danger">
+          {restoreError}
+        </p>
+      )}
       {photos.data && photos.data.count > 0 && photos.data.folderLink && (
         <a href={photos.data.folderLink} target="_blank" rel="noreferrer" className="btn-ghost text-sm">
           Photos ({photos.data.count})
@@ -75,6 +106,17 @@ export function DocketProduction({ workOrder }: { workOrder: string }) {
                   <span className={`text-xs font-bold ${c.returned ? "text-danger" : c.status === "done" ? "text-ok" : "text-text-2"}`}>
                     {STEP_STATUS(c)}
                   </span>
+                  {user?.accessLevel === "admin" && c.status === "done" && (
+                    <button
+                      type="button"
+                      className="btn-ghost min-h-9 px-3 text-xs"
+                      aria-label={`Restore ${AREA_LABEL[c.roleId] ?? c.roleId} card`}
+                      disabled={restore.isPending}
+                      onClick={() => restore.mutate(c.id)}
+                    >
+                      Restore
+                    </button>
+                  )}
                 </li>
               ))}
           </ol>

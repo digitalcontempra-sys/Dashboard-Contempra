@@ -1,13 +1,15 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { AREA_LABEL, CARD_FIELDS, continueBlocker, continueLabel, type CardFields } from "../../shared/cards";
-import type { CardDTO } from "../../shared/types";
+import { AREA_LABEL, CARD_FIELDS, continueBlocker, type CardFields } from "../../shared/cards";
+import { STAGE_STATUS } from "../../shared/handoff";
+import type { AssigneeDTO, CardDTO } from "../../shared/types";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { AreaChip } from "../components/AreaChip";
 import { BucketTag } from "../components/BucketChip";
 import { Icon } from "../components/Icon";
 import { CardFieldsEditor } from "./fields";
+import { emptyRow, HandoffPicker, rowsComplete, toTargets, type HandoffRow } from "./HandoffPicker";
 
 const SAVE_DELAY_MS = 1000;
 const firstName = (n: string) => n.trim().split(/\s+/)[0] ?? n;
@@ -21,6 +23,9 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [back, setBack] = useState<{ open: boolean; step: number | null; reason: string }>({ open: false, step: null, reason: "" });
+  // The Continue sheet: who gets the docket next and what they must do.
+  const [next, setNext] = useState<HandoffRow[] | null>(null);
+  const people = useQuery({ queryKey: ["assignees"], queryFn: () => api<AssigneeDTO[]>("/api/assignees"), enabled: next !== null });
   // Edits not yet sent, and the version the next request must carry.
   const pending = useRef<CardFields | null>(null);
   const version = useRef(initial.version);
@@ -32,7 +37,8 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
   onCloseRef.current = onClose;
 
   const active = card.status === "active";
-  const blocker = continueBlocker(card.roleId, fields, { proofRequired: card.header.proofRequired });
+  // The creator's card has no area fields; it only moves the docket on or closes it.
+  const blocker = card.stage ? null : continueBlocker(card.roleId, fields, { proofRequired: card.header.proofRequired });
 
   useEffect(() => {
     void api(`/api/cards/${initial.id}/seen`, { method: "POST" })
@@ -139,7 +145,10 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
   }
 
   const claimedByOther = card.claimedBy && card.claimedBy.id !== user?.id;
-  const canSendBack = active && card.earlier.length > 0;
+  // A hand-off card goes back to whoever handed it over; an old route card to an earlier area.
+  const routeBack = !card.handoff && card.earlier.length > 0;
+  const canSendBack = active && (routeBack || (card.handoff && card.from !== null));
+  const waiting = card.stage === "waiting_design" || card.stage === "waiting_sample";
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center sm:items-center sm:p-6">
@@ -159,6 +168,9 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
               {card.status === "waiting" && (
                 <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-text-2">Up next</span>
               )}
+              {card.stage && card.status === "active" && (
+                <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent">{STAGE_STATUS[card.stage]}</span>
+              )}
             </div>
             <h2 className="mt-1.5 text-2xl font-bold tracking-tight">{card.header.customer ?? "—"}</h2>
             <p className="mt-0.5 text-[15px] text-text-2">
@@ -177,6 +189,17 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
           </button>
         </header>
 
+        {(card.instruction || card.from) && (
+          <div className="mx-5 mb-2 rounded-xl border border-border bg-surface-2 px-3.5 py-2 sm:mx-7">
+            {card.instruction && (
+              <>
+                <p className="text-[11px] font-semibold tracking-wide text-text-3 uppercase">What to do</p>
+                <p className="text-[15px] font-medium break-words whitespace-pre-wrap">{card.instruction}</p>
+              </>
+            )}
+            {card.from && <p className="mt-0.5 text-[13px] text-text-3">From {card.from.name}</p>}
+          </div>
+        )}
         {card.returned && (
           <p className="mx-5 mb-2 rounded-xl bg-danger px-3.5 py-2 text-sm font-semibold text-white sm:mx-7">
             Returned by {card.returned.by} · {card.returned.reason}
@@ -201,6 +224,7 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
 
           {back.open && (
             <div className="mt-4 rounded-2xl border border-danger/30 bg-danger-soft p-3.5">
+              {routeBack && (
               <div role="radiogroup" aria-label="Send back to" className="flex flex-wrap gap-2">
                 {card.earlier.map((e) => (
                   <label
@@ -220,6 +244,7 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
                   </label>
                 ))}
               </div>
+              )}
               <label htmlFor="send-back-reason" className="mt-3 mb-1 block text-[13px] font-medium text-text-2">
                 Reason
               </label>
@@ -236,10 +261,36 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
                 <button
                   type="button"
                   className="btn bg-danger text-white"
-                  disabled={busy || back.step === null || back.reason.trim().length < 3}
-                  onClick={() => void act("send-back", { toStep: back.step, reason: back.reason.trim() })}
+                  disabled={busy || (routeBack && back.step === null) || back.reason.trim().length < 3}
+                  onClick={() =>
+                    void act("send-back", routeBack ? { toStep: back.step, reason: back.reason.trim() } : { reason: back.reason.trim() })
+                  }
                 >
-                  Send back
+                  {routeBack ? "Send back" : `Send back to ${card.from?.name ?? ""}`}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {next && (
+            <div className="mt-4 rounded-2xl border border-border bg-surface p-3.5">
+              <h3 className="mb-2 text-sm font-bold">Send to</h3>
+              {people.isPending ? (
+                <p className="text-sm text-text-2">Loading people…</p>
+              ) : (
+                <HandoffPicker people={people.data ?? []} rows={next} onChange={setNext} disabled={busy} />
+              )}
+              <div className="mt-3 flex justify-end gap-2">
+                <button type="button" className="btn-ghost" onClick={() => setNext(null)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={busy || !rowsComplete(next)}
+                  onClick={() => void act("continue", { to: toTargets(next) })}
+                >
+                  Send
                 </button>
               </div>
             </div>
@@ -265,14 +316,36 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
                   I'm on it
                 </button>
               )}
-              <button
-                type="button"
-                className="btn-primary ml-auto"
-                disabled={busy || blocker !== null}
-                onClick={() => void act("continue", {})}
-              >
-                {continueLabel(card.roleId, card.nextRoleId)}
-              </button>
+              {card.approval && (
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={busy}
+                  onClick={() => void act(card.approval === "proof" ? "proof-sent" : "sample-sent", {})}
+                >
+                  {card.approval === "proof" ? "Proof sent" : "Sample sent"}
+                </button>
+              )}
+              <div className="ml-auto flex flex-wrap gap-2">
+                {!card.stage && (
+                  <button type="button" className="btn-ghost" disabled={busy || blocker !== null} onClick={() => void act("done", {})}>
+                    Done
+                  </button>
+                )}
+                {card.stage === "ready_to_close" && (
+                  <button type="button" className="btn-ghost" disabled={busy} onClick={() => void act("close", {})}>
+                    Close docket
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={busy || blocker !== null || next !== null}
+                  onClick={() => setNext([emptyRow()])}
+                >
+                  {waiting ? "Approved → Continue" : "Continue →"}
+                </button>
+              </div>
             </div>
             {blocker && (
               <div className="mt-2 flex flex-wrap items-center justify-end gap-2">

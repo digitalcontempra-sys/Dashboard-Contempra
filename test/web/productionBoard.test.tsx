@@ -4,7 +4,6 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BoardDTO, CardEventDTO } from "../../src/shared/types";
 import { DocketDetail } from "../../src/web/components/DocketDetail";
-import { ProductionPanel } from "../../src/web/docket/ProductionPanel";
 import { Providers } from "../../src/web/providers";
 import { makeCard } from "./cardFixtures";
 import { adminUser, managerUser, mockApi, staffUser } from "./mockApi";
@@ -80,6 +79,7 @@ function showDetail(user: object) {
     "GET /api/dockets/91488": () => detail,
     "GET /api/virtual-dockets/91488/history": () => history,
     "GET /api/virtual-dockets/91488/photos": () => ({ count: 2, folderLink: "https://drive.google.com/drive/folders/p" }),
+    "POST /api/cards/7/restore": () => makeCard(),
     "GET /api/production-board": () =>
       board({ columns: [{ roleId: "printer_roll", area: "Print Roll", cards: [{ ...makeCard({ roleId: "printer_roll", status: "done" }), noMembers: false }] }] }),
   });
@@ -109,27 +109,20 @@ describe("Docket detail tabs", () => {
     expect(screen.getByText("Done ✓")).toBeInTheDocument();
     expect(calls.find((c) => c.url.pathname === "/api/production-board")!.url.searchParams.get("wo")).toBe("91488");
     expect(await screen.findByRole("link", { name: "Photos (2)" })).toHaveAttribute("href", "https://drive.google.com/drive/folders/p");
+    expect(screen.queryByRole("button", { name: /Restore/ })).toBeNull();
+  });
+
+  it("an admin restores a finished card", async () => {
+    const { calls } = showDetail(adminUser);
+    await userEvent.click(await screen.findByRole("tab", { name: "Production" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Restore Print Roll card" }));
+    await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url.pathname === "/api/cards/7/restore")).toBe(true));
   });
 
   it("Staff get no tabs", async () => {
     showDetail(staffUser);
     await screen.findByText("Encore Lounge");
     expect(screen.queryByRole("tab", { name: "History" })).toBeNull();
-  });
-});
-
-describe("Route chips", () => {
-  it("say Team when no one is picked, or the names", () => {
-    const roles = [{ id: "printer_roll", label: "Printer Roll" }];
-    const assignees = [{ id: 5, fullName: "Erin Lee", roles: ["printer_roll"] }];
-    const { rerender } = render(
-      <ProductionPanel jobs={[{ name: "Whole docket", steps: [{ roleId: "printer_roll", assigneeIds: [] }] }]} onChange={() => undefined} roles={roles} assignees={assignees} />,
-    );
-    expect(screen.getByText("Printer Roll · Team")).toBeInTheDocument();
-    rerender(
-      <ProductionPanel jobs={[{ name: "Whole docket", steps: [{ roleId: "printer_roll", assigneeIds: [5] }] }]} onChange={() => undefined} roles={roles} assignees={assignees} />,
-    );
-    expect(screen.getByText("Printer Roll · Erin")).toBeInTheDocument();
   });
 });
 

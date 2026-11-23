@@ -28,14 +28,24 @@ function show(card: CardDTO, extra: Record<string, (u: URL, init?: RequestInit) 
   return { ...api, onClose, unmount };
 }
 
+const people = () => [
+  { id: 4, fullName: "Pat", roles: ["finishing"] },
+  { id: 5, fullName: "Kristy", roles: [] },
+];
+const handed = (over: Partial<CardDTO> = {}) =>
+  makeCard({ handoff: true, earlier: [], nextRoleId: null, instruction: "Laminate 2 banners", from: { id: 3, name: "Mike" }, ...over });
+
 describe("CardView", () => {
-  it("names the next area and explains what is missing", async () => {
+  it("Continue and Done wait for the area's required fields", async () => {
     const { calls } = show(makeCard());
-    const next = screen.getByRole("button", { name: "Continue → Finishing" });
+    const next = screen.getByRole("button", { name: "Continue →" });
+    const done = screen.getByRole("button", { name: "Done" });
     expect(next).toBeDisabled();
+    expect(done).toBeDisabled();
     expect(screen.getByRole("status")).toHaveTextContent('Mark "Laminated" to continue');
     await userEvent.click(screen.getByRole("checkbox", { name: "Laminated" }));
     expect(next).toBeEnabled();
+    expect(done).toBeEnabled();
     await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true), { timeout: 2500 });
     const put = calls.find((c) => c.method === "PUT")!;
     expect(put.url.pathname).toBe("/api/cards/7/fields");
@@ -49,10 +59,11 @@ describe("CardView", () => {
     await waitFor(() => expect(calls.some((c) => c.method === "PUT" && c.url.pathname === "/api/cards/7/fields")).toBe(true));
   });
 
-  it("Continue waits for a save in flight and sends its new version", async () => {
+  it("Continue hands the docket to chosen people, after a save in flight, with its new version", async () => {
     let finishPut!: () => void;
     const card = makeCard();
-    const { calls } = show(card, {
+    const { calls, onClose } = show(card, {
+      "GET /api/assignees": people,
       "PUT /api/cards/7/fields": (_u, init) =>
         new Promise((resolve) => {
           finishPut = () => resolve({ ...card, fields: JSON.parse(String(init?.body)).fields, version: 5 });
@@ -61,10 +72,64 @@ describe("CardView", () => {
     });
     await userEvent.click(screen.getByRole("checkbox", { name: "Laminated" }));
     await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true), { timeout: 2500 });
-    await userEvent.click(screen.getByRole("button", { name: "Continue → Finishing" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    const send = screen.getByRole("button", { name: "Send" });
+    expect(send).toBeDisabled();
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Person 1" }), "4:finishing");
+    await userEvent.type(screen.getByRole("textbox", { name: "What to do 1" }), "Grommets");
+    await userEvent.click(send);
     finishPut();
     await waitFor(() => expect(calls.some((c) => c.url.pathname === "/api/cards/7/continue")).toBe(true));
-    expect(calls.find((c) => c.url.pathname === "/api/cards/7/continue")!.body).toEqual({ version: 5 });
+    expect(calls.find((c) => c.url.pathname === "/api/cards/7/continue")!.body).toEqual({
+      to: [{ userId: 4, roleId: "finishing", instruction: "Grommets" }],
+      version: 5,
+    });
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it("Done ends my part", async () => {
+    const { calls } = show(makeCard({ fields: { laminated: true } }), { "POST /api/cards/7/done": () => makeCard({ status: "done" }) });
+    await userEvent.click(screen.getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(calls.find((c) => c.url.pathname === "/api/cards/7/done")?.body).toEqual({ version: 0 }));
+  });
+
+  it("shows what to do and who sent it; Send back goes to that person", async () => {
+    const { calls } = show(handed(), { "POST /api/cards/7/send-back": () => handed({ status: "waiting" }) });
+    expect(screen.getByText("Laminate 2 banners")).toBeInTheDocument();
+    expect(screen.getByText("From Mike")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "← Send back" }));
+    expect(screen.queryByRole("radio")).toBeNull();
+    await userEvent.type(screen.getByLabelText("Reason"), "Wrong size");
+    await userEvent.click(screen.getByRole("button", { name: "Send back to Mike" }));
+    await waitFor(() => expect(calls.find((c) => c.url.pathname === "/api/cards/7/send-back")?.body).toEqual({ reason: "Wrong size", version: 0 }));
+  });
+
+  it("the designer can send a proof; a printer a sample", async () => {
+    const { calls, unmount } = show(handed({ roleId: "designer", approval: "proof" }), { "POST /api/cards/7/proof-sent": () => handed({ status: "done" }) });
+    expect(screen.queryByRole("button", { name: "Send to production →" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Proof sent" }));
+    await waitFor(() => expect(calls.some((c) => c.url.pathname === "/api/cards/7/proof-sent")).toBe(true));
+    unmount();
+    show(handed({ roleId: "printer_fb", approval: "sample" }));
+    expect(screen.getByRole("button", { name: "Sample sent" })).toBeEnabled();
+  });
+
+  it("the creator closes a docket that is Ready to close", async () => {
+    const card = handed({ roleId: "general", stage: "ready_to_close", instruction: null, from: { id: 9, name: "Seb" } });
+    const { calls } = show(card, { "POST /api/cards/7/close": () => ({ ...card, status: "done" }) });
+    expect(screen.getByText("Ready to close")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Continue →" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Close docket" }));
+    await waitFor(() => expect(calls.some((c) => c.url.pathname === "/api/cards/7/close")).toBe(true));
+  });
+
+  it("while waiting for the client, the creator approves or sends back", () => {
+    show(handed({ roleId: "general", stage: "waiting_design", instruction: null, from: { id: 9, name: "Ira" } }));
+    expect(screen.getByText("Waiting for design approval")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approved → Continue" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "← Send back" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Close docket" })).toBeNull();
   });
 
   it("marks the card seen when it opens", async () => {
@@ -72,13 +137,7 @@ describe("CardView", () => {
     await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url.pathname === "/api/cards/7/seen")).toBe(true));
   });
 
-  it("the designer's button says Send to production", () => {
-    show(makeCard({ roleId: "designer", nextRoleId: "printer_roll", earlier: [], step: 0 }));
-    expect(screen.getByRole("button", { name: "Send to production →" })).toBeEnabled();
-    expect(screen.queryByRole("button", { name: "← Send back" })).toBeNull();
-  });
-
-  it("Send back needs an area and a reason", async () => {
+  it("an old route card sent back needs an area and a reason", async () => {
     const { calls } = show(makeCard(), { "POST /api/cards/7/send-back": () => makeCard({ status: "waiting" }) });
     await userEvent.click(screen.getByRole("button", { name: "← Send back" }));
     const send = screen.getByRole("button", { name: "Send back" });
@@ -151,9 +210,9 @@ describe("CardView", () => {
 
   it("shows the server's message when the card already moved", async () => {
     show(makeCard({ fields: { laminated: true } }), {
-      "POST /api/cards/7/continue": () => Response.json({ error: "This card was already moved by Erin." }, { status: 409 }),
+      "POST /api/cards/7/done": () => Response.json({ error: "This card was already moved by Erin." }, { status: 409 }),
     });
-    await userEvent.click(screen.getByRole("button", { name: "Continue → Finishing" }));
+    await userEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("This card was already moved by Erin.");
   });
 

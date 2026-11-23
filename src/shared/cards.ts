@@ -198,11 +198,6 @@ export function continueBlocker(
   return null;
 }
 
-export function continueLabel(roleId: string, nextRoleId: string | null): string {
-  if (roleId === "designer") return "Send to production →";
-  return `Continue → ${nextRoleId ? (AREA_LABEL[nextRoleId] ?? nextRoleId) : "Done"}`;
-}
-
 /**
  * Within one job: done cards stay done; the first card that is not done is active and the other
  * open cards wait. (A step inserted before finished work does not undo that work.)
