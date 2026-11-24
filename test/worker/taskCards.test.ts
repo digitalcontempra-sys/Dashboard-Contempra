@@ -155,6 +155,12 @@ describe("task cards", () => {
     const p2 = await history(ana, 2);
     expect(p2.items).toHaveLength(3);
     expect(p2.hasMore).toBe(false);
+    // A silly page number falls back to page 1 instead of failing.
+    for (const bad of ["1e999", "-3", "abc", "2.5"]) {
+      const res = await api(`/api/task-cards?box=history&page=${bad}`, { cookie: ana });
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { items: TaskCardDTO[] }).items).toHaveLength(50);
+    }
   });
 
   it("managers use the same rules", async () => {

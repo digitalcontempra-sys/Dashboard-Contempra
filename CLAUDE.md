@@ -44,7 +44,9 @@ A production dashboard for **Contempra Signs** (a sign shop in Winnipeg). It sit
   - a full history.
 - **Production Board** (managers): one column per area, plus `General`.
 - **Notifications.** A chime, a pulsing badge and the tab title. On iPhone, sound needs a tap first, so the app shows "Tap anywhere to turn on sound".
-- **Task Cards.** Yellow sticky notes from one person to another, with Done. My Cards has the filter All / Docket cards / Task cards / Sent by me.
+- **Task Cards.** Yellow sticky notes from one person to another, with Done. My Cards has the filter All / Docket cards / Task cards / Sent by me / History.
+  - A person can write a **note to self** ("Me" first in the To list). It is seen from the start and sets `done_seen_at` on Done, so it raises no badge, chime or done alert. It is left out of Sent by me.
+  - **History** lists every finished Task Card I sent or received (labels `Sent by me`, `Sent to me`, `Note to self`), newest `done_at` first, 50 per page with Show more (`GET /api/task-cards?box=history&page=N`).
 - **Installer photos.** Taken with the phone camera, resized in the browser, uploaded to one Drive folder per docket. Thumbnails are kept in R2.
 - **Area colors** with a legend, current-area chips on the Main Dashboard, and white cards even in dark mode.
 - **Staff accounts** with three access levels:
@@ -179,7 +181,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
    5. Have a fresh reviewer check the whole branch, and fix what it finds that matters.
    6. Ask "¿Hago merge a main y publico?"
 3. **Verification before saying "done":**
-   - `npx vitest run` passes (today 440 tests).
+   - `npx vitest run` passes (today 446 tests).
    - `npm run typecheck` is clean.
    - For UI changes, check the page in the local preview, including phone width 375 px: no horizontal scroll.
 4. **Commit messages:**

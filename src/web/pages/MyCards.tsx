@@ -42,7 +42,8 @@ const SHOW: { id: Show; label: string }[] = [
 
 function Tabs<T extends string | null>({ label, items, value, onChange }: { label: string; items: { id: T; label: string }[]; value: T; onChange: (v: T) => void }) {
   return (
-    <div role="tablist" aria-label={label} className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:px-0">
+    // Wraps instead of scrolling sideways, so every chip (History included) is visible on a phone.
+    <div role="tablist" aria-label={label} className="mb-3 flex flex-wrap gap-2">
       {items.map((it) => (
         <button
           key={String(it.id)}

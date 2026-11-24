@@ -88,7 +88,8 @@ taskCardRoutes.get("/task-cards", async (c) => {
     return c.json(results.map((r) => toDto(r, me.id, today)));
   }
   if (c.req.query("box") === "history") {
-    const page = Math.max(1, Math.floor(Number(c.req.query("page")) || 1));
+    const asked = Number(c.req.query("page"));
+    const page = Number.isSafeInteger(asked) && asked >= 1 ? asked : 1;
     const { results } = await c.env.DB.prepare(
       `${SELECT} WHERE (t.from_user = ?1 OR t.to_user = ?1) AND t.status = 'done' ORDER BY t.done_at DESC, t.id DESC LIMIT ?2 OFFSET ?3`,
     )
