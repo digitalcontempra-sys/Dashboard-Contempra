@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AREA_LABEL } from "../../shared/cards";
 import { STAGE_STATUS } from "../../shared/handoff";
-import type { BoardDTO, CardDTO, CardEventDTO } from "../../shared/types";
+import type { AssigneeDTO, BoardDTO, CardDTO, CardEventDTO } from "../../shared/types";
 import { api, withQuery } from "../api";
 import { useAuth } from "../auth";
 import { AreaChip } from "./AreaChip";
@@ -74,8 +74,12 @@ export function DocketProduction({ workOrder }: { workOrder: string }) {
     queryFn: () => api<{ count: number; folderLink: string | null }>(`/api/virtual-dockets/${encodeURIComponent(workOrder)}/photos`),
     retry: false,
   });
+  const people = useQuery({ queryKey: ["assignees"], queryFn: () => api<AssigneeDTO[]>("/api/assignees"), staleTime: 60_000 });
   if (error) return <p className="py-4 text-danger">{(error as Error).message}</p>;
   if (isPending) return <p className="py-4 text-text-3">Loading…</p>;
+  const names = new Map((people.data ?? []).map((p) => [p.id, p.fullName]));
+  /** Whoever started the card, else the people it was sent to. */
+  const who = (c: CardDTO) => c.claimedBy?.name ?? c.assigneeIds.map((id) => names.get(id)).filter(Boolean).join(", ");
   const cards = data.columns.flatMap((c) => c.cards);
   if (cards.length === 0) return <p className="py-4 text-text-2">No production route yet.</p>;
   const jobs = [...new Set(cards.map((c) => c.jobName))];
@@ -100,8 +104,9 @@ export function DocketProduction({ workOrder }: { workOrder: string }) {
               .sort((a, b) => a.step - b.step)
               .map((c) => (
                 <li key={c.id} className="flex items-center gap-3 rounded-xl bg-surface-2 px-3.5 py-2.5">
-                  <span className="flex-1">
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
                     <AreaChip roleId={c.roleId} size="md" />
+                    {who(c) && <span className="truncate text-[13px] font-semibold text-text-2">{who(c)}</span>}
                   </span>
                   <span className={`text-xs font-bold ${c.returned ? "text-danger" : c.status === "done" ? "text-ok" : "text-text-2"}`}>
                     {STEP_STATUS(c)}

@@ -1,6 +1,6 @@
 import type { DocketSummary } from "../../shared/types";
 import { BUCKET_TONE, dueLabel } from "../format";
-import { AreaChip } from "./AreaChip";
+import { AreaChip, HolderList } from "./AreaChip";
 import { BucketTag } from "./BucketChip";
 
 const STATUS_LABEL: Record<DocketSummary["status"], string> = {
@@ -45,7 +45,7 @@ function DocketTile({ d, onOpen, extra, showStatus }: { d: Item; onOpen: (wo: st
           <p className="truncate text-sm font-semibold tabular-nums">{dueLabel(d.dueIso, d.dueRaw)}</p>
           {(d.areas?.length || d.productionDone) && (
             <div className="mt-1 flex flex-wrap gap-1">
-              {d.areas?.map((a) => <AreaChip key={a} roleId={a} />)}
+              {d.holders ? <HolderList holders={d.holders} /> : d.areas?.map((a) => <AreaChip key={a} roleId={a} />)}
               {d.productionDone && <span className="rounded-md bg-ok-soft px-1.5 py-px text-[10.5px] font-bold text-ok">Done</span>}
             </div>
           )}

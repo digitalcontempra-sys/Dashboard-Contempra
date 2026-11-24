@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { DocketListResponse } from "../../src/shared/types";
-import { cardsOf, newDocket, route, setupCards, step, teardownCards } from "./cardHelpers";
+import type { DocketDetail, DocketListResponse } from "../../src/shared/types";
+import { cardsOf, handDocket, newDocket, route, setupCards, step, teardownCards } from "./cardHelpers";
 import { api } from "./helpers";
 
 let s: Awaited<ReturnType<typeof setupCards>>;
@@ -40,6 +40,31 @@ describe("current area on the Main Dashboard", () => {
     const item = (await list()).find((x) => x.workOrder === d.workOrder)!;
     expect(item.areas).toEqual(["printer_roll", "colex"]);
     expect(item.productionDone).toBe(false);
+  });
+
+  it("says who has the docket now, per area (whoever started it, else who it was sent to)", async () => {
+    await s.staffWith("gary", "measure");
+    await s.staffWith("ira", "designer");
+    const d = await handDocket(s.manager, [
+      { userId: s.ids.ira, instruction: "Logo" },
+      { userId: s.ids.gary, instruction: "Measure" },
+    ]);
+    const item = (await list()).find((x) => x.workOrder === d.workOrder)!;
+    expect(item.holders).toEqual([
+      { roleId: "designer", names: ["ira"] },
+      { roleId: "measure", names: ["gary"] },
+    ]);
+    const team = await newDocket(s.manager, route("colex"));
+    expect((await list()).find((x) => x.workOrder === team.workOrder)!.holders).toEqual([{ roleId: "colex", names: [] }]);
+    const [c] = await cardsOf(team.workOrder);
+    await env.DB.prepare("UPDATE cards SET claimed_by = ? WHERE id = ?").bind(s.ids.gary, c.id).run();
+    expect((await list()).find((x) => x.workOrder === team.workOrder)!.holders).toEqual([{ roleId: "colex", names: ["gary"] }]);
+    // The docket detail says it too.
+    const detail = (await (await api(`/api/dockets/${d.workOrder}`, { cookie: s.manager })).json()) as DocketDetail;
+    expect(detail.holders).toEqual([
+      { roleId: "designer", names: ["ira"] },
+      { roleId: "measure", names: ["gary"] },
+    ]);
   });
 
   it("says done when every card is done, and nothing without a route", async () => {

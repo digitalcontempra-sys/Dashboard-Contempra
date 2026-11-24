@@ -7,6 +7,7 @@ import {
   type DocketListResponse,
   type DocketSummary,
   type DocketView,
+  type Holder,
   type HistoryFilter,
   type NonBilledItem,
   type NonBilledTab,
@@ -46,6 +47,14 @@ const VENDOR_PICKUP_SQL = `EXISTS (SELECT 1 FROM cards c WHERE c.work_order = do
 
 /** Areas (role ids) with an active card, comma-separated. */
 const AREAS_SQL = `(SELECT group_concat(DISTINCT c.role_id) FROM cards c WHERE c.work_order = dockets.work_order AND c.status = 'active')`;
+/**
+ * Who has the docket now: per active card, whoever started it, else the people it was sent to
+ * (a team card with neither gives the area alone). role<US>name rows joined by <RS>.
+ */
+const HOLDERS_SQL = `(SELECT group_concat(c.role_id || char(31) || coalesce(u.full_name, ''), char(30))
+  FROM cards c LEFT JOIN users u ON (c.claimed_by IS NOT NULL AND u.id = c.claimed_by)
+    OR (c.claimed_by IS NULL AND u.id IN (SELECT value FROM json_each(c.assignee_ids)))
+  WHERE c.work_order = dockets.work_order AND c.status = 'active')`;
 /** Every card of the docket is done (and it has at least one). */
 const PRODUCTION_DONE_SQL = `(EXISTS (SELECT 1 FROM cards c WHERE c.work_order = dockets.work_order)
   AND NOT EXISTS (SELECT 1 FROM cards c WHERE c.work_order = dockets.work_order AND c.status != 'done'))`;
@@ -71,8 +80,24 @@ class Sql {
   }
 }
 
-const sortAreas = (ids: string[]) =>
-  ids.sort((a, b) => ROLE_ORDER.indexOf(a as (typeof ROLE_ORDER)[number]) - ROLE_ORDER.indexOf(b as (typeof ROLE_ORDER)[number]));
+/** Production order; roles outside it (General) go last. */
+const rank = (id: string) => {
+  const i = ROLE_ORDER.indexOf(id as (typeof ROLE_ORDER)[number]);
+  return i < 0 ? ROLE_ORDER.length : i;
+};
+const sortAreas = (ids: string[]) => ids.sort((a, b) => rank(a) - rank(b));
+
+export function parseHolders(raw: unknown): Holder[] {
+  if (typeof raw !== "string" || raw === "") return [];
+  const by = new Map<string, string[]>();
+  for (const row of raw.split("")) {
+    const [roleId, name = ""] = row.split("");
+    const names = by.get(roleId) ?? [];
+    if (name && !names.includes(name)) names.push(name);
+    by.set(roleId, names);
+  }
+  return sortAreas([...by.keys()]).map((roleId) => ({ roleId, names: by.get(roleId)! }));
+}
 
 function toSummary(r: Row, today: string): DocketSummary {
   const dueIso = (r.due_iso as string) ?? null;
@@ -92,6 +117,7 @@ function toSummary(r: Row, today: string): DocketSummary {
     vendorPickup: r.vendor_pickup === 1,
     areas: typeof r.areas === "string" ? sortAreas(r.areas.split(",")) : [],
     productionDone: r.production_done === 1,
+    holders: parseHolders(r.holders),
   };
 }
 
@@ -132,7 +158,7 @@ export async function listDockets(db: D1Database, p: DocketQuery, now: Date): Pr
   const [countsRes, totalRes, listRes] = await db.batch([
     sql.bind(db, countsSql),
     sql.bind(db, `SELECT count(*) AS n FROM dockets WHERE ${listWhere}`),
-    sql.bind(db, `SELECT *, ${VENDOR_PICKUP_SQL} AS vendor_pickup, ${AREAS_SQL} AS areas, ${PRODUCTION_DONE_SQL} AS production_done FROM dockets WHERE ${listWhere} ${order} LIMIT :limit OFFSET :offset`),
+    sql.bind(db, `SELECT *, ${VENDOR_PICKUP_SQL} AS vendor_pickup, ${AREAS_SQL} AS areas, ${HOLDERS_SQL} AS holders, ${PRODUCTION_DONE_SQL} AS production_done FROM dockets WHERE ${listWhere} ${order} LIMIT :limit OFFSET :offset`),
   ]);
   const c = (countsRes.results[0] ?? {}) as Record<TimeBucket, number | null>;
   return {
@@ -183,7 +209,7 @@ export async function listNonBilled(db: D1Database, p: NonBilledQuery, now: Date
 }
 
 export async function getDocket(db: D1Database, wo: string, now: Date): Promise<DocketDetail | null> {
-  const r = await db.prepare("SELECT * FROM dockets WHERE work_order = ?").bind(wo).first<Row>();
+  const r = await db.prepare(`SELECT *, ${HOLDERS_SQL} AS holders FROM dockets WHERE work_order = ?`).bind(wo).first<Row>();
   if (!r) return null;
   const s = (k: string) => (r[k] as string) ?? null;
   return {

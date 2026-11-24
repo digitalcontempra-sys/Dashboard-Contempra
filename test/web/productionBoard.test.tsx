@@ -116,6 +116,7 @@ const detail = {
   dueIso: null, dueRaw: null, status: "active", billing: "not_billed", bucket: "no_due_date", overdue: false,
   sheetRow: 2, dateRaw: null, comp: false, hold: false, seq: null, address: null, roleNote: null, inv: false,
   invDateRaw: null, quotePo: null, notes: null, link: null, syncedAt: "",
+  holders: [{ roleId: "measure", names: ["Cory"] }],
 };
 const history: CardEventDTO[] = [
   { at: "2026-11-09T20:14:00Z", area: "Print Roll", user: "Seb", action: "continued", detail: "Continue → Laminate" },
@@ -129,8 +130,11 @@ function showDetail(user: object) {
     "GET /api/virtual-dockets/91488/history": () => history,
     "GET /api/virtual-dockets/91488/photos": () => ({ count: 2, folderLink: "https://drive.google.com/drive/folders/p" }),
     "POST /api/cards/7/restore": () => makeCard(),
+    "GET /api/assignees": () => [{ id: 5, fullName: "Erin Lee", roles: ["printer_roll"] }],
     "GET /api/production-board": () =>
-      board({ columns: [{ roleId: "printer_roll", area: "Print Roll", cards: [{ ...makeCard({ roleId: "printer_roll", status: "done" }), noMembers: false }] }] }),
+      board({
+        columns: [{ roleId: "printer_roll", area: "Print Roll", cards: [{ ...makeCard({ roleId: "printer_roll", status: "done", assigneeIds: [5] }), noMembers: false }] }],
+      }),
   });
   render(
     <MemoryRouter>
@@ -151,11 +155,19 @@ describe("Docket detail tabs", () => {
     expect(within(list).getByText(/Sent back to Design · Cut file missing/)).toBeInTheDocument();
   });
 
-  it("managers see each step in the Production tab", async () => {
+  it("the header says who has the docket now", async () => {
+    showDetail(staffUser);
+    const now = await screen.findByLabelText("Now with");
+    expect(within(now).getByText("Measure")).toBeInTheDocument();
+    expect(within(now).getByText("Cory")).toBeInTheDocument();
+  });
+
+  it("managers see each step in the Production tab, with who has it", async () => {
     const { calls } = showDetail(managerUser);
     await userEvent.click(await screen.findByRole("tab", { name: "Production" }));
     expect(await screen.findByText("Print Roll")).toBeInTheDocument();
     expect(screen.getByText("Done ✓")).toBeInTheDocument();
+    expect(await screen.findByText("Erin Lee")).toBeInTheDocument();
     expect(calls.find((c) => c.url.pathname === "/api/production-board")!.url.searchParams.get("wo")).toBe("91488");
     expect(await screen.findByRole("link", { name: "Photos (2)" })).toHaveAttribute("href", "https://drive.google.com/drive/folders/p");
     expect(screen.queryByRole("button", { name: /Restore/ })).toBeNull();

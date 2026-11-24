@@ -5,6 +5,7 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import { DocketHistory, DocketProduction } from "./DocketHistory";
 import { dueLabel, longDate } from "../format";
+import { HolderList } from "./AreaChip";
 import { BucketTag } from "./BucketChip";
 import { Icon } from "./Icon";
 import { DocketActions } from "../docket/DocketActions";
@@ -103,6 +104,12 @@ export function DocketDetail({ workOrder, onClose }: { workOrder: string; onClos
             </div>
             <h2 className="mt-1.5 text-2xl font-bold tracking-tight">{d?.customer ?? (isPending ? "Loading…" : "—")}</h2>
             {d?.project && <p className="mt-1 text-[15px] leading-snug text-text-2">{d.project}</p>}
+            {d?.holders && d.holders.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-text-3">Now with</span>
+                <HolderList holders={d.holders} size="md" label="Now with" />
+              </div>
+            )}
           </div>
           <button
             ref={closeRef}

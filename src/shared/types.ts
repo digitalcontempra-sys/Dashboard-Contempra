@@ -38,7 +38,11 @@ export type DocketSummary = {
   areas?: string[];
   /** Every production card is done (list endpoint only). */
   productionDone?: boolean;
+  /** Who has the docket now, per area in production order (names empty for a team card nobody started). */
+  holders?: Holder[];
 };
+
+export type Holder = { roleId: string; names: string[] };
 
 export type DocketDetail = DocketSummary & {
   sheetRow: number;

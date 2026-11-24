@@ -1,4 +1,5 @@
 import { AREA_LABEL, AREA_TOKEN, ROLE_ORDER } from "../../shared/cards";
+import type { Holder } from "../../shared/types";
 
 /** var(--area-…) for a role id, for borders and dots. */
 export const areaColor = (roleId: string) => `var(--${AREA_TOKEN[roleId] ?? "text-3"})`;
@@ -19,6 +20,22 @@ export function AreaChip({ roleId, size = "sm" }: { roleId: string; size?: "sm" 
     >
       {AREA_LABEL[roleId] ?? roleId}
     </span>
+  );
+}
+
+/** Who has the docket now: each area's chip followed by the people working on it there. */
+export function HolderList({ holders, size = "sm", label }: { holders: Holder[]; size?: "sm" | "md"; label?: string }) {
+  return (
+    <div aria-label={label} className={`flex flex-wrap items-center ${size === "md" ? "gap-x-3 gap-y-1.5" : "gap-x-2 gap-y-1"}`}>
+      {holders.map((h) => (
+        <span key={h.roleId} className="inline-flex min-w-0 items-center gap-1">
+          <AreaChip roleId={h.roleId} size={size} />
+          {h.names.length > 0 && (
+            <span className={`truncate font-semibold text-text-2 ${size === "md" ? "text-[13px]" : "text-[11px]"}`}>{h.names.join(", ")}</span>
+          )}
+        </span>
+      ))}
+    </div>
   );
 }
 

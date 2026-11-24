@@ -28,7 +28,7 @@ function setup(syncOver: Record<string, unknown> = {}) {
   return mockApi({
     "GET /api/auth/me": () => managerUser,
     "GET /api/dockets": () => ({
-      items: [item({ areas: ["laminate_roll"] }), item({ workOrder: "91480", customer: "Kelly Ryback", dueIso: null, dueRaw: "in production", bucket: "no_due_date", productionDone: true })],
+      items: [item({ areas: ["laminate_roll"], holders: [{ roleId: "laminate_roll", names: ["Cory"] }] }), item({ workOrder: "91480", customer: "Kelly Ryback", dueIso: null, dueRaw: "in production", bucket: "no_due_date", productionDone: true })],
       total: 2,
       page: 1,
       pageSize: 50,
@@ -152,6 +152,8 @@ describe("areas on the Main Dashboard", () => {
     renderApp("/dashboard");
     const tile = await screen.findByRole("button", { name: /Work order 91487/ });
     expect(within(tile).getByText("Laminate")).toHaveAttribute("data-area", "laminate_roll");
+    // Who has it in that area.
+    expect(within(tile).getByText("Cory")).toBeInTheDocument();
     expect(within(screen.getByRole("button", { name: /Work order 91480/ })).getByText("Done")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Areas" })).toBeInTheDocument();
   });
