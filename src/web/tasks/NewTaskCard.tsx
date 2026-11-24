@@ -17,29 +17,29 @@ const WHEN: { kind: TaskDueKind; label: string }[] = [
 /** "New Task Card" button plus its form: a note for one person. */
 export function NewTaskCardButton({ className = "btn-ghost" }: { className?: string }) {
   const [open, setOpen] = useState(false);
-  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
-    if (!sentTo) return;
-    const t = setTimeout(() => setSentTo(null), 4000);
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 4000);
     return () => clearTimeout(t);
-  }, [sentTo]);
+  }, [notice]);
   return (
     <>
       <button type="button" className={className} onClick={() => setOpen(true)}>
         <Icon name="plus" className="size-4" />
         New Task Card
       </button>
-      {sentTo && (
+      {notice && (
         <p role="status" className="text-sm font-medium text-ok">
-          Task sent to {sentTo}
+          {notice}
         </p>
       )}
       {open && (
         <NewTaskCardDialog
           onClose={() => setOpen(false)}
-          onSent={(name) => {
+          onSent={(name, self) => {
             setOpen(false);
-            setSentTo(firstName(name));
+            setNotice(self ? "Note saved" : `Task sent to ${firstName(name)}`);
           }}
         />
       )}
@@ -47,7 +47,7 @@ export function NewTaskCardButton({ className = "btn-ghost" }: { className?: str
   );
 }
 
-function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (name: string) => void }) {
+function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (name: string, self: boolean) => void }) {
   const qc = useQueryClient();
   const { user } = useAuth();
   const people = useQuery({ queryKey: ["assignees"], queryFn: () => api<AssigneeDTO[]>("/api/assignees"), staleTime: 60_000 });
@@ -71,7 +71,12 @@ function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (
   }, []);
 
   const q = query.trim().toLowerCase();
+  // "Me" comes first, so a personal note is one tap away.
+  const meOption: AssigneeDTO | null = user ? { id: user.id, fullName: user.fullName, roles: [] } : null;
+  const showMe = meOption !== null && (!q || "me".startsWith(q) || meOption.fullName.toLowerCase().includes(q));
   const matches = (people.data ?? []).filter((p) => p.id !== user?.id && (!q || p.fullName.toLowerCase().includes(q)));
+  const options = showMe ? [meOption, ...matches] : matches;
+  const self = to !== null && to.id === user?.id;
   const ready = to !== null && note.trim().length > 0 && (kind !== "date" || date !== "");
 
   async function send() {
@@ -84,7 +89,7 @@ function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (
         json: { toUserId: to.id, note: note.trim(), due: kind === "date" ? { kind, date } : { kind } },
       });
       void qc.invalidateQueries({ queryKey: ["tasks"] });
-      onSent(to.fullName);
+      onSent(to.fullName, self);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -108,7 +113,7 @@ function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (
         </label>
         {to ? (
           <div className="flex min-h-11 items-center justify-between rounded-[var(--radius-control)] bg-surface-2 px-3">
-            <span className="font-semibold">{to.fullName}</span>
+            <span className="font-semibold">{self ? `Me (${to.fullName})` : to.fullName}</span>
             <button type="button" className="text-sm text-accent" onClick={() => setTo(null)}>
               Change
             </button>
@@ -128,7 +133,7 @@ function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (
               aria-controls="task-to-list"
             />
             <ul id="task-to-list" role="listbox" aria-label="People" className="mt-1 max-h-44 overflow-y-auto rounded-xl bg-surface-2">
-              {matches.map((p) => (
+              {options.map((p) => (
                 <li
                   key={p.id}
                   role="option"
@@ -138,7 +143,7 @@ function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (
                   onClick={() => setTo(p)}
                   onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setTo(p)}
                 >
-                  {p.fullName}
+                  {p.id === user?.id ? `Me (${p.fullName})` : p.fullName}
                 </li>
               ))}
             </ul>
@@ -186,7 +191,7 @@ function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (
             Cancel
           </button>
           <button type="button" className="btn-primary" disabled={!ready || busy} onClick={() => void send()}>
-            Send
+            {self ? "Save" : "Send"}
           </button>
         </div>
       </section>

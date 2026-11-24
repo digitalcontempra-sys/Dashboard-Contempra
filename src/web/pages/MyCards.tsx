@@ -10,7 +10,7 @@ import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/Layout";
 import { BUCKETS } from "../format";
 import { NewTaskCardButton } from "../tasks/NewTaskCard";
-import { SentList, TaskTile, TaskView } from "../tasks/TaskCards";
+import { HistoryList, SentList, TaskTile, TaskView } from "../tasks/TaskCards";
 
 export const CARD_GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6";
 
@@ -31,12 +31,13 @@ export function groupCards(cards: CardDTO[], tasks: TaskCardDTO[] = []): Group[]
   return groups.filter((g) => g.cards.length + g.tasks.length > 0);
 }
 
-type Show = "all" | "docket" | "task" | "sent";
+type Show = "all" | "docket" | "task" | "sent" | "history";
 const SHOW: { id: Show; label: string }[] = [
   { id: "all", label: "All" },
   { id: "docket", label: "Docket cards" },
   { id: "task", label: "Task cards" },
   { id: "sent", label: "Sent by me" },
+  { id: "history", label: "History" },
 ];
 
 function Tabs<T extends string | null>({ label, items, value, onChange }: { label: string; items: { id: T; label: string }[]; value: T; onChange: (v: T) => void }) {
@@ -92,6 +93,8 @@ export function MyCards() {
 
         {show === "sent" ? (
           <SentList />
+        ) : show === "history" ? (
+          <HistoryList />
         ) : (
           <>
             {error && <p className="py-6 text-danger">{(error as Error).message}</p>}

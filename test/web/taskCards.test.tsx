@@ -68,6 +68,21 @@ describe("New Task Card", () => {
     expect(await screen.findByText("Task sent to Erin")).toBeInTheDocument();
   });
 
+  it("I can write a note to myself: Me comes first, the button says Save", async () => {
+    const { calls } = app({ "POST /api/task-cards": () => task({ id: 4, from: { id: staffUser.id, name: staffUser.fullName } }) });
+    renderApp("/my-cards");
+    await userEvent.click(await screen.findByRole("button", { name: "New Task Card" }));
+    const dialog = screen.getByRole("dialog", { name: "New Task Card" });
+    const options = within(dialog).getAllByRole("option");
+    expect(options[0]).toHaveTextContent(`Me (${staffUser.fullName})`);
+    expect(options.filter((o) => o.textContent === staffUser.fullName)).toHaveLength(0);
+    await userEvent.click(options[0]);
+    await userEvent.type(within(dialog).getByLabelText("Note"), "Buy tape");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(calls.find((c) => c.method === "POST" && c.url.pathname === "/api/task-cards")?.body).toMatchObject({ toUserId: staffUser.id }));
+    expect(await screen.findByText("Note saved")).toBeInTheDocument();
+  });
+
   it("managers also have it on the Main Dashboard", async () => {
     mockApi({
       "GET /api/auth/me": () => managerUser,
@@ -86,7 +101,7 @@ describe("Task cards in My Cards", () => {
     expect(await screen.findByText("Call the vendor about the banner stand")).toBeInTheDocument();
     expect(screen.getByText("Docket Co")).toBeInTheDocument();
     const filter = screen.getByRole("tablist", { name: "Show" });
-    expect(within(filter).getAllByRole("tab").map((t) => t.textContent)).toEqual(["All", "Docket cards", "Task cards", "Sent by me"]);
+    expect(within(filter).getAllByRole("tab").map((t) => t.textContent)).toEqual(["All", "Docket cards", "Task cards", "Sent by me", "History"]);
     await userEvent.click(within(filter).getByRole("tab", { name: "Task cards" }));
     expect(screen.queryByText("Docket Co")).toBeNull();
     expect(screen.getByRole("button", { name: /Task from Seb/ })).toBeInTheDocument();
@@ -126,6 +141,63 @@ describe("Task cards in My Cards", () => {
     await waitFor(() => expect(calls.some((c) => c.url.pathname === "/api/task-cards/sent/seen")).toBe(true));
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.url.pathname === "/api/task-cards/8")).toBe(true));
+  });
+});
+
+describe("notes to self and History", () => {
+  const me = { id: staffUser.id, name: staffUser.fullName };
+
+  it("a note to self looks personal and can be deleted", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { calls } = app({
+      "GET /api/task-cards": (u) => (u.searchParams.get("box") === "sent" ? [] : [task({ from: me, isNew: false, note: "Buy tape" })]),
+      "POST /api/task-cards/3/seen": () => ({ ok: true }),
+      "DELETE /api/task-cards/3": () => ({ ok: true }),
+    });
+    renderApp("/my-cards");
+    const tile = await screen.findByRole("button", { name: /Note to self: Buy tape/ });
+    expect(within(tile).getByText("Note to self")).toBeInTheDocument();
+    expect(within(tile).queryByText(/From/)).toBeNull();
+    await userEvent.click(tile);
+    const dialog = screen.getByRole("dialog", { name: "Note to self" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.url.pathname === "/api/task-cards/3")).toBe(true));
+  });
+
+  it("History lists finished tasks, labelled by who sent them, with Show more", async () => {
+    const page1 = {
+      items: [
+        task({ id: 11, status: "done", doneAt: "2026-11-22T16:00:00Z", note: "Got from Seb" }),
+        task({ id: 12, status: "done", doneAt: "2026-11-21T16:00:00Z", from: me, to: { id: 5, name: "Erin Lee" }, note: "Sent to Erin" }),
+        task({ id: 13, status: "done", doneAt: "2026-11-20T16:00:00Z", from: me, to: me, note: "Mine" }),
+      ],
+      hasMore: true,
+    };
+    const page2 = { items: [task({ id: 14, status: "done", doneAt: "2026-11-01T16:00:00Z", note: "Old one" })], hasMore: false };
+    const { calls } = app({
+      "GET /api/task-cards": (u) =>
+        u.searchParams.get("box") === "history" ? (u.searchParams.get("page") === "2" ? page2 : page1) : [],
+    });
+    renderApp("/my-cards");
+    await userEvent.click(await screen.findByRole("tab", { name: "History" }));
+    const list = await screen.findByRole("list", { name: "Task history" });
+    const rows = within(list).getAllByRole("listitem");
+    expect(rows.map((r) => r.textContent)).toEqual([
+      expect.stringMatching(/^Sent to me.*From Seb Bastian.*Got from Seb.*Done ✓ · Nov 22, 10:00 AM/),
+      expect.stringMatching(/^Sent by me.*To Erin Lee.*Sent to Erin/),
+      expect.stringMatching(/^Note to self.*Mine/),
+    ]);
+    await userEvent.click(screen.getByRole("button", { name: "Show more" }));
+    expect(await within(list).findByText("Old one")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
+    expect(calls.some((c) => c.url.searchParams.get("box") === "history" && c.url.searchParams.get("page") === "2")).toBe(true);
+  });
+
+  it("History says so when nothing is finished yet", async () => {
+    app({ "GET /api/task-cards": (u) => (u.searchParams.get("box") === "history" ? { items: [], hasMore: false } : []) });
+    renderApp("/my-cards");
+    await userEvent.click(await screen.findByRole("tab", { name: "History" }));
+    expect(await screen.findByText("No finished task cards yet.")).toBeInTheDocument();
   });
 });
 

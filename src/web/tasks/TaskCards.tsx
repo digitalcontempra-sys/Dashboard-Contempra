@@ -1,7 +1,8 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import type { TaskCardDTO } from "../../shared/types";
+import type { TaskCardDTO, TaskHistoryPage } from "../../shared/types";
 import { api } from "../api";
+import { useAuth } from "../auth";
 import { BucketTag } from "../components/BucketChip";
 import { Icon } from "../components/Icon";
 
@@ -12,21 +13,26 @@ export const taskTime = (iso: string) => TIME.format(new Date(iso)).replace(NARR
 
 const TASK_STYLE = { background: "var(--task-bg)", borderColor: "var(--task-border)", color: "var(--task-ink)" };
 
+/** A task I wrote for myself: a personal note. */
+export const isSelf = (t: TaskCardDTO) => t.from.id === t.to.id;
+
 /** Light-yellow sticky-note tile, unlike docket cards. */
 export function TaskTile({ task, onOpen }: { task: TaskCardDTO; onOpen: () => void }) {
+  const self = isSelf(task);
+  const who = self ? "Note to self" : `Task from ${firstName(task.from.name)}`;
   return (
     <button
       type="button"
       onClick={onOpen}
       style={TASK_STYLE}
       className={`tile force-light group border ${task.isNew ? "ring-2 ring-accent" : ""}`}
-      aria-label={`Task from ${firstName(task.from.name)}: ${task.note.slice(0, 60)}${task.isNew ? ", new" : ""}`}
+      aria-label={`${who}: ${task.note.slice(0, 60)}${task.isNew ? ", new" : ""}`}
     >
       <div className="flex items-center gap-1.5">
-        <span className="rounded-md bg-black/10 px-1.5 py-px text-[10px] font-black uppercase tracking-wide">Task</span>
+        <span className="rounded-md bg-black/10 px-1.5 py-px text-[10px] font-black uppercase tracking-wide">{self ? "Note" : "Task"}</span>
         {task.isNew && <span className="rounded-md bg-accent px-1.5 py-px text-[10px] font-black text-accent-ink">NEW</span>}
       </div>
-      <p className="mt-2 text-[12px] font-semibold opacity-80">From {firstName(task.from.name)}</p>
+      <p className="mt-2 text-[12px] font-semibold opacity-80">{self ? "Note to self" : `From ${firstName(task.from.name)}`}</p>
       <p className="mt-1 line-clamp-3 text-[14px] leading-snug font-semibold">{task.note}</p>
       <div className="mt-auto">
         <BucketTag bucket={task.bucket} />
@@ -58,10 +64,13 @@ export function TaskView({ task, onClose }: { task: TaskCardDTO; onClose: () => 
     return () => document.removeEventListener("keydown", onKey);
   }, [task.id, qc]);
 
-  async function done() {
+  const self = isSelf(task);
+
+  async function done(remove = false) {
+    if (remove && !window.confirm("Delete this note?")) return;
     setBusy(true);
     try {
-      await api(`/api/task-cards/${task.id}/done`, { method: "POST" });
+      await api(remove ? `/api/task-cards/${task.id}` : `/api/task-cards/${task.id}/done`, { method: remove ? "DELETE" : "POST" });
       void qc.invalidateQueries({ queryKey: ["tasks"] });
       void qc.invalidateQueries({ queryKey: ["my-cards-summary"] });
       onClose();
@@ -79,15 +88,15 @@ export function TaskView({ task, onClose }: { task: TaskCardDTO; onClose: () => 
       <section
         role="dialog"
         aria-modal="true"
-        aria-label={`Task from ${task.from.name}`}
+        aria-label={self ? "Note to self" : `Task from ${task.from.name}`}
         style={TASK_STYLE}
         className="animate-sheet-in relative w-full rounded-t-[var(--radius-panel)] border p-5 shadow-[var(--shadow-lift)] sm:max-w-md sm:rounded-[var(--radius-panel)]"
       >
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <span className="rounded-md bg-black/10 px-1.5 py-px text-[10px] font-black uppercase tracking-wide">Task</span>
+            <span className="rounded-md bg-black/10 px-1.5 py-px text-[10px] font-black uppercase tracking-wide">{self ? "Note" : "Task"}</span>
             <p className="mt-2 text-sm font-semibold opacity-80">
-              From {task.from.name} · {taskTime(task.createdAt)}
+              {self ? "Note to self" : `From ${task.from.name}`} · {taskTime(task.createdAt)}
             </p>
           </div>
           <button ref={closeRef} type="button" aria-label="Close" className="grid size-11 place-items-center rounded-full bg-black/10" onClick={onClose}>
@@ -103,13 +112,66 @@ export function TaskView({ task, onClose }: { task: TaskCardDTO; onClose: () => 
             {error}
           </p>
         )}
-        <div className="mt-5 flex justify-end">
+        <div className="mt-5 flex justify-end gap-2">
+          {self && (
+            <button type="button" className="btn-ghost" disabled={busy} onClick={() => void done(true)}>
+              Delete
+            </button>
+          )}
           <button type="button" className="btn-primary" disabled={busy} onClick={() => void done()}>
             Done
           </button>
         </div>
       </section>
     </div>
+  );
+}
+
+/** Finished tasks I sent or received (and my own notes), newest first, 50 at a time. */
+export function HistoryList() {
+  const { user } = useAuth();
+  const history = useInfiniteQuery({
+    queryKey: ["tasks", "history"],
+    queryFn: ({ pageParam }) => api<TaskHistoryPage>(`/api/task-cards?box=history&page=${pageParam}`),
+    initialPageParam: 1,
+    getNextPageParam: (last, pages) => (last.hasMore ? pages.length + 1 : undefined),
+  });
+
+  if (history.error) return <p className="py-6 text-danger">{(history.error as Error).message}</p>;
+  if (!history.data) return null;
+  const items = history.data.pages.flatMap((p) => p.items);
+  if (items.length === 0) return <div className="card px-6 py-14 text-center text-text-2">No finished task cards yet.</div>;
+  const kind = (t: TaskCardDTO) =>
+    isSelf(t)
+      ? { label: "Note to self", cls: "bg-surface-2 text-text-2", who: null }
+      : t.from.id === user?.id
+        ? { label: "Sent by me", cls: "bg-coming-soft text-coming", who: `To ${t.to.name}` }
+        : { label: "Sent to me", cls: "bg-accent-soft text-accent", who: `From ${t.from.name}` };
+  return (
+    <>
+      <ul aria-label="Task history" className="card divide-y divide-border overflow-hidden">
+        {items.map((t) => {
+          const k = kind(t);
+          return (
+            <li key={t.id} className="flex flex-col gap-1 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold ${k.cls}`}>{k.label}</span>
+                {k.who && <span className="text-sm font-semibold">{k.who}</span>}
+              </div>
+              <p className="line-clamp-3 text-sm break-words whitespace-pre-wrap text-text-2">{t.note}</p>
+              <span className="text-xs font-semibold text-ok">{`Done ✓ · ${taskTime(t.doneAt ?? t.createdAt)}`}</span>
+            </li>
+          );
+        })}
+      </ul>
+      {history.hasNextPage && (
+        <div className="mt-3 flex justify-center">
+          <button type="button" className="btn-ghost" disabled={history.isFetchingNextPage} onClick={() => void history.fetchNextPage()}>
+            Show more
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
