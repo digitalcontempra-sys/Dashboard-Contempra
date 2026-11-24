@@ -56,7 +56,7 @@ describe("STATUS column", () => {
     const head = s.g.sheet.rows[0];
     expect(head.slice(10, 13)).toEqual(["ROLE", "STATUS", "Inv"]);
     expect(head[16]).toBe("LINK");
-    expect(head.slice(17, 29)).toEqual(STAGE_HEADERS);
+    expect(head.slice(17, 30)).toEqual(STAGE_HEADERS);
     // The existing docket moved with it.
     expect(row("91487")[6]).toBe("Tartan Towing");
     expect(row("91487")[11]).toBe("");

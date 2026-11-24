@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { AREA_LABEL } from "../../shared/cards";
 import type { AppEnv } from "../app";
 import { requireAuth, requireLevel } from "../auth/sessions";
 import { canAct } from "../cards/actions";
@@ -99,7 +100,7 @@ cardPhotoRoutes.post("/cards/:id/photos", async (c) => {
   if ((count?.n ?? 0) >= MAX_PHOTOS) return c.json({ error: `This card already has ${MAX_PHOTOS} photos.` }, 409);
 
   const ext = photo.type === "image/png" ? "png" : "jpg";
-  const name = `${card.work_order} Install ${stamp(new Date())}.${ext}`;
+  const name = `${card.work_order} ${AREA_LABEL[card.role_id] ?? "Photo"} ${stamp(new Date())}.${ext}`;
   const bytes = await photo.arrayBuffer();
   const mime = photo.type === "image/png" ? "image/png" : "image/jpeg";
   const drive = getGateways(c.env).drive;

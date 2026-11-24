@@ -55,7 +55,7 @@ describe("Import staff", () => {
     const { results } = await env.DB.prepare(
       "SELECT ur.role_id FROM user_roles ur JOIN users u ON u.id = ur.user_id WHERE u.username = 'kharash' ORDER BY ur.role_id",
     ).all<{ role_id: string }>();
-    expect(results.map((r) => r.role_id)).toEqual(["finishing", "installer", "laminate_roll"]);
+    expect(results.map((r) => r.role_id)).toEqual(["finishing", "installer", "laminate_roll", "measure"]);
     const jeff = await env.DB.prepare("SELECT access_level FROM users WHERE username = 'jeff.b'").first();
     expect(jeff).toEqual({ access_level: "admin" });
 

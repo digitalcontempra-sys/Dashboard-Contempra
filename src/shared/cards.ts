@@ -25,6 +25,7 @@ export const ROLE_ORDER = [
   "colex",
   "finishing",
   "installer",
+  "measure",
 ] as const;
 
 /** Role names as in the roles table (used for role tabs). */
@@ -38,6 +39,7 @@ export const ROLE_LABEL: Record<string, string> = {
   colex: "Colex",
   finishing: "Finishing / Packaging",
   installer: "Installer",
+  measure: "Measure",
   general: "General",
 };
 
@@ -52,6 +54,7 @@ export const AREA_TOKEN: Record<string, string> = {
   colex: "area-colex",
   finishing: "area-finishing",
   installer: "area-install",
+  measure: "area-measure",
 };
 
 /** Area name of each role, used in "Continue → <area>" and the sheet's Stage column. */
@@ -65,6 +68,7 @@ export const AREA_LABEL: Record<string, string> = {
   colex: "Colex",
   finishing: "Finishing",
   installer: "Install",
+  measure: "Measure",
   general: "General",
 };
 
@@ -142,6 +146,16 @@ export const CARD_FIELDS: Record<string, FieldSpec[]> = {
   installer: [
     check("siteChecked", "Site checked"),
     check("installed", "Installed", true),
+    text("address", "Address"),
+    { key: "date", label: "Date", kind: "date" },
+    text("crew", "Crew"),
+    { key: "photos", label: "Photos", kind: "photos" },
+    text("note", "Notes"),
+  ],
+  measure: [
+    check("siteChecked", "Site checked"),
+    check("measured", "Measured", true),
+    text("measurements", "Measurements"),
     text("address", "Address"),
     { key: "date", label: "Date", kind: "date" },
     text("crew", "Crew"),

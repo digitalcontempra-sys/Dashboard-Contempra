@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  AREA_LABEL,
   AREA_TOKEN,
+  CARD_FIELDS,
+  ROLE_LABEL,
   ROLE_ORDER,
   areaCellText,
   continueBlocker,
@@ -45,6 +48,24 @@ describe("continueBlocker", () => {
   });
   it("installer needs Installed", () => {
     expect(msg("installer", {})).toBe('Mark "Installed" to continue');
+  });
+  it("Measure is the last area and needs Measured", () => {
+    expect(ROLE_ORDER.at(-1)).toBe("measure");
+    expect(AREA_LABEL.measure).toBe("Measure");
+    expect(ROLE_LABEL.measure).toBe("Measure");
+    expect(CARD_FIELDS.measure.map((f) => `${f.label}:${f.kind}${f.required ? "*" : ""}`)).toEqual([
+      "Site checked:check",
+      "Measured:check*",
+      "Measurements:text",
+      "Address:text",
+      "Date:date",
+      "Crew:text",
+      "Photos:photos",
+      "Notes:text",
+    ]);
+    expect(msg("measure", {})).toBe('Mark "Measured" to continue');
+    expect(msg("measure", { measured: true })).toBeNull();
+    expect(fieldsSummary("measure", { measured: true, measurements: "24 x 32 in" })).toBe("Measured ✓ · Measurements: 24 x 32 in");
   });
 });
 

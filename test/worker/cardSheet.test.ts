@@ -40,10 +40,10 @@ beforeEach(async () => {
 afterEach(teardownCards);
 
 const setup = () => post("/api/admin/production-columns", s.admin, { confirm: "SET UP" });
-/** A row as the code sees it (A–P, Q–AB), without the STATUS column. */
+/** A row as the code sees it (A–P, Q–AC), without the STATUS column. */
 const logical = (r: unknown[]) => (s.g.sheet.rows[0][11] === "STATUS" ? [...r.slice(0, 11), ...r.slice(12)] : r);
 const sheetRow = (wo: string) => logical(s.g.sheet.rowOf(wo)!);
-const stageCells = (wo: string) => sheetRow(wo).slice(16, 28);
+const stageCells = (wo: string) => sheetRow(wo).slice(16, 29);
 const today = new Intl.DateTimeFormat("en-US", { timeZone: "America/Winnipeg", month: "2-digit", day: "2-digit" }).format(new Date());
 
 describe("Set up production columns", () => {
@@ -55,7 +55,7 @@ describe("Set up production columns", () => {
       ["Work Order", ...OLD],
       [91487, "x", "", "", "", "", "", "", "", "old"],
     ]);
-    expect(logical(s.g.sheet.rows[0]).slice(16, 28)).toEqual(STAGE_HEADERS);
+    expect(logical(s.g.sheet.rows[0]).slice(16, 29)).toEqual(STAGE_HEADERS);
     expect(logical(s.g.sheet.rows[1]).slice(16, 25).every((v) => v === "")).toBe(true);
     expect(s.g.sheet.tabs.Production).toEqual([PRODUCTION_HEADERS]);
     const flag = await env.DB.prepare("SELECT value FROM app_settings WHERE key = 'production_columns'").first();
@@ -73,17 +73,17 @@ describe("Set up production columns", () => {
 });
 
 describe("Photos column", () => {
-  it("a sheet on the Q–AA layout gets the Photos header in AB", async () => {
+  it("a sheet on the Q–AA layout gets the Photos header in AC", async () => {
     expect((await setup()).status).toBe(200);
-    s.g.sheet.rows[0].splice(17, 12, ...STAGE_HEADERS.slice(0, 11));
+    s.g.sheet.rows[0].splice(17, 13, ...STAGE_HEADERS.slice(0, 10), "Assigned");
     await env.DB.prepare("UPDATE app_settings SET value = 'v2' WHERE key = 'production_columns'").run();
     const res = await setup();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ archivedRows: 0, updated: true });
-    expect(logical(s.g.sheet.rows[0])[27]).toBe("Photos");
+    expect(logical(s.g.sheet.rows[0])[28]).toBe("Photos");
   });
 
-  it("links the docket's photo folder from column AB", async () => {
+  it("links the docket's photo folder from column AC", async () => {
     await setup();
     const d = await newDocket(s.manager, route("installer"));
     const [c] = await cardsOf(d.workOrder);
@@ -94,7 +94,7 @@ describe("Photos column", () => {
     ]);
     await queueCardSheet(env.DB, d.workOrder);
     await flushCardSheet(env, d.workOrder);
-    expect(sheetRow(d.workOrder)[27]).toBe('=HYPERLINK("https://drive.google.com/drive/folders/f1","Photos (2)")');
+    expect(sheetRow(d.workOrder)[28]).toBe('=HYPERLINK("https://drive.google.com/drive/folders/f1","Photos (2)")');
   });
 });
 
@@ -108,10 +108,11 @@ describe("Contour Cut column", () => {
     const res = await setup();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ archivedRows: 0, updated: true });
-    expect(logical(s.g.sheet.rows[0]).slice(16, 28)).toEqual(STAGE_HEADERS);
+    expect(logical(s.g.sheet.rows[0]).slice(16, 29)).toEqual(STAGE_HEADERS);
     expect(STAGE_HEADERS[5]).toBe("Contour Cut");
-    expect(STAGE_HEADERS[10]).toBe("Assigned");
-    expect(STAGE_HEADERS[11]).toBe("Photos");
+    expect(STAGE_HEADERS[10]).toBe("Measure");
+    expect(STAGE_HEADERS[11]).toBe("Assigned");
+    expect(STAGE_HEADERS[12]).toBe("Photos");
     expect(s.g.sheet.tabs["Legacy Q-Y"]).toBe(legacy);
     const flag = await env.DB.prepare("SELECT value FROM app_settings WHERE key = 'production_columns'").first();
     expect(flag).toEqual({ value: PRODUCTION_COLUMNS_VERSION });
@@ -123,6 +124,29 @@ describe("Contour Cut column", () => {
     await flushCardSheet(env, d.workOrder);
     expect(stageCells(d.workOrder)[0]).toBe("Contour Cut");
     expect(stageCells(d.workOrder)[5]).toBe("Active · Team");
+  });
+});
+
+describe("Measure column", () => {
+  it("a Measure card shows in its column, after Install", async () => {
+    await setup();
+    await s.staffWith("gary", "measure");
+    const d = await handDocket(s.manager, [{ userId: s.ids.gary, instruction: "Measure the wall" }]);
+    await flushCardSheet(env, d.workOrder);
+    expect(stageCells(d.workOrder)[0]).toBe("Measure");
+    expect(stageCells(d.workOrder)[10]).toBe("Active · gary");
+    expect(stageCells(d.workOrder)[11]).toBe("gary");
+  });
+
+  it("a sheet on the v5 layout is updated to the Measure layout", async () => {
+    expect((await setup()).status).toBe(200);
+    s.g.sheet.rows[0].splice(17, 13, ...STAGE_HEADERS.slice(0, 10), "Assigned", "Photos");
+    await env.DB.prepare("UPDATE app_settings SET value = 'v5' WHERE key = 'production_columns'").run();
+    const res = await setup();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ archivedRows: 0, updated: true });
+    expect(logical(s.g.sheet.rows[0]).slice(16, 29)).toEqual(STAGE_HEADERS);
+    expect(PRODUCTION_COLUMNS_VERSION).toBe("v6");
   });
 });
 
@@ -154,6 +178,7 @@ describe("Stage columns", () => {
       `✓ erin ${today}`,
       "—",
       "Active · lee",
+      "—",
       "—",
       "—",
       "—",

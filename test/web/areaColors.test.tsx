@@ -10,13 +10,14 @@ import { mockApi, staffUser } from "./mockApi";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("area colors", () => {
-  it("the legend lists the 9 areas in production order", () => {
+  it("the legend lists the 10 areas in production order", () => {
     render(<AreaLegend />);
     const legend = screen.getByRole("region", { name: "Areas" });
     const chips = within(legend).getAllByText(/.+/, { selector: "[data-area]" });
-    expect(chips).toHaveLength(9);
+    expect(chips).toHaveLength(10);
     expect(chips[0]).toHaveTextContent("Design");
     expect(chips[8]).toHaveTextContent("Install");
+    expect(chips[9]).toHaveTextContent("Measure");
   });
 
   it("a card tile shows its area chip and a colored left border", () => {
