@@ -35,8 +35,7 @@ const dto = (over: Record<string, unknown> = {}) => ({
   source: "virtual",
   pdf: { stored: true, driveLink: null, driveStatus: "done" },
   deletedAt: null,
-  // The server never sends Staff the Link (column P holds the priced PDF in Drive).
-  sheet: { notes: "Call before going", link: null },
+  sheet: { notes: "Call before going" },
   ...over,
 });
 
@@ -99,10 +98,12 @@ describe("Read Docket", () => {
     priced.materials[0] = { name: "IJ35 vinyl", cost: "$100.00" };
     priced.deposit = "$50.00";
     priced.delivery = "$20.00";
-    show(managerUser, dto({ form: priced, sheet: { notes: null, link: "https://example.com/art" } }));
+    show(managerUser, dto({ form: priced }));
     const panel = await openPanel();
     await within(panel).findByText("IJ35 vinyl");
-    expect(within(panel).getByRole("link", { name: "https://example.com/art" })).toHaveAttribute("href", "https://example.com/art");
+    // No Drive link in the dashboard: the sheet's LINK column keeps it.
+    expect(within(panel).queryByText("Link")).toBeNull();
+    expect(within(panel).queryByRole("link")).toBeNull();
     expect(panel.textContent).not.toMatch(/\$|100|Deposit/);
   });
 

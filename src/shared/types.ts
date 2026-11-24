@@ -11,8 +11,8 @@ export type VirtualDocketDTO = {
   source: "virtual" | "sheet";
   pdf: { stored: boolean; driveLink: string | null; driveStatus: string };
   deletedAt: string | null;
-  /** Notes (O) and Link (P) from the sheet mirror; null when the docket is not in the mirror. */
-  sheet: { notes: string | null; link: string | null };
+  /** Notes (O) from the sheet mirror; null when empty or not in the mirror. Link (P, the PDF in Drive) stays in the sheet only. */
+  sheet: { notes: string | null };
 };
 
 export type TrashItem = { workOrder: string; forName: string; deletedAt: string; deletedBy: string | null; daysLeft: number };

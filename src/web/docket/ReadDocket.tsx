@@ -36,7 +36,6 @@ function sections(stored: Partial<DocketForm>, sheet: VirtualDocketDTO["sheet"])
         ))}
       </ul>
     );
-  const link = sheet.link?.trim();
   return [
     ["Customer", keep([["Customer", f.forName.trim()], ["Contact", f.contact.trim()], ["Phone", f.phone.trim()], ["Email", f.email.trim()]])],
     [
@@ -76,16 +75,6 @@ function sections(stored: Partial<DocketForm>, sheet: VirtualDocketDTO["sheet"])
       "Notes",
       keep([
         ["Notes", sheet.notes?.trim() && <span className="whitespace-pre-wrap">{sheet.notes.trim()}</span>],
-        [
-          "Link",
-          link && /^https?:\/\//i.test(link) ? (
-            <a className="break-all text-accent underline" href={link} target="_blank" rel="noopener noreferrer">
-              {link}
-            </a>
-          ) : (
-            link
-          ),
-        ],
       ]),
     ],
   ];
@@ -198,7 +187,7 @@ export function ReadDocket({ workOrder, onClose }: { workOrder: string; onClose:
             </p>
           )}
           {docket.data &&
-            sections(docket.data.form, docket.data.sheet ?? { notes: null, link: null })
+            sections(docket.data.form, docket.data.sheet ?? { notes: null })
               .filter(([, rows]) => rows.length > 0)
               .map(([heading, rows]) => (
                 <section key={heading} className="mt-3 first:mt-0">

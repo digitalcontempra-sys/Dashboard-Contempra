@@ -42,7 +42,7 @@ A production dashboard for **Contempra Signs** (a sign shop in Winnipeg). It sit
   - on the creator's card: `Close docket` (when `Ready to close`) or `Approved → Continue`;
   - Admin `Restore` (Production tab of a docket);
   - a full history.
-  - **Read Docket** (button in the card header): a read-only panel with the docket grouped (Customer, Dates, Work, Address & service, Order, Notes from the sheet, plus Link for Admin/Manager only, since column P holds the priced PDF in Drive) and **View PDF**. It never shows prices; Staff get a fresh price-free PDF. Spec `2026-11-24-read-docket-design.md`.
+  - **Read Docket** (button in the card header): a read-only panel with the docket grouped (Customer, Dates, Work, Address & service, Order, Notes from the sheet; no Link: the dashboard shows no Drive links, column P keeps it in the sheet) and **View PDF**. It never shows prices; Staff get a fresh price-free PDF. Spec `2026-11-24-read-docket-design.md`.
 - **Production Board** (managers): one column per area, plus `General`.
 - **Notifications.** A chime, a pulsing badge and the tab title. On iPhone, sound needs a tap first, so the app shows "Tap anywhere to turn on sound".
 - **Task Cards.** Yellow sticky notes from one person to another, with Done. My Cards has the filter All / Docket cards / Task cards / Sent by me / History.

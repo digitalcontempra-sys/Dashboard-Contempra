@@ -110,18 +110,18 @@ describe("read", () => {
     expect(m.form.materials[0].cost).toBe("100");
   });
 
-  it("gives the sheet's Notes to everyone and its Link (the priced PDF in Drive) only to managers", async () => {
+  it("gives everyone the sheet's Notes, and nobody its Link (the PDF in Drive)", async () => {
     await create(manager);
     await env.DB.prepare("UPDATE dockets SET notes = 'Call first', link = 'https://example.com/art' WHERE work_order = '91488'").run();
     const s = (await (await api("/api/virtual-dockets/91488", { cookie: staff })).json()) as { sheet: unknown };
-    expect(s.sheet).toEqual({ notes: "Call first", link: null });
+    expect(s.sheet).toEqual({ notes: "Call first" });
     const m = (await (await api("/api/virtual-dockets/91488", { cookie: manager })).json()) as { sheet: unknown };
-    expect(m.sheet).toEqual({ notes: "Call first", link: "https://example.com/art" });
+    expect(m.sheet).toEqual({ notes: "Call first" });
     await env.DB.prepare(
       "INSERT INTO dockets (work_order, sheet_row, customer, notes, link, comp, hold, inv, due_rush, status, billing, row_hash, synced_at) VALUES ('91487', 3, 'Tartan Towing', 'Back door', 'https://drive.google.com/x', 0, 0, 0, 0, 'active', 'not_billed', 'h', 't')",
     ).run();
     const t = (await (await api("/api/virtual-dockets/91487", { cookie: staff })).json()) as { sheet: unknown };
-    expect(t.sheet).toEqual({ notes: "Back door", link: null });
+    expect(t.sheet).toEqual({ notes: "Back door" });
   });
 
   it("prefills a docket that only exists in the sheet", async () => {

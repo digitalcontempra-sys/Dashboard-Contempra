@@ -13,8 +13,8 @@
   - **Work:** Description (texto libre, respetando saltos de línea), Materials (solo nombres), Labour (nombre, trabajo, horas, fecha).
   - **Address & service:** Address, Service (INSTALLATION/DELIVERY/SERVICE/PICKUP), Call when ready.
   - **Order:** Quote #, PO #, Order taken by, Account Manager (salesperson).
-  - **Notes** y **Link** (columnas O y P de la hoja). El link es clicable y solo lo ven Admin/Manager.
-- **Notes para todos, Link sin Staff:** la columna P guarda el link de Drive del PDF con precios, así que el servidor manda `link: null` a Staff. `GET /api/virtual-dockets/:wo` agrega `sheet: { notes, link }` leído del espejo `dockets`. Staff no puede usar `/api/dockets/:wo`, por eso va en este DTO.
+  - **Notes** (columna O de la hoja).
+- **Notes para todos, sin Link:** la columna P guarda el link de Drive del PDF; el dueño decidió (2026-11-24) que el dashboard no muestre Drive (tampoco el botón Open in Drive). El link sigue en la hoja. `GET /api/virtual-dockets/:wo` agrega `sheet: { notes }` leído del espejo `dockets`. Staff no puede usar `/api/dockets/:wo`, por eso va en este DTO.
 - **Precios:** el servidor ya quita precios a Staff (`stripPrices`). El panel nunca muestra costos, totales, impuestos ni depósito, para nadie (es una vista de producción).
 - **View PDF:** Admin/Manager con PDF guardado abren el PDF guardado (con precios). Staff (o sin PDF guardado) ven una copia generada en el navegador; Staff sin precios. La pestaña se abre antes de generar (si no, Safari en iPhone la bloquea). Si el navegador la bloquea igual, se muestra un mensaje y la card sigue abierta.
 - **UI:** el botón `Read Docket` va en el encabezado de la card (no ocupa espacio en el cuerpo). El panel es un diálogo encima de la card (z mayor), con `Close`; Escape cierra solo el panel. Sin scroll lateral a 375 px.
