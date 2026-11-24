@@ -9,7 +9,7 @@ Fecha: 2026-11-24. Rama `feature/task-cards-history`. Aprobada de antemano por e
 - **Todo el historial, por páginas** (decisión del dueño): 50 por página, botón `Show more` mientras haya más.
 - Cada fila lleva una etiqueta clara:
   - `Sent by me`: la envié yo a otra persona. Texto `To <name>`.
-  - `Sent to me`: me la envió otra persona. Texto `From <name>`.
+  - `Sent by <name>`: me la envió otra persona (antes `Sent to me` + `From <name>`; el dueño pidió el nombre en la etiqueta).
   - `Note to self`: me la envié a mí mismo.
   - Debajo, la nota y `Done ✓ · <fecha y hora Winnipeg>`.
 - API: `GET /api/task-cards?box=history&page=N` (N desde 1) → `{ items: TaskCardDTO[], hasMore: boolean }`. Usa los índices existentes (`to_user, status` y `from_user, created_at`); el volumen es bajo.

@@ -183,7 +183,7 @@ describe("notes to self and History", () => {
     const list = await screen.findByRole("list", { name: "Task history" });
     const rows = within(list).getAllByRole("listitem");
     expect(rows.map((r) => r.textContent)).toEqual([
-      expect.stringMatching(/^Sent to me.*From Seb Bastian.*Got from Seb.*Done ✓ · Nov 22, 10:00 AM/),
+      expect.stringMatching(/^Sent by Seb BastianGot from Seb.*Done ✓ · Nov 22, 10:00 AM/),
       expect.stringMatching(/^Sent by me.*To Erin Lee.*Sent to Erin/),
       expect.stringMatching(/^Note to self.*Mine/),
     ]);

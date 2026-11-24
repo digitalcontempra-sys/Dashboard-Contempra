@@ -146,7 +146,7 @@ export function HistoryList() {
       ? { label: "Note to self", cls: "bg-surface-2 text-text-2", who: null }
       : t.from.id === user?.id
         ? { label: "Sent by me", cls: "bg-coming-soft text-coming", who: `To ${t.to.name}` }
-        : { label: "Sent to me", cls: "bg-accent-soft text-accent", who: `From ${t.from.name}` };
+        : { label: `Sent by ${t.from.name}`, cls: "bg-accent-soft text-accent", who: null };
   return (
     <>
       <ul aria-label="Task history" className="card divide-y divide-border overflow-hidden">

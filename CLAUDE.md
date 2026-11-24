@@ -46,7 +46,7 @@ A production dashboard for **Contempra Signs** (a sign shop in Winnipeg). It sit
 - **Notifications.** A chime, a pulsing badge and the tab title. On iPhone, sound needs a tap first, so the app shows "Tap anywhere to turn on sound".
 - **Task Cards.** Yellow sticky notes from one person to another, with Done. My Cards has the filter All / Docket cards / Task cards / Sent by me / History.
   - A person can write a **note to self** ("Me" first in the To list). It is seen from the start and sets `done_seen_at` on Done, so it raises no badge, chime or done alert. It is left out of Sent by me.
-  - **History** lists every finished Task Card I sent or received (labels `Sent by me`, `Sent to me`, `Note to self`), newest `done_at` first, 50 per page with Show more (`GET /api/task-cards?box=history&page=N`).
+  - **History** lists every finished Task Card I sent or received (labels `Sent by me`, `Sent by <name>`, `Note to self`), newest `done_at` first, 50 per page with Show more (`GET /api/task-cards?box=history&page=N`).
 - **Installer photos.** Taken with the phone camera, resized in the browser, uploaded to one Drive folder per docket. Thumbnails are kept in R2.
 - **Area colors** with a legend, current-area chips on the Main Dashboard, and white cards even in dark mode.
 - **Staff accounts** with three access levels:
