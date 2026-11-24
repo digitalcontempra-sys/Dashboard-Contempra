@@ -91,7 +91,7 @@ A production dashboard for **Contempra Signs** (a sign shop in Winnipeg). It sit
   - Custom utilities use `@utility`, not `@apply` of custom classes.
 - **Data:** D1 (SQLite) holds the app's own data plus a mirror of the sheet (`dockets` table).
   - The Google Sheet stays the shop's source of truth for columns A–P, except K (ROLE), which the dashboard writes for dockets with cards.
-  - Columns Q–AC are written only by the dashboard.
+  - Columns Q–AD are written only by the dashboard.
 - **Google:** OAuth with the sheet owner's Gmail.
   - Scopes: `openid email spreadsheets drive.file`.
   - The refresh token is AES-GCM encrypted with the `TOKEN_KEY` secret.
@@ -114,7 +114,7 @@ src/shared/            pure rules shared by worker + web
 src/worker/
   index.ts             routes mount order + cron handler
   routes/              auth, users, staffImport, dockets, virtualDockets, cards, cardPhotos, taskCards, google, sync
-  cards/               service (reconcile route → cards), actions (claim/fields/continue/send back), read (My Cards, Board, history), dto, sheetSync (Q–AC + Production tab + queue)
+  cards/               service (reconcile route → cards), actions (claim/fields/continue/send back), read (My Cards, Board, history), dto, sheetSync (Q–AD + Production tab + queue)
   dockets/             service (create/edit/cancel/trash), pdf, lock (D1 lease), errors
   google/              oauth, sheets gateway, drive gateway
   sheet/               raw sheet reading + row mapping (A–P)
@@ -147,7 +147,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
   - AD holds `=HYPERLINK(folder,"Photos (n)")`, written with USER_ENTERED.
   - **If you change this layout:** bump `PRODUCTION_COLUMNS_VERSION` in `src/worker/cards/sheetSync.ts` and keep the in-place upgrade path. After publishing, the owner must press **Admin → Set up production columns** again; until then, sheet writes stay queued.
   - The first setup copies the old Q–Y to the tab `Legacy Q-Y`.
-- **STATUS column (v5).** Set up inserts a real column **L = STATUS** after ROLE; Inv…LINK move to M–Q and Stage…Photos to R–AD. The code still uses the original letters (A–P, Q–AC): `src/worker/sheet/layout.ts` translates them when the connected sheet has the column (`app_settings.status_column` = that sheet's id). `getGateways(env).sheet` and the sync reader (`readContempra`) translate; `getRawGateways` does not (only for inserting the column). The logical cell key `STATUS` writes L. Never hard-code the shifted letters.
+- **STATUS column (v5).** Set up inserts a real column **L = STATUS** after ROLE; Inv…LINK move to M–Q and Stage…Photos to R–AE. The code still uses the original letters (A–P, Q–AD): `src/worker/sheet/layout.ts` translates them when the connected sheet has the column (`app_settings.status_column` = that sheet's id). `getGateways(env).sheet` and the sync reader (`readContempra`) translate; `getRawGateways` does not (only for inserting the column). The logical cell key `STATUS` writes L. Never hard-code the shifted letters.
 - **Column K (ROLE) + STATUS** show who has the docket now and in what state, in the same order: per active card, whoever pressed `I'm on it` (`In progress`), else its assignees, else its area label (`Starting`, or `Returned` after a send back). The creator's card shows `Ready to close`, `Waiting for design approval` or `Waiting for sample approval`. All cards done (closed) → K is whoever closed it, STATUS `Done`. A docket without cards keeps its K. Staff no longer type in K.
 - **`Production` tab:** one row per card (Work Order, Job, Step, Role, Assigned To, Status, Fields, Returned Reason, Updated By, Updated At).
 - **`Docket Tracking` tab** (from `v4`): one row per docket (Work Order, Customer, Tracking). Tracking is one cell, one line per event, Winnipeg time, e.g. `Ira - received from Mike - November 23 2026 - 9:37 AM`. Lines: `created` (from `virtual_dockets`), `received from <name>` (`activated`), `started` (`claimed`), `sent to <name> (<what to do>)` (`continued`), `returned to <name> (<reason>)` (`sent_back`), `done, back to <creator>`, `proof sent, back to …`, `sample sent, back to …`, `approved`, `closed`, `restored`. Old-route events keep their old text (`received`, `sent to <area>`, `done`). `Legacy Q-Y` is never touched again.
@@ -241,7 +241,7 @@ Each network step is retried 3 times.
 - **Output noise.** PowerShell prints `NativeCommandError` lines for wrangler's stderr. They are harmless. Look for `Done: https://dashboard-contempra…` and `exit 0`.
 - **Check after publishing:** `GET /api/health` returns 200. New routes return 401 (not 404) without a session.
 
-After a publish that changed the sheet layout (Q–AC), remind the owner to press **Admin → Set up production columns**.
+After a publish that changed the sheet layout (Q–AD), remind the owner to press **Admin → Set up production columns**.
 
 ---
 
@@ -304,7 +304,7 @@ Everything below is live and pushed to `main`:
 
 1. **Still testing on the TEST sheet.** To go live with the real "Workorder Books":
    1. Admin → Google connection → paste the real sheet URL.
-   2. Press **Set up production columns** on it. This copies Q–Y to `Legacy Q-Y` and writes the Q–AC headers.
+   2. Press **Set up production columns** on it. This copies Q–Y to `Legacy Q-Y` and writes the Q–AD headers.
    3. Confirm sync works.
 2. **Security:**
    - Delete the sheet tab `USERS`. It holds plaintext passwords from an old experiment; the dashboard does not use it.
