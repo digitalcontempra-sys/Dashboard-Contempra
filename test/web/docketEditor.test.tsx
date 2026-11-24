@@ -73,7 +73,7 @@ describe("New Docket", () => {
     expect(btn).toBeEnabled();
     await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Person 1" }), "7:designer");
     expect(btn).toBeDisabled();
-    expect(screen.getByText("Clear Send to to save as a new order.")).toBeInTheDocument();
+    expect(btn).toHaveAttribute("title", "Clear Send to to save as a new order.");
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Person 1" }), "");
     expect(btn).toBeEnabled();
     await userEvent.click(btn);

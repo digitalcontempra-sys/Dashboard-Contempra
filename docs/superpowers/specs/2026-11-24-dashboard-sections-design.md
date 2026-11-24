@@ -44,11 +44,12 @@ Decisión: `TimeBucket` pasa a `rush_today | upcoming | no_due_date` en toda la 
 
 - Botón **`Save as New Order`** en el editor, junto a Save, solo mientras el docket no está en producción (nuevo, o guardado sin cards).
 - Requisitos: FOR (cliente) y descripción no vacía. Si no, el servidor da 400 `Write what's missing in the description (for example, waiting for measurements).`; la UI desactiva el botón.
-- Si `Send to` tiene a alguien, el botón se desactiva (con ayuda `Clear Send to to save as a new order.`): un New Order no se asigna.
-- API: `POST /api/virtual-dockets` y `PUT /api/virtual-dockets/:wo` aceptan `newOrder: true`. No se combina con `handoff` (400). En un docket con cards: 409 `This docket is already in production.`
+- Si `Send to` tiene a alguien, el botón se desactiva (tooltip `Clear Send to to save as a new order.`): un New Order no se asigna.
+- API: `POST /api/virtual-dockets` y `PUT /api/virtual-dockets/:wo` aceptan `newOrder: true`. No se combina con `handoff` ni con una ruta vieja `jobs` (400 `A new order is saved without Send to.`). En un docket con cards: 409 `This docket is already in production.`
 - Guarda en D1 `virtual_dockets.new_order = 1` (migración `0012_new_orders.sql`) y pone el docket en la cola del Sheet.
 - **Sheet**: con `new_order = 1` y sin cards, K = nombre del creador y STATUS = `Waiting for more info`. Docket Tracking recibe la línea `created` como siempre.
-- **Salida**: el flag se borra cuando el docket se asigna (Save con `Send to`, que crea las cards). Un Save normal sin personas lo deja en New Orders. Cancelar o mandar a Trash lo saca por el estado.
+- **Salida**: el flag se borra cuando el docket se asigna (Save con `Send to`, que crea las cards). Un Save normal sin personas lo deja en New Orders. Cancelar o mandar a Trash lo saca por el estado (decisión: el flag y el STATUS del Sheet quedan como estaban; Inv/Date ya dice CANCEL).
+- History no calcula secciones (ahorra lecturas de D1).
 - **Editar fácil**: en el Main Dashboard, un tile de New Order abre directamente el editor (Edit Docket), no el detalle. El editor muestra `New order · waiting for more info` bajo el título.
 - `VirtualDocketDTO.newOrder: boolean`.
 

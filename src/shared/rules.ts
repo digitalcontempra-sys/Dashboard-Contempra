@@ -89,11 +89,6 @@ export function todayInBusinessTz(now: Date): string {
   }).format(now);
 }
 
-export function weekEnd(todayIso: string): string {
-  const d = new Date(`${todayIso}T00:00:00Z`);
-  const daysToSunday = (7 - d.getUTCDay()) % 7;
-  return new Date(d.getTime() + daysToSunday * DAY_MS).toISOString().slice(0, 10);
-}
 
 export function deriveTimeBucket(
   dueIso: string | null,

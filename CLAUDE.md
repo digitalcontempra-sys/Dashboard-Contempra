@@ -33,7 +33,11 @@ Read this whole file before doing anything. It is the project's memory: what it 
 
 A production dashboard for **Contempra Signs** (a sign shop in Winnipeg). It sits on top of the shop's Google Sheet "Workorder Books", the work-order book everyone already uses, and adds the following:
 
-- **Main Dashboard.** Every work order (docket), grouped by time: Rush / Today, This Week, Coming, No Due Date. Each tile (and the docket header, "Now with") shows who has it now, per area. It also has On Hold and History views, an account-manager filter and search. The docket detail links to the editor with **Edit Docket** (pencil icon) and offers **Download PDF**; it has no Drive button (the Drive copy stays as a backup).
+- **Main Dashboard.** Every work order (docket), in one section each: Rush / Today, Upcoming, **New Orders**, No Due Date, **Daily Complete** (spec `2026-11-24-dashboard-sections-design.md`).
+  - **New Orders:** saved with **Save as New Order** (editor, only while not in production): customer + a note in the description, nobody in Send to. Flag `virtual_dockets.new_order`; sheet K = creator, STATUS `Waiting for more info`. Its tile opens the editor. It leaves New Orders when it is handed to people.
+  - **Daily Complete:** the creator's card is `Ready to close` with nobody else on the docket (done, waiting for delivery). `Close docket` (= delivered) moves it to History.
+  - Order: All by creation date (newest first); Rush and Upcoming by Due Date (soonest first); New Orders and No Due Date newest first; Daily Complete longest waiting first. Coming no longer exists anywhere (`TimeBucket` = `rush_today | upcoming | no_due_date`).
+  - Each tile (and the docket header, "Now with") shows who has it now, per area. It also has On Hold and History views, an account-manager filter and search. The docket detail links to the editor with **Edit Docket** (pencil icon) and offers **Download PDF**; it has no Drive button (the Drive copy stays as a backup).
 - **Virtual Docket.** A replica of the paper docket form that writes the docket's row to the sheet, renders a PDF in the browser and stores it in R2 and Google Drive. Dockets can be cancelled, moved to Trash and restored.
 - **Production cards (hand to hand, like the paper docket).** The creator sends the new docket to one or more people, each with a `What to do` note. Each card belongs to one person, in one area (or `General` for people without one), with:
   - required fields (★);
@@ -125,7 +129,7 @@ src/web/
   tasks/               NewTaskCard, TaskCards (tile, view, Sent by me)
   components/          Layout (nav, badge, sound toggle), DocketList, DocketDetail (tabs), DocketHistory, AreaChip/AreaLegend, BucketChip
   docket/              DocketPaper (paper replica), ProductionPanel (route editor), DocketPdf, afterSave
-migrations/            0001–0011 (D1). Add new ones as 0012_*.sql; never edit an applied one
+migrations/            0001–0012 (D1). Add new ones as 0013_*.sql; never edit an applied one
 data/catalogs/         material lists: roll-print, flatbed (Print FB), laminate (Laminate Roll)
 scripts/               publish.ps1, set-google-secrets.ps1, dev-setup.mjs, create-admin.mjs, import-fixture.mjs, xlsx_to_values.py
 test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), web/ (jsdom + mockApi)
@@ -184,7 +188,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
    5. Have a fresh reviewer check the whole branch, and fix what it finds that matters.
    6. Ask "¿Hago merge a main y publico?"
 3. **Verification before saying "done":**
-   - `npx vitest run` passes (today 478 tests).
+   - `npx vitest run` passes (today 495 tests).
    - `npm run typecheck` is clean.
    - For UI changes, check the page in the local preview, including phone width 375 px: no horizontal scroll.
 4. **Commit messages:**
@@ -289,31 +293,33 @@ git push origin main
 
 ---
 
-## 12. Status (2026-11-23)
+## 12. Status (2026-11-24)
 
 Everything below is live and pushed to `main`:
-- dashboard, sync, Virtual Docket, PDF / Drive;
-- production cards with all 11 areas (incl. Measure and Sub Contract), Installer teams, Board, history, notifications;
-- sheet columns Q–AB (v3, set up on the TEST sheet; v4 adds column K holder + `Docket Tracking` tab, needs **Set up production columns** once after publishing);
-- Task Cards, installer photos (AB link), area colors;
-- calendar-only dates;
-- material lists per area (Roll, Print FB, Laminate Roll);
+- Main Dashboard, sync, Virtual Docket (Edit Docket, Download PDF, cancel, Trash), PDF / Drive backup;
+- production cards by hand-off with all 11 areas (incl. Measure and Sub Contract), Installer teams, Read Docket, Board, history, notifications;
+- sheet layout `v7`: STATUS column (L), Stage…Photos in Q–AD (logical letters), column K holder, `Production` and `Docket Tracking` tabs;
+- Task Cards (notes to self, History), installer photos (AD link), area colors;
+- calendar-only dates; material lists per area (Roll, Print FB, Laminate Roll);
 - staff accounts (imported; the owner's account has Printer Roll, Designer and Contour Cut).
+
+On branch `feature/dashboard-sections` (until merged): Main Dashboard sections (New Orders, Daily Complete, Upcoming), Save as New Order, migration 0012. No sheet layout change.
 
 ### Pending: owner
 
-1. **Still testing on the TEST sheet.** To go live with the real "Workorder Books":
+1. **Set up production columns (v7)** on the TEST sheet, if not pressed yet since the Sub Contract publish: until then sheet writes stay queued.
+2. **Still testing on the TEST sheet.** To go live with the real "Workorder Books":
    1. Admin → Google connection → paste the real sheet URL.
    2. Press **Set up production columns** on it. This copies Q–Y to `Legacy Q-Y` and writes the Q–AD headers.
    3. Confirm sync works.
-2. **Security:**
+3. **Security:**
    - Delete the sheet tab `USERS`. It holds plaintext passwords from an old experiment; the dashboard does not use it.
    - Rotate the Google OAuth client secret. It was once pasted in chat:
      1. Google Cloud Console → Credentials → the OAuth client → **Add secret**, and download the JSON.
      2. Run `powershell -ExecutionPolicy Bypass -File scripts/set-google-secrets.ps1`.
      3. Check **Sync now** in Admin.
      4. Disable the old secret.
-3. **Laminate Roll list.** The material list is provisional; replace `data/catalogs/laminate-materials.json` when the owner sends the final one.
+4. **Laminate Roll list.** The material list is provisional; replace `data/catalogs/laminate-materials.json` when the owner sends the final one.
 
 ### Pending: technical (do only when the owner asks)
 
@@ -332,6 +338,8 @@ Everything below is live and pushed to `main`:
   - Production-tab rows are keyed by job name.
   - Queue rows of purged dockets are never cleaned.
   - There is an import cycle `dockets/service ↔ cards/service ↔ cards/sheetSync`.
+  - A cancelled New Order keeps `new_order = 1` and its sheet K / STATUS (`Waiting for more info`); History hides the section, and Inv/Date says CANCEL.
+  - Daily Complete "waiting since" restarts when another branch finishes later (`activated_at` of the creator's card).
 - **Check D1 `rows_read`** of the Main Dashboard list in production (area subqueries).
 - **Optional:** auto-deploy from GitHub through Cloudflare.
 

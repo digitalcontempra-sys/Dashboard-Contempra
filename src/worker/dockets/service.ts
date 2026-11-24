@@ -129,9 +129,10 @@ function validateForm(form: DocketForm | undefined): DocketForm {
 }
 
 /** "Save as New Order": only the customer and a note (the description), and nobody to hand it to yet. */
-function validateNewOrder(form: DocketForm, input: { newOrder?: unknown; handoff?: unknown }): boolean {
+function validateNewOrder(form: DocketForm, input: { newOrder?: unknown; handoff?: unknown; jobs?: ProductionJob[] }): boolean {
   if (input.newOrder !== true) return false;
-  if (input.handoff !== undefined) throw new ServiceError(400, "A new order is saved without Send to.");
+  const routed = Array.isArray(input.jobs) && input.jobs.some((j) => j?.steps?.length);
+  if (input.handoff !== undefined || routed) throw new ServiceError(400, "A new order is saved without Send to.");
   if (!form.body?.trim()) throw new ServiceError(400, "Write what's missing in the description (for example, waiting for measurements).");
   return true;
 }

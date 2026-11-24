@@ -6,7 +6,6 @@ import {
   normalizeAccountManager,
   parseSheetDate,
   todayInBusinessTz,
-  weekEnd,
 } from "../../src/shared/rules";
 
 const base = { comp: false, hold: false, dueRaw: null, invDateRaw: null };
@@ -74,10 +73,6 @@ describe("deriveBilling", () => {
 describe("business dates", () => {
   it("today is computed in Winnipeg time", () => {
     expect(todayInBusinessTz(new Date("2026-10-20T04:30:00Z"))).toBe("2026-10-19");
-  });
-  it("week ends on Sunday", () => {
-    expect(weekEnd("2026-10-19")).toBe("2026-10-25");
-    expect(weekEnd("2026-10-25")).toBe("2026-10-25");
   });
 });
 

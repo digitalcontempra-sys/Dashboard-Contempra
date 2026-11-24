@@ -44,6 +44,16 @@ describe("Save as New Order", () => {
     expect(await errorOf(res)).toBe("A new order is saved without Send to.");
   });
 
+  it("is not combined with an old route either (API only)", async () => {
+    const res = await post("/api/virtual-dockets", s.manager, {
+      form: docketForm({ body: NOTE }),
+      newOrder: true,
+      jobs: [{ name: "Whole docket", steps: [{ roleId: "designer", assigneeIds: [] }] }],
+    });
+    expect(res.status).toBe(400);
+    expect(await errorOf(res)).toBe("A new order is saved without Send to.");
+  });
+
   it("a plain Save keeps it a New Order; handing it to people takes it out", async () => {
     await s.staffWith("seb", "printer_fb");
     const d = (await (await newOrder()).json()) as VirtualDocketDTO;

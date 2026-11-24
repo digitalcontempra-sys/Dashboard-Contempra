@@ -163,9 +163,11 @@ export async function listDockets(db: D1Database, p: DocketQuery, now: Date): Pr
   if (p.view === "history" && p.history === "cancelled") where.push("status = 'cancelled'");
   commonFilters(where, named, p.am, p.q);
   // Each docket's section is computed once; the outer queries read it like a column.
-  const withSections = `WITH base AS (
-      SELECT *, ${NEW_ORDER_SQL} AS new_order_flag, ${READY_SINCE_SQL} AS ready_since FROM dockets WHERE ${where.join(" AND ")}
-    ), sec AS (SELECT *, ${SECTION_SQL} AS section FROM base)`;
+  // History has no sections: it skips the per-docket subqueries (D1 rows read).
+  const flags =
+    p.view === "history" ? "0 AS new_order_flag, NULL AS ready_since" : `${NEW_ORDER_SQL} AS new_order_flag, ${READY_SINCE_SQL} AS ready_since`;
+  const withSections = `WITH base AS (SELECT *, ${flags} FROM dockets WHERE ${where.join(" AND ")}),
+    sec AS (SELECT *, ${SECTION_SQL} AS section FROM base)`;
   const listWhere = p.bucket ? "section = :section" : "1";
   named.section = p.bucket ?? null;
   const page = pageOf(p.page);

@@ -168,16 +168,19 @@ export function DocketEditor() {
               </button>
             )}
             {canHandOff && (
-              <button className="btn-ghost" type="button" disabled={saving || !newOrderReady} onClick={() => save(false, true)}>
+              <button
+                className="btn-ghost"
+                type="button"
+                disabled={saving || !newOrderReady}
+                title={hasNote && !untouched ? "Clear Send to to save as a new order." : undefined}
+                onClick={() => save(false, true)}
+              >
                 Save as New Order
               </button>
             )}
             <button className="btn-primary" type="button" disabled={saving || !handoffReady} onClick={() => save(false)}>
               Save
             </button>
-            {canHandOff && hasNote && !untouched && (
-              <p className="w-full text-right text-xs text-text-3">Clear Send to to save as a new order.</p>
-            )}
           </>
         )}
       </div>
