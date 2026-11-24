@@ -5,7 +5,7 @@ describe("schema", () => {
   it("seeds the eight production roles in order", async () => {
     const { results } = await env.DB.prepare("SELECT id, label FROM roles ORDER BY sort").all<{ id: string; label: string }>();
     expect(results.map((r) => r.id)).toEqual([
-      "designer", "printer_roll", "printer_fb", "laminate_roll", "contour_cut", "liquid_lam", "colex", "finishing", "installer", "measure", "general",
+      "designer", "printer_roll", "printer_fb", "laminate_roll", "contour_cut", "liquid_lam", "colex", "finishing", "installer", "measure", "subcontract", "general",
     ]);
     expect(results.find((r) => r.id === "colex")?.label).toBe("Colex");
     expect(results.find((r) => r.id === "installer")?.label).toBe("Installer");

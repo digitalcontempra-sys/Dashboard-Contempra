@@ -9,7 +9,7 @@ import { getGateways, getRawGateways } from "../google/gateways";
 import { markStatusColumn, STATUS_HEADER, STATUS_KEY } from "../sheet/layout";
 import { tabRef, type RowCells } from "../google/sheets";
 
-/** Q..AC. Bump PRODUCTION_COLUMNS_VERSION whenever this layout changes. */
+/** Q..AD. Bump PRODUCTION_COLUMNS_VERSION whenever this layout changes. */
 export const STAGE_HEADERS = [
   "Stage",
   "Design",
@@ -22,6 +22,7 @@ export const STAGE_HEADERS = [
   "Finishing",
   "Install",
   "Measure",
+  "Sub Contract",
   "Assigned",
   "Photos",
 ];
@@ -30,8 +31,9 @@ export const STAGE_HEADERS = [
  * v4: column K shows who has the docket, and the "Docket Tracking" tab exists.
  * v5: a real STATUS column is inserted after ROLE (see sheet/layout.ts).
  * v6: a Measure column after Install (Assigned moves to AB, Photos to AC).
+ * v7: a Sub Contract column after Measure (Assigned moves to AC, Photos to AD).
  */
-export const PRODUCTION_COLUMNS_VERSION = "v6";
+export const PRODUCTION_COLUMNS_VERSION = "v7";
 export const PRODUCTION_HEADERS = [
   "Work Order",
   "Job",
@@ -65,8 +67,8 @@ export function trackingLine(name: string, kind: string, iso: string): string {
   const p = Object.fromEntries(WHEN.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
   return `${name} - ${kind} - ${p.month} ${p.day} ${p.year} - ${p.hour}:${p.minute} ${String(p.dayPeriod).toUpperCase()}`;
 }
-/** Sheet columns R..AA, one per area, in role order; AB is Assigned. */
-const AREA_COLS = ["R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA"];
+/** Sheet columns R..AB, one per area, in role order; AC is Assigned. */
+const AREA_COLS = ["R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "AB"];
 const RETRY_BATCH = 20;
 
 /** Marks a docket's sheet columns as needing a rewrite. hold/comp: a later non-null value wins. */
@@ -295,7 +297,7 @@ export function stageRowCells(cards: SheetCard[], names: Map<number, string>, q:
           .join(" | ")
       : "—";
   });
-  cells.AB = active.length ? [...new Set(active.map((c) => assignedText(c, names)))].join(", ") : "";
+  cells.AC = active.length ? [...new Set(active.map((c) => assignedText(c, names)))].join(", ") : "";
   Object.assign(cells, holderCells(cards, names));
   if (q.comp === 1) cells.D = true;
   if (q.comp === 0) cells.D = false; // restored
@@ -345,11 +347,11 @@ export async function flushCardSheet(env: Env, wo: string): Promise<void> {
         .bind(wo)
         .first<{ n: number; link: string | null }>();
       const hasPhotos = (photos?.n ?? 0) > 0 && photos?.link;
-      await sheet.updateCells(row, { ...stageRowCells(cards, names, q), ...(hasPhotos ? {} : { AC: "" }) });
+      await sheet.updateCells(row, { ...stageRowCells(cards, names, q), ...(hasPhotos ? {} : { AD: "" }) });
       if (hasPhotos) {
         // A clickable "Photos (n)" that opens the docket's Drive folder (a formula, so it is written USER_ENTERED).
         const link = String(photos!.link).replace(/"/g, "");
-        await sheet.writeRanges([{ range: `Contempra!AC${row}`, values: [[`=HYPERLINK("${link}","Photos (${photos!.n})")`]] }], "USER_ENTERED");
+        await sheet.writeRanges([{ range: `Contempra!AD${row}`, values: [[`=HYPERLINK("${link}","Photos (${photos!.n})")`]] }], "USER_ENTERED");
       }
 
       // Production tab: one row per (Work Order, Job, Step), updated in place in one request.
@@ -438,11 +440,11 @@ export async function setupProductionColumns(env: Env, _user: SessionUser): Prom
     }
     await markStatusColumn(db);
     const sheet = getGateways(env).sheet; // speaks the original letters from here on
-    const head = await sheet.readRange("Contempra!Q1:AC1");
+    const head = await sheet.readRange("Contempra!Q1:AD1");
     if (String(head[0]?.[0] ?? "").trim() === "Stage") {
       if (!inserted && setting?.value === PRODUCTION_COLUMNS_VERSION) throw new ServiceError(409, "Production columns are already set up.");
       // Older layout: the stage cells are rewritten from the cards by the flushes queued below.
-      await sheet.clearColumns("Q", "AC", 2);
+      await sheet.clearColumns("Q", "AD", 2);
       await sheet.writeRange("Contempra!Q1", [STAGE_HEADERS]);
       await setupTrackingTab(sheet);
       return null;
@@ -457,7 +459,7 @@ export async function setupProductionColumns(env: Env, _user: SessionUser): Prom
     }
     await sheet.ensureTab(LEGACY_TAB);
     await sheet.writeRange(`${tabRef(LEGACY_TAB)}!A1`, legacy);
-    await sheet.clearColumns("Q", "AC", 2);
+    await sheet.clearColumns("Q", "AD", 2);
     await sheet.writeRange("Contempra!Q1", [STAGE_HEADERS]);
     await sheet.ensureTab(PRODUCTION_TAB);
     await sheet.writeRange(`${tabRef(PRODUCTION_TAB)}!A1`, [PRODUCTION_HEADERS]);

@@ -49,8 +49,7 @@ describe("continueBlocker", () => {
   it("installer needs Installed", () => {
     expect(msg("installer", {})).toBe('Mark "Installed" to continue');
   });
-  it("Measure is the last area and needs Measured", () => {
-    expect(ROLE_ORDER.at(-1)).toBe("measure");
+  it("Measure needs Measured", () => {
     expect(AREA_LABEL.measure).toBe("Measure");
     expect(ROLE_LABEL.measure).toBe("Measure");
     expect(CARD_FIELDS.measure.map((f) => `${f.label}:${f.kind}${f.required ? "*" : ""}`)).toEqual([
@@ -66,6 +65,24 @@ describe("continueBlocker", () => {
     expect(msg("measure", {})).toBe('Mark "Measured" to continue');
     expect(msg("measure", { measured: true })).toBeNull();
     expect(fieldsSummary("measure", { measured: true, measurements: "24 x 32 in" })).toBe("Measured ✓ · Measurements: 24 x 32 in");
+  });
+  it("Sub Contract is the last area and needs who, what and Received back", () => {
+    expect(ROLE_ORDER.at(-1)).toBe("subcontract");
+    expect(AREA_LABEL.subcontract).toBe("Sub Contract");
+    expect(ROLE_LABEL.subcontract).toBe("Sub Contract");
+    expect(AREA_TOKEN.subcontract).toBe("area-subcontract");
+    expect(CARD_FIELDS.subcontract.map((f) => `${f.label}:${f.kind}${f.required ? "*" : ""}`)).toEqual([
+      "Subcontractor:text*",
+      "Work sent:text*",
+      "Sent out:date",
+      "Expected back:date",
+      "Received back:check*",
+      "Notes:text",
+    ]);
+    expect(msg("subcontract", {})).toBe('Mark "Received back" to continue');
+    expect(msg("subcontract", { receivedBack: true })).toBe('Fill in "Subcontractor" to continue');
+    expect(msg("subcontract", { receivedBack: true, subcontractor: "ABC Signs", workSent: "  " })).toBe('Fill in "Work sent" to continue');
+    expect(msg("subcontract", { receivedBack: true, subcontractor: "ABC Signs", workSent: "Channel letters" })).toBeNull();
   });
 });
 

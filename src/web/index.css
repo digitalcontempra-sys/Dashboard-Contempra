@@ -106,6 +106,7 @@
   --area-finishing: rgb(219 39 119);
   --area-install: rgb(139 94 60);
   --area-measure: rgb(71 85 105);
+  --area-subcontract: rgb(101 120 22);
   --area-soft-alpha: 0.13;
   /* Chip text: darker than the area color so it reads (AA) on the tint. */
   --area-design-ink: rgb(91 33 182);
@@ -118,6 +119,7 @@
   --area-finishing-ink: rgb(157 23 77);
   --area-install-ink: rgb(101 67 33);
   --area-measure-ink: rgb(51 65 85);
+  --area-subcontract-ink: rgb(63 78 12);
   --task-bg: rgb(254 249 195);
   --task-border: rgb(234 179 8 / 0.45);
   --task-ink: rgb(66 50 4);
@@ -134,6 +136,7 @@
     --area-finishing: rgb(255 130 185);
     --area-install: rgb(215 170 130);
     --area-measure: rgb(160 175 200);
+    --area-subcontract: rgb(190 215 100);
     --area-soft-alpha: 0.2;
     --area-design-ink: rgb(200 185 255);
     --area-print-roll-ink: rgb(165 200 255);
@@ -145,6 +148,7 @@
     --area-finishing-ink: rgb(255 175 210);
     --area-install-ink: rgb(235 205 175);
     --area-measure-ink: rgb(205 215 230);
+    --area-subcontract-ink: rgb(215 235 150);
     --task-bg: rgb(66 56 16);
     --task-border: rgb(234 179 8 / 0.5);
     --task-ink: rgb(254 243 199);

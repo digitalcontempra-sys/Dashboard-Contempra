@@ -2,7 +2,7 @@ import type { RowCells, SheetGateway } from "../google/sheets";
 
 /**
  * The Contempra tab can have a real STATUS column inserted after ROLE (K). The code keeps using the
- * original letters (A–P, Q–AC: "logical" columns); this module moves them to where they really are
+ * original letters (A–P, Q–AD: "logical" columns); this module moves them to where they really are
  * ("physical") once the column exists, so nothing else needs to know which layout a sheet has.
  *
  * Logical cell key for the STATUS column (written only when the column exists).

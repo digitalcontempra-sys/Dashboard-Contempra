@@ -26,6 +26,7 @@ export const ROLE_ORDER = [
   "finishing",
   "installer",
   "measure",
+  "subcontract",
 ] as const;
 
 /** Role names as in the roles table (used for role tabs). */
@@ -40,6 +41,7 @@ export const ROLE_LABEL: Record<string, string> = {
   finishing: "Finishing / Packaging",
   installer: "Installer",
   measure: "Measure",
+  subcontract: "Sub Contract",
   general: "General",
 };
 
@@ -55,6 +57,7 @@ export const AREA_TOKEN: Record<string, string> = {
   finishing: "area-finishing",
   installer: "area-install",
   measure: "area-measure",
+  subcontract: "area-subcontract",
 };
 
 /** Area name of each role, used in "Continue → <area>" and the sheet's Stage column. */
@@ -69,6 +72,7 @@ export const AREA_LABEL: Record<string, string> = {
   finishing: "Finishing",
   installer: "Install",
   measure: "Measure",
+  subcontract: "Sub Contract",
   general: "General",
 };
 
@@ -162,6 +166,14 @@ export const CARD_FIELDS: Record<string, FieldSpec[]> = {
     { key: "photos", label: "Photos", kind: "photos" },
     text("note", "Notes"),
   ],
+  subcontract: [
+    text("subcontractor", "Subcontractor", true),
+    text("workSent", "Work sent", true),
+    { key: "sentOut", label: "Sent out", kind: "date" },
+    { key: "expectedBack", label: "Expected back", kind: "date" },
+    check("receivedBack", "Received back", true),
+    text("note", "Notes"),
+  ],
 };
 
 const MAX_TEXT = 500;
@@ -209,6 +221,8 @@ export function continueBlocker(
   }
   if (roleId === "printer_fb" && (!filled(f.sheetSize) || !filled(f.sheetQty))) return block("Enter the size and quantity");
   if (roleId === "finishing" && !filled(f.leftAt)) return block('Fill in "I left this job at…" to continue');
+  const emptyText = specs.find((s) => s.required && s.kind === "text" && !filled(f[s.key]));
+  if (emptyText) return block(`Fill in "${emptyText.label}" to continue`);
   return null;
 }
 
