@@ -142,7 +142,13 @@ async function toDto(db: D1Database, row: VirtualRow, jobs: ProductionJob[], act
       driveStatus: row.drive_status,
     },
     deletedAt: row.deleted_at,
+    sheet: await sheetExtras(db, row.work_order),
   };
+}
+
+async function sheetExtras(db: D1Database, wo: string): Promise<VirtualDocketDTO["sheet"]> {
+  const r = await db.prepare("SELECT notes, link FROM dockets WHERE work_order = ?").bind(wo).first<{ notes: string | null; link: string | null }>();
+  return { notes: r?.notes ?? null, link: r?.link ?? null };
 }
 
 export async function nextWorkOrder(env: Env): Promise<number> {
@@ -227,6 +233,7 @@ export async function getVirtualDocket(env: Env, actor: SessionUser, wo: string)
     source: "sheet",
     pdf: { stored: false, driveLink: null, driveStatus: "none" },
     deletedAt: null,
+    sheet: { notes: detail.notes, link: detail.link },
   };
 }
 

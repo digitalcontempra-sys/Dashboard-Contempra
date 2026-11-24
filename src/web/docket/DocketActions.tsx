@@ -4,11 +4,12 @@ import { Link, useNavigate } from "react-router-dom";
 import type { VirtualDocketDTO } from "../../shared/types";
 import { api } from "../api";
 import { useAuth } from "../auth";
+import { Icon } from "../components/Icon";
 import { downloadBlob, renderDocketPdf } from "./renderPdf";
 
 /**
  * Actions for one docket, filtered by access level:
- * Open Docket · Download PDF · Open in Drive · Cancel docket (admin/manager) · Delete (admin).
+ * Edit Docket · Download PDF · Open in Drive · Cancel docket (admin/manager) · Delete (admin).
  */
 export function DocketActions({ workOrder, showOpen = true, onDone }: { workOrder: string; showOpen?: boolean; onDone?: () => void }) {
   const { user } = useAuth();
@@ -72,8 +73,9 @@ export function DocketActions({ workOrder, showOpen = true, onDone }: { workOrde
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
         {showOpen && (
-          <Link to={`/dockets/${workOrder}`} className="btn-primary">
-            Open Docket
+          <Link to={`/dockets/${workOrder}`} className="btn-primary inline-flex items-center gap-1.5">
+            <Icon name="pencil" className="size-4" />
+            Edit Docket
           </Link>
         )}
         <button type="button" className="btn-ghost" onClick={download} disabled={busy || !docket.data}>

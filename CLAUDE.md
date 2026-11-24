@@ -33,7 +33,7 @@ Read this whole file before doing anything. It is the project's memory: what it 
 
 A production dashboard for **Contempra Signs** (a sign shop in Winnipeg). It sits on top of the shop's Google Sheet "Workorder Books", the work-order book everyone already uses, and adds the following:
 
-- **Main Dashboard.** Every work order (docket), grouped by time: Rush / Today, This Week, Coming, No Due Date. Each tile (and the docket header, "Now with") shows who has it now, per area. It also has On Hold and History views, an account-manager filter and search.
+- **Main Dashboard.** Every work order (docket), grouped by time: Rush / Today, This Week, Coming, No Due Date. Each tile (and the docket header, "Now with") shows who has it now, per area. It also has On Hold and History views, an account-manager filter and search. The docket detail links to the editor with **Edit Docket** (pencil icon).
 - **Virtual Docket.** A replica of the paper docket form that writes the docket's row to the sheet, renders a PDF in the browser and stores it in R2 and Google Drive. Dockets can be cancelled, moved to Trash and restored.
 - **Production cards (hand to hand, like the paper docket).** The creator sends the new docket to one or more people, each with a `What to do` note. Each card belongs to one person, in one area (or `General` for people without one), with:
   - required fields (★);
@@ -42,6 +42,7 @@ A production dashboard for **Contempra Signs** (a sign shop in Winnipeg). It sit
   - on the creator's card: `Close docket` (when `Ready to close`) or `Approved → Continue`;
   - Admin `Restore` (Production tab of a docket);
   - a full history.
+  - **Read Docket** (button in the card header): a read-only panel with the docket grouped (Customer, Dates, Work, Address & service, Order, Notes + Link from the sheet) and **View PDF**. It never shows prices; Staff get a fresh price-free PDF. Spec `2026-11-24-read-docket-design.md`.
 - **Production Board** (managers): one column per area, plus `General`.
 - **Notifications.** A chime, a pulsing badge and the tab title. On iPhone, sound needs a tap first, so the app shows "Tap anywhere to turn on sound".
 - **Task Cards.** Yellow sticky notes from one person to another, with Done. My Cards has the filter All / Docket cards / Task cards / Sent by me / History.
@@ -181,7 +182,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
    5. Have a fresh reviewer check the whole branch, and fix what it finds that matters.
    6. Ask "¿Hago merge a main y publico?"
 3. **Verification before saying "done":**
-   - `npx vitest run` passes (today 446 tests).
+   - `npx vitest run` passes (today 453 tests).
    - `npm run typecheck` is clean.
    - For UI changes, check the page in the local preview, including phone width 375 px: no horizontal scroll.
 4. **Commit messages:**

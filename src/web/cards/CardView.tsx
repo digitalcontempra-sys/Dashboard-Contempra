@@ -8,6 +8,7 @@ import { useAuth } from "../auth";
 import { AreaChip } from "../components/AreaChip";
 import { BucketTag } from "../components/BucketChip";
 import { Icon } from "../components/Icon";
+import { ReadDocket } from "../docket/ReadDocket";
 import { CardFieldsEditor } from "./fields";
 import { emptyRow, HandoffPicker, rowsComplete, toTargets, type HandoffRow } from "./HandoffPicker";
 
@@ -25,6 +26,7 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
   const [back, setBack] = useState<{ open: boolean; step: number | null; reason: string }>({ open: false, step: null, reason: "" });
   // The Continue sheet: who gets the docket next and what they must do.
   const [next, setNext] = useState<HandoffRow[] | null>(null);
+  const [reading, setReading] = useState(false);
   const people = useQuery({ queryKey: ["assignees"], queryFn: () => api<AssigneeDTO[]>("/api/assignees"), enabled: next !== null });
   // Edits not yet sent, and the version the next request must carry.
   const pending = useRef<CardFields | null>(null);
@@ -178,6 +180,14 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
               {card.header.project ? ` · ${card.header.project}` : ""}
             </p>
             {card.header.accountManager && <p className="mt-0.5 text-[13px] text-text-3">Account Manager: {card.header.accountManager}</p>}
+            <button
+              type="button"
+              className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-full bg-surface-2 px-3 text-[13px] font-semibold text-text-2 transition hover:bg-border hover:text-text"
+              onClick={() => setReading(true)}
+            >
+              <Icon name="doc" className="size-4" />
+              Read Docket
+            </button>
           </div>
           <button
             ref={closeRef}
@@ -362,6 +372,7 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
           </footer>
         )}
       </section>
+      {reading && <ReadDocket workOrder={card.workOrder} onClose={() => setReading(false)} />}
     </div>
   );
 }
