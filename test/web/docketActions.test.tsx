@@ -88,16 +88,14 @@ describe("Docket actions", () => {
     for (const name of ["Edit", "Cancel docket", "Delete", "Save"]) expect(screen.queryByRole("button", { name })).toBeNull();
   });
 
-  it("the card detail offers Edit Docket, Drive and Cancel to managers", async () => {
+  it("the card detail offers Edit Docket, Download PDF and Cancel to managers, but no Drive link", async () => {
     mockApi({ ...lists, ...dashboard, "GET /api/auth/me": () => managerUser, "GET /api/virtual-dockets/91488": () => dto() });
     renderApp("/dashboard");
     await userEvent.click(await screen.findByText("Encore Lounge"));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("link", { name: "Edit Docket" })).toHaveAttribute("href", "/dockets/91488");
-    expect(await within(dialog).findByRole("link", { name: "Open in Drive" })).toHaveAttribute(
-      "href",
-      "https://drive.google.com/file/d/f1/view",
-    );
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Download PDF" })).toBeEnabled());
+    expect(within(dialog).queryByRole("link", { name: "Open in Drive" })).toBeNull();
     expect(within(dialog).getByRole("button", { name: "Cancel docket" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Delete" })).toBeNull();
   });

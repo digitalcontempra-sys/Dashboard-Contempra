@@ -33,7 +33,7 @@ Read this whole file before doing anything. It is the project's memory: what it 
 
 A production dashboard for **Contempra Signs** (a sign shop in Winnipeg). It sits on top of the shop's Google Sheet "Workorder Books", the work-order book everyone already uses, and adds the following:
 
-- **Main Dashboard.** Every work order (docket), grouped by time: Rush / Today, This Week, Coming, No Due Date. Each tile (and the docket header, "Now with") shows who has it now, per area. It also has On Hold and History views, an account-manager filter and search. The docket detail links to the editor with **Edit Docket** (pencil icon).
+- **Main Dashboard.** Every work order (docket), grouped by time: Rush / Today, This Week, Coming, No Due Date. Each tile (and the docket header, "Now with") shows who has it now, per area. It also has On Hold and History views, an account-manager filter and search. The docket detail links to the editor with **Edit Docket** (pencil icon) and offers **Download PDF**; it has no Drive button (the Drive copy stays as a backup).
 - **Virtual Docket.** A replica of the paper docket form that writes the docket's row to the sheet, renders a PDF in the browser and stores it in R2 and Google Drive. Dockets can be cancelled, moved to Trash and restored.
 - **Production cards (hand to hand, like the paper docket).** The creator sends the new docket to one or more people, each with a `What to do` note. Each card belongs to one person, in one area (or `General` for people without one), with:
   - required fields (★);

@@ -9,7 +9,7 @@ import { downloadBlob, renderDocketPdf } from "./renderPdf";
 
 /**
  * Actions for one docket, filtered by access level:
- * Edit Docket · Download PDF · Open in Drive · Cancel docket (admin/manager) · Delete (admin).
+ * Edit Docket · Download PDF · Cancel docket (admin/manager) · Delete (admin).
  */
 export function DocketActions({ workOrder, showOpen = true, onDone }: { workOrder: string; showOpen?: boolean; onDone?: () => void }) {
   const { user } = useAuth();
@@ -68,7 +68,6 @@ export function DocketActions({ workOrder, showOpen = true, onDone }: { workOrde
     }
   }
 
-  const driveLink = docket.data?.pdf.driveLink;
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
@@ -81,11 +80,6 @@ export function DocketActions({ workOrder, showOpen = true, onDone }: { workOrde
         <button type="button" className="btn-ghost" onClick={download} disabled={busy || !docket.data}>
           {busy ? "Preparing…" : "Download PDF"}
         </button>
-        {driveLink && (
-          <a className="btn-ghost" href={driveLink} target="_blank" rel="noopener noreferrer">
-            Open in Drive
-          </a>
-        )}
         {canEdit && (
           <button
             type="button"
