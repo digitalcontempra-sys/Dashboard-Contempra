@@ -13,6 +13,7 @@ Para cuando un trabajo se manda a hacer afuera.
 ### Quién
 
 - La migración da el rol a **todos los admins y managers** activos (`access_level IN ('admin','manager')`). Un manager nuevo lo recibe desde Admin → Users.
+- Sub Contract no cuenta como "área propia" de la persona: un manager que solo tiene Sub Contract sigue recibiendo una tarjeta General por defecto y sigue en "Other" del selector (así Staff puede seguir enviándole cosas).
 - **Solo un admin o manager puede enviar un docket a Sub Contract** (al crear el docket o en Continue). El servidor responde 403 `Only a manager can send work to Sub Contract.`; el selector de Staff no muestra el grupo Sub Contract.
 
 ### Campos de la tarjeta (en este orden)
@@ -60,6 +61,8 @@ No son áreas: son cuadrillas de Installer, usan la columna Install.
 - Aparece en My Cards de cada miembro (con alerta), con la etiqueta del equipo.
 - **I'm on it**: la toma el primero. Desde ahí solo esa persona (o un admin/manager) puede moverla; otro miembro que pulse I'm on it recibe 409 `<Name> is already on it.` Los demás la siguen viendo con "<Name> is on it" hasta que se mueve.
 - **Done / Continue / Send back / Proof sent**: la tarjeta deja de estar activa y desaparece para todo el equipo.
+- No se puede elegir a la vez a una persona sola y a su equipo en la misma área: 400 `<Name> is already in Team B.`
+- Fotos: solo quien tomó la tarjeta de equipo puede subirlas.
 - Send back a una tarjeta de equipo: la tarjeta se estaciona y, si el docket vuelve al mismo equipo, se reutiliza (por `team_id`).
 
 ### Hoja y seguimiento

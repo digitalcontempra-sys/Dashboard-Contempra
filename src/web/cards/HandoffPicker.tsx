@@ -1,5 +1,5 @@
 import { AREA_LABEL, ROLE_ORDER } from "../../shared/cards";
-import { GENERAL_ROLE, SUBCONTRACT_ROLE } from "../../shared/handoff";
+import { GENERAL_ROLE, homeAreas, SUBCONTRACT_ROLE } from "../../shared/handoff";
 import type { AssigneeDTO, TeamDTO } from "../../shared/types";
 import { Icon } from "../components/Icon";
 
@@ -49,7 +49,7 @@ export function HandoffPicker({
       label: AREA_LABEL[roleId],
       people: people.filter((p) => p.roles.includes(roleId)),
     })),
-    { roleId: GENERAL_ROLE, label: "Other", people: people.filter((p) => p.roles.length === 0) },
+    { roleId: GENERAL_ROLE, label: "Other", people: people.filter((p) => homeAreas(p.roles).length === 0) },
   ].filter((g) => g.people.length > 0);
   const set = (i: number, row: HandoffRow) => onChange(rows.map((r, ri) => (ri === i ? row : r)));
 

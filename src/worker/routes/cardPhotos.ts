@@ -2,7 +2,8 @@ import { Hono, type Context } from "hono";
 import { AREA_LABEL } from "../../shared/cards";
 import type { AppEnv } from "../app";
 import { requireAuth, requireLevel } from "../auth/sessions";
-import { canAct } from "../cards/actions";
+import { assertTaken, canAct } from "../cards/actions";
+import { ServiceError } from "../dockets/errors";
 import type { CardRow } from "../cards/service";
 import { flushCardSheet, queueCardSheet } from "../cards/sheetSync";
 import { getGateways } from "../google/gateways";
@@ -31,6 +32,10 @@ function stamp(d: Date): string {
 }
 
 export const cardPhotoRoutes = new Hono<AppEnv>();
+cardPhotoRoutes.onError((e, c) => {
+  if (e instanceof ServiceError) return c.json({ error: e.message }, e.status);
+  throw e;
+});
 cardPhotoRoutes.use("/cards/:id/photos", requireAuth);
 cardPhotoRoutes.use("/cards/:id/photos/*", requireAuth);
 
@@ -87,6 +92,8 @@ cardPhotoRoutes.get("/cards/:id/photos", async (c) => {
 
 cardPhotoRoutes.post("/cards/:id/photos", async (c) => {
   const card = await cardFor(c);
+  // A team card taken by someone else: only they add photos.
+  if (card) await assertTaken(c.env.DB, card, c.get("user"));
   if (!card) {
     const exists = await c.env.DB.prepare("SELECT 1 FROM cards WHERE id = ?").bind(Number(c.req.param("id"))).first();
     return exists ? c.json({ error: "You can't work on this card." }, 403) : c.json({ error: "Card not found" }, 404);

@@ -59,9 +59,10 @@ export function parseTargets(raw: unknown, people: Person[], teams: Team[] = [])
     const person = people.find((p) => p.id === t.userId);
     if (!person) continue;
     let roleId = typeof t.roleId === "string" && t.roleId !== "" ? t.roleId : null;
-    if (person.roles.length === 0) roleId = GENERAL_ROLE;
-    else if (roleId === null && person.roles.length === 1) roleId = person.roles[0];
-    if (roleId === null || (roleId !== GENERAL_ROLE && !person.roles.includes(roleId)) || (roleId === GENERAL_ROLE && person.roles.length > 0)) {
+    // Sub Contract is never someone's own area: a manager who only has it still gets a General card.
+    const areas = homeAreas(person.roles);
+    if (roleId === null) roleId = areas.length === 0 ? GENERAL_ROLE : areas.length === 1 ? areas[0] : null;
+    if (roleId === null || (roleId !== GENERAL_ROLE && !person.roles.includes(roleId)) || (roleId === GENERAL_ROLE && areas.length > 0)) {
       throw new Error(`Choose an area for ${person.name}.`);
     }
     // What to do is optional.
@@ -70,5 +71,13 @@ export function parseTargets(raw: unknown, people: Person[], teams: Team[] = [])
     out.push({ userId: person.id, roleId, instruction });
   }
   if (out.length === 0) throw new Error("Choose at least one person.");
+  // One person would get two cards for the same area.
+  for (const o of out) {
+    const team = !o.team && out.find((x) => x.team && x.roleId === o.roleId && x.team.memberIds.includes(o.userId))?.team;
+    if (team) throw new Error(`${people.find((p) => p.id === o.userId)?.name ?? "Someone"} is already in ${team.name}.`);
+  }
   return out;
 }
+
+/** A person's own areas (Sub Contract is an area people are sent work in, not one they belong to). */
+export const homeAreas = (roles: string[]) => roles.filter((r) => r !== SUBCONTRACT_ROLE);

@@ -137,3 +137,56 @@ describe("Sub Contract", () => {
     expect((await handDocket(s.manager, [{ userId: boss, roleId: "subcontract", instruction: "Letters" }])).workOrder).toBeTruthy();
   });
 });
+
+describe("review fixes", () => {
+  it("a manager with only Sub Contract still gets a General card by default, and staff can hand to them", async () => {
+    await env.DB.prepare("INSERT INTO user_roles (user_id, role_id) VALUES (?, 'subcontract')").bind(s.ids.mgr).run();
+    const ira = await s.staffWith("ira", "designer");
+    const d = await handDocket(s.manager, [{ userId: s.ids.ira, instruction: "Logo" }]);
+    const c = await cardOf(d.workOrder, s.ids.ira);
+    expect((await move(c, "continue", ira, { to: [{ userId: s.ids.mgr, instruction: "Check" }] })).status).toBe(200);
+    expect((await cardOf(d.workOrder, s.ids.mgr)).role_id).toBe("general");
+  });
+
+  it("the card history names the team it was continued to", async () => {
+    const ira = await s.staffWith("ira", "designer");
+    const d = await handDocket(s.manager, [{ userId: s.ids.ira, instruction: "Logo" }]);
+    await move(await cardOf(d.workOrder, s.ids.ira), "continue", ira, { to: toTeam("Install") });
+    const res = await api(`/api/virtual-dockets/${d.workOrder}/history`, { cookie: s.manager });
+    const text = JSON.stringify(await res.json());
+    expect(text).toContain("Continue → Team B");
+    expect(text).not.toContain("Continue → ?");
+  });
+
+  it("starting a team card moves its version, so a member's stale move is refused", async () => {
+    const d = await handDocket(s.manager, toTeam() as never);
+    const c = await cardOf(d.workOrder, s.ids.gary);
+    await env.DB.prepare("UPDATE cards SET fields_json = ? WHERE id = ?").bind(JSON.stringify({ installed: true }), c.id).run();
+    await post(`/api/cards/${c.id}/claim`, gary);
+    const stale = await move(c, "done", dennis);
+    expect(stale.status).toBe(409);
+    expect((await allCards(d.workOrder))[0].status).toBe("active");
+  });
+
+  it("only whoever took a team card can add photos to it", async () => {
+    const d = await handDocket(s.manager, toTeam() as never);
+    const c = await cardOf(d.workOrder, s.ids.gary);
+    await post(`/api/cards/${c.id}/claim`, gary);
+    const form = new FormData();
+    form.append("photo", new File([new Uint8Array([1, 2, 3])], "a.jpg", { type: "image/jpeg" }));
+    form.append("thumb", new File([new Uint8Array([1])], "t.jpg", { type: "image/jpeg" }));
+    const res = await api(`/api/cards/${c.id}/photos`, { method: "POST", cookie: dennis, body: form });
+    expect(res.status).toBe(409);
+    expect(await errorOf(res)).toBe("gary is already on it.");
+  });
+
+  it("a person can't be chosen both alone and in their team", async () => {
+    const res = await api("/api/virtual-dockets", {
+      method: "POST",
+      cookie: s.manager,
+      json: { form: (await import("./cardHelpers")).docketForm(), handoff: [...toTeam(), { userId: s.ids.gary, roleId: "installer", instruction: "" }] },
+    });
+    expect(res.status).toBe(400);
+    expect(await errorOf(res)).toBe("gary is already in Team B.");
+  });
+});

@@ -23,7 +23,7 @@ export async function loadForAction(db: D1Database, user: SessionUser, id: numbe
 }
 
 /** A team card is taken by whoever started it first: the other members can no longer move it. */
-async function assertTaken(db: D1Database, card: CardRow, user: SessionUser): Promise<void> {
+export async function assertTaken(db: D1Database, card: CardRow, user: SessionUser): Promise<void> {
   if (card.team_id === null || card.claimed_by === null || card.claimed_by === user.id) return;
   if (user.accessLevel === "admin" || user.accessLevel === "manager") return;
   const who = await db.prepare("SELECT full_name FROM users WHERE id = ?").bind(card.claimed_by).first<{ full_name: string }>();

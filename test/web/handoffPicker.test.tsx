@@ -90,10 +90,12 @@ describe("HandoffPicker: teams and Sub Contract", () => {
       ["Teams", ["Team B — Install (Dennis, Gary)"]],
       ["Install", ["Gary — Install", "Dennis — Install"]],
       ["Sub Contract", ["Ali — Sub Contract"]],
+      // Sub Contract is not their own area: they can still get a General card.
+      ["Other", ["Ali"]],
     ]);
     unmount();
     render(<TeamHarness canSubcontract={false} onRows={() => undefined} />);
-    expect(groupsOf().map((g) => g[0])).toEqual(["Teams", "Install"]);
+    expect(groupsOf().map((g) => g[0])).toEqual(["Teams", "Install", "Other"]);
   });
 
   it("a team row becomes one team target", async () => {

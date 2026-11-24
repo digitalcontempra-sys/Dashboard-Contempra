@@ -144,7 +144,7 @@ function describe(action: string, roleId: string, d: Record<string, unknown>, na
       return "I'm on it";
     case "continued":
       // Hand-off: the people it went to. Old route: the next area.
-      if (Array.isArray(d.to)) return `Continue → ${(d.to as { userId: number }[]).map((t) => name(t.userId)).join(", ")}`;
+      if (Array.isArray(d.to)) return `Continue → ${(d.to as { userId: number; team?: { name: string } }[]).map((t) => t.team?.name ?? name(t.userId)).join(", ")}`;
       return `${roleId === "designer" ? "Send to production →" : "Continue →"} ${String(d.to ?? "")}`;
     case "sent_back":
       return `Sent back to ${d.toUser !== undefined ? name(d.toUser) : String(d.to ?? "")} · ${String(d.reason ?? "")}`;
