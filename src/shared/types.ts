@@ -1,5 +1,5 @@
-import type { Billing, DocketStatus, TimeBucket } from "./rules";
-export type { Billing, DocketStatus, TimeBucket };
+import type { Billing, DashSection, DocketStatus, TimeBucket } from "./rules";
+export type { Billing, DashSection, DocketStatus, TimeBucket };
 
 export type VirtualDocketDTO = {
   workOrder: string;
@@ -7,6 +7,8 @@ export type VirtualDocketDTO = {
   jobs: import("./docketForm").ProductionJob[];
   /** The docket has cards: it was handed to someone (it cannot be handed over again from the editor). */
   inProduction: boolean;
+  /** Saved with "Save as New Order": waiting for more info until it is handed to people. */
+  newOrder: boolean;
   version: number;
   source: "virtual" | "sheet";
   pdf: { stored: boolean; driveLink: string | null; driveStatus: string };
@@ -33,6 +35,10 @@ export type DocketSummary = {
   status: DocketStatus;
   billing: Billing;
   bucket: TimeBucket;
+  /** Main Dashboard section: New Orders, Daily Complete, or the time bucket. */
+  section: DashSection;
+  /** Daily Complete: when the creator's card became Ready to close. */
+  readySince: string | null;
   overdue: boolean;
   /** Finishing marked it ready for vendor pickup (list endpoint only). */
   vendorPickup?: boolean;
@@ -66,7 +72,7 @@ export type NonBilledItem = DocketSummary & { ageDays: number | null };
 
 export type Page<T> = { items: T[]; total: number; page: number; pageSize: number };
 
-export type DocketListResponse = Page<DocketSummary> & { counts: Record<TimeBucket, number> };
+export type DocketListResponse = Page<DocketSummary> & { counts: Record<DashSection, number> };
 
 export type ReviewItemDTO = {
   kind: "duplicate_work_order" | "invalid_work_order";

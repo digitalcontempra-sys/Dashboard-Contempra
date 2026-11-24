@@ -11,7 +11,7 @@ import { Icon } from "./Icon";
 import { DocketActions } from "../docket/DocketActions";
 
 const STATUS: Record<Detail["status"], { label: string; cls: string }> = {
-  active: { label: "Active", cls: "bg-coming-soft text-coming" },
+  active: { label: "Active", cls: "bg-info-soft text-info" },
   on_hold: { label: "On Hold", cls: "bg-warn-soft text-warn" },
   completed: { label: "Completed", cls: "bg-ok-soft text-ok" },
   cancelled: { label: "Cancelled", cls: "bg-nodate-soft text-nodate" },
@@ -100,7 +100,7 @@ export function DocketDetail({ workOrder, onClose }: { workOrder: string; onClos
                   {STATUS[d.status].label}
                 </span>
               )}
-              {live && <BucketTag bucket={d.bucket} overdue={d.overdue} />}
+              {live && <BucketTag bucket={d.section} overdue={d.overdue && d.section === "rush_today"} />}
             </div>
             <h2 className="mt-1.5 text-2xl font-bold tracking-tight">{d?.customer ?? (isPending ? "Loading…" : "—")}</h2>
             {d?.project && <p className="mt-1 text-[15px] leading-snug text-text-2">{d.project}</p>}

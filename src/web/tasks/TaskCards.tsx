@@ -145,7 +145,7 @@ export function HistoryList() {
     isSelf(t)
       ? { label: "Note to self", cls: "bg-surface-2 text-text-2", who: null }
       : t.from.id === user?.id
-        ? { label: "Sent by me", cls: "bg-coming-soft text-coming", who: `To ${t.to.name}` }
+        ? { label: "Sent by me", cls: "bg-info-soft text-info", who: `To ${t.to.name}` }
         : { label: `Sent by ${t.from.name}`, cls: "bg-accent-soft text-accent", who: null };
   return (
     <>

@@ -1,17 +1,27 @@
-import type { TimeBucket } from "../shared/rules";
+import { DASH_SECTIONS, TIME_BUCKETS, type DashSection, type TimeBucket } from "../shared/rules";
 
-export const BUCKETS: { id: TimeBucket; label: string }[] = [
-  { id: "rush_today", label: "Rush / Today" },
-  { id: "this_week", label: "This Week" },
-  { id: "coming", label: "Coming" },
-  { id: "no_due_date", label: "No Due Date" },
-];
+const LABEL: Record<DashSection, string> = {
+  rush_today: "Rush / Today",
+  upcoming: "Upcoming",
+  new_orders: "New Orders",
+  no_due_date: "No Due Date",
+  daily_complete: "Daily Complete",
+};
 
-export const BUCKET_TONE: Record<TimeBucket, { fg: string; bg: string }> = {
+/** Time groups (My Cards, Production Board, Task Cards). */
+export const BUCKETS: { id: TimeBucket; label: string }[] = TIME_BUCKETS.map((id) => ({ id, label: LABEL[id] }));
+/** Main Dashboard sections, in chip order. */
+export const SECTIONS: { id: DashSection; label: string }[] = DASH_SECTIONS.map((id) => ({ id, label: LABEL[id] }));
+
+/** The tag on a single tile ("New Order", not the section's plural). */
+export const SECTION_TAG: Record<DashSection, string> = { ...LABEL, new_orders: "New Order" };
+
+export const BUCKET_TONE: Record<DashSection, { fg: string; bg: string }> = {
   rush_today: { fg: "text-rush", bg: "bg-rush-soft" },
-  this_week: { fg: "text-week", bg: "bg-week-soft" },
-  coming: { fg: "text-coming", bg: "bg-coming-soft" },
+  upcoming: { fg: "text-week", bg: "bg-week-soft" },
+  new_orders: { fg: "text-info", bg: "bg-info-soft" },
   no_due_date: { fg: "text-nodate", bg: "bg-nodate-soft" },
+  daily_complete: { fg: "text-ok", bg: "bg-ok-soft" },
 };
 
 const MONTH = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });

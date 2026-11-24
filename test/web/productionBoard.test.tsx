@@ -113,7 +113,7 @@ describe("Production Board", () => {
 
 const detail = {
   workOrder: "91488", customer: "Encore Lounge", project: "letters", accountManager: "JB", dateIso: "2026-11-05",
-  dueIso: null, dueRaw: null, status: "active", billing: "not_billed", bucket: "no_due_date", overdue: false,
+  dueIso: null, dueRaw: null, status: "active", billing: "not_billed", bucket: "no_due_date", section: "no_due_date", readySince: null, overdue: false,
   sheetRow: 2, dateRaw: null, comp: false, hold: false, seq: null, address: null, roleNote: null, inv: false,
   invDateRaw: null, quotePo: null, notes: null, link: null, syncedAt: "",
   holders: [{ roleId: "measure", names: ["Cory"] }],

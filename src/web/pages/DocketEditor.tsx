@@ -84,12 +84,18 @@ export function DocketEditor() {
   const canHandOff = canEdit && (isNew || existing.data?.inProduction === false);
   const untouched = rows.length === 1 && rows[0].pick === "" && rows[0].instruction.trim() === "";
   const handoffReady = !canHandOff || untouched || rowsComplete(rows);
+  // Save as New Order: only the customer and a note (the description), nobody in Send to yet.
+  const hasNote = Boolean(form.forName.trim() && form.body.trim());
+  const newOrderReady = canHandOff && untouched && hasNote;
+  const isNewOrder = existing.data?.newOrder === true;
 
-  async function save(andNew: boolean) {
+  async function save(andNew: boolean, asNewOrder = false) {
     setSaving(true);
     setError(null);
     try {
-      const body = { form, version, ...(canHandOff && !untouched ? { handoff: toTargets(rows) } : {}) };
+      const body = asNewOrder
+        ? { form, version, newOrder: true }
+        : { form, version, ...(canHandOff && !untouched ? { handoff: toTargets(rows) } : {}) };
       const dto = isNew
         ? await api<VirtualDocketDTO>("/api/virtual-dockets", { method: "POST", json: body })
         : await api<VirtualDocketDTO>(`/api/virtual-dockets/${encodeURIComponent(wo!)}`, { method: "PUT", json: body });
@@ -130,7 +136,17 @@ export function DocketEditor() {
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-lg font-bold tracking-tight">{isNew ? "New Docket" : `Docket #${wo}`}</h1>
           <p className="text-xs text-text-3">
-            {!canEdit ? "View only" : saving ? "Saving…" : dirty ? "Draft saved on this device" : isNew ? "Not saved yet" : "All changes saved"}
+            {!canEdit
+              ? "View only"
+              : saving
+                ? "Saving…"
+                : dirty
+                  ? "Draft saved on this device"
+                  : isNew
+                    ? "Not saved yet"
+                    : isNewOrder
+                      ? "New order · waiting for more info"
+                      : "All changes saved"}
           </p>
         </div>
         {canEdit && (
@@ -151,9 +167,17 @@ export function DocketEditor() {
                 Save &amp; New
               </button>
             )}
+            {canHandOff && (
+              <button className="btn-ghost" type="button" disabled={saving || !newOrderReady} onClick={() => save(false, true)}>
+                Save as New Order
+              </button>
+            )}
             <button className="btn-primary" type="button" disabled={saving || !handoffReady} onClick={() => save(false)}>
               Save
             </button>
+            {canHandOff && hasNote && !untouched && (
+              <p className="w-full text-right text-xs text-text-3">Clear Send to to save as a new order.</p>
+            )}
           </>
         )}
       </div>

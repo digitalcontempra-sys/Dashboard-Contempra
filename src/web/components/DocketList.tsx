@@ -1,5 +1,6 @@
 import type { DocketSummary } from "../../shared/types";
-import { BUCKET_TONE, dueLabel } from "../format";
+import { BUCKET_TONE, dueLabel, shortDate } from "../format";
+import { todayInBusinessTz } from "../../shared/rules";
 import { AreaChip, HolderList } from "./AreaChip";
 import { BucketTag } from "./BucketChip";
 
@@ -16,7 +17,7 @@ const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:g
 
 function DocketTile({ d, onOpen, extra, showStatus }: { d: Item; onOpen: (wo: string) => void; extra?: (d: Item) => React.ReactNode; showStatus?: boolean }) {
   const live = d.status === "active" || d.status === "on_hold";
-  const tone = d.overdue ? "bg-danger" : `${BUCKET_TONE[d.bucket].fg} bg-current`;
+  const tone = d.overdue && d.section === "rush_today" ? "bg-danger" : `${BUCKET_TONE[d.section].fg} bg-current`;
   return (
     <button
       type="button"
@@ -52,9 +53,12 @@ function DocketTile({ d, onOpen, extra, showStatus }: { d: Item; onOpen: (wo: st
           {d.vendorPickup && (
             <span className="mt-1 inline-block rounded-md bg-warn-soft px-1.5 py-px text-[10px] font-bold text-warn">Vendor pickup ready</span>
           )}
+          {d.section === "daily_complete" && d.readySince && (
+            <p className="mt-1 text-[11px] font-semibold text-ok">Ready since {shortDate(todayInBusinessTz(new Date(d.readySince)))}</p>
+          )}
           {extra?.(d)}
         </div>
-        {live && <BucketTag bucket={d.bucket} overdue={d.overdue} />}
+        {live && <BucketTag bucket={d.section} overdue={d.overdue && d.section === "rush_today"} />}
       </div>
     </button>
   );

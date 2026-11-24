@@ -1,5 +1,5 @@
 import { ROLE_ORDER } from "../../shared/cards";
-import { deriveTimeBucket, todayInBusinessTz, weekEnd, type TimeBucket } from "../../shared/rules";
+import { deriveTimeBucket, todayInBusinessTz, type DashSection } from "../../shared/rules";
 import {
   PAGE_SIZE,
   type AccountManagerCount,
@@ -18,7 +18,7 @@ import {
 export type DocketQuery = {
   view: DocketView;
   history?: HistoryFilter;
-  bucket?: TimeBucket;
+  bucket?: DashSection;
   am?: string;
   q?: string;
   page?: number;
@@ -28,11 +28,28 @@ export type NonBilledQuery = { tab: NonBilledTab; am?: string; q?: string; page?
 
 type Row = Record<string, unknown> & { work_order: string };
 
-const BUCKET_SQL: Record<TimeBucket, string> = {
-  rush_today: "(due_rush = 1 OR due_iso <= :today)",
-  this_week: "(due_rush = 0 AND due_iso > :today AND due_iso <= :weekEnd)",
-  coming: "(due_rush = 0 AND due_iso > :weekEnd)",
-  no_due_date: "(due_rush = 0 AND due_iso IS NULL)",
+/** Saved with "Save as New Order": waiting for more info until it is handed to people. */
+const NEW_ORDER_SQL = `EXISTS (SELECT 1 FROM virtual_dockets v WHERE v.work_order = dockets.work_order AND v.new_order = 1)`;
+/**
+ * Daily Complete: since when the creator's card has been Ready to close with nobody else on the
+ * docket (null otherwise). A send back to the creator is not "complete".
+ */
+const READY_SINCE_SQL = `(SELECT coalesce(c.activated_at, c.updated_at) FROM cards c
+  WHERE c.work_order = dockets.work_order AND c.status = 'active' AND c.stage = 'ready_to_close' AND c.returned_reason IS NULL
+    AND NOT EXISTS (SELECT 1 FROM cards o WHERE o.work_order = c.work_order AND o.status = 'active' AND o.id != c.id))`;
+/** One section per docket: New Orders, then Daily Complete, then its time bucket. */
+const SECTION_SQL = `CASE WHEN new_order_flag = 1 THEN 'new_orders' WHEN ready_since IS NOT NULL THEN 'daily_complete'
+  WHEN due_rush = 1 OR due_iso <= :today THEN 'rush_today' WHEN due_iso IS NULL THEN 'no_due_date' ELSE 'upcoming' END`;
+
+const WO_DESC = "CAST(work_order AS INTEGER) DESC";
+const NEWEST_FIRST = `ORDER BY date_iso IS NULL, date_iso DESC, ${WO_DESC}`;
+const SECTION_ORDER: Record<DashSection | "all", string> = {
+  all: NEWEST_FIRST,
+  rush_today: `ORDER BY due_rush DESC, due_iso ASC, ${WO_DESC}`,
+  upcoming: `ORDER BY due_iso ASC, ${WO_DESC}`,
+  new_orders: NEWEST_FIRST,
+  no_due_date: NEWEST_FIRST,
+  daily_complete: `ORDER BY ready_since ASC, ${WO_DESC}`,
 };
 
 const VIEW_SQL: Record<DocketView, string> = {
@@ -59,9 +76,7 @@ const HOLDERS_SQL = `(SELECT group_concat(c.role_id || char(31) || coalesce(u.fu
 const PRODUCTION_DONE_SQL = `(EXISTS (SELECT 1 FROM cards c WHERE c.work_order = dockets.work_order)
   AND NOT EXISTS (SELECT 1 FROM cards c WHERE c.work_order = dockets.work_order AND c.status != 'done'))`;
 
-const ACTIVE_ORDER =
-  "ORDER BY (due_rush = 1 OR due_iso <= :today) DESC, due_rush DESC, due_iso IS NULL, due_iso ASC, CAST(work_order AS INTEGER) DESC";
-const HISTORY_ORDER = "ORDER BY CAST(work_order AS INTEGER) DESC";
+const HISTORY_ORDER = `ORDER BY ${WO_DESC}`;
 
 /** Tiny named-parameter builder: D1 only supports positional `?`. */
 class Sql {
@@ -102,6 +117,8 @@ export function parseHolders(raw: unknown): Holder[] {
 function toSummary(r: Row, today: string): DocketSummary {
   const dueIso = (r.due_iso as string) ?? null;
   const { bucket, overdue } = deriveTimeBucket(dueIso, r.due_rush === 1, today);
+  const readySince = (r.ready_since as string) ?? null;
+  const section: DashSection = r.new_order_flag === 1 ? "new_orders" : readySince ? "daily_complete" : bucket;
   return {
     workOrder: r.work_order,
     customer: (r.customer as string) ?? null,
@@ -113,6 +130,8 @@ function toSummary(r: Row, today: string): DocketSummary {
     status: r.status as DocketSummary["status"],
     billing: r.billing as DocketSummary["billing"],
     bucket,
+    section,
+    readySince,
     overdue,
     vendorPickup: r.vendor_pickup === 1,
     areas: typeof r.areas === "string" ? sortAreas(r.areas.split(",")) : [],
@@ -138,40 +157,40 @@ const pageOf = (p?: number) => (p && p > 0 ? Math.floor(p) : 1);
 
 export async function listDockets(db: D1Database, p: DocketQuery, now: Date): Promise<DocketListResponse> {
   const today = todayInBusinessTz(now);
-  const named: Record<string, unknown> = { today, weekEnd: weekEnd(today) };
+  const named: Record<string, unknown> = { today };
   const where = [VIEW_SQL[p.view]];
   if (p.view === "history" && p.history === "completed") where.push("status = 'completed'");
   if (p.view === "history" && p.history === "cancelled") where.push("status = 'cancelled'");
   commonFilters(where, named, p.am, p.q);
-  const baseWhere = where.join(" AND ");
-
-  const countsSql = `SELECT
-    ${(Object.keys(BUCKET_SQL) as TimeBucket[]).map((b) => `SUM(CASE WHEN ${BUCKET_SQL[b]} THEN 1 ELSE 0 END) AS ${b}`).join(", ")}
-    FROM dockets WHERE ${baseWhere}`;
-  const listWhere = p.bucket ? `${baseWhere} AND ${BUCKET_SQL[p.bucket]}` : baseWhere;
+  // Each docket's section is computed once; the outer queries read it like a column.
+  const withSections = `WITH base AS (
+      SELECT *, ${NEW_ORDER_SQL} AS new_order_flag, ${READY_SINCE_SQL} AS ready_since FROM dockets WHERE ${where.join(" AND ")}
+    ), sec AS (SELECT *, ${SECTION_SQL} AS section FROM base)`;
+  const listWhere = p.bucket ? "section = :section" : "1";
+  named.section = p.bucket ?? null;
   const page = pageOf(p.page);
   named.limit = PAGE_SIZE;
   named.offset = (page - 1) * PAGE_SIZE;
-  const order = p.view === "history" ? HISTORY_ORDER : ACTIVE_ORDER;
+  const order = p.view === "history" ? HISTORY_ORDER : SECTION_ORDER[p.bucket ?? "all"];
 
   const sql = new Sql(named);
   const [countsRes, totalRes, listRes] = await db.batch([
-    sql.bind(db, countsSql),
-    sql.bind(db, `SELECT count(*) AS n FROM dockets WHERE ${listWhere}`),
-    sql.bind(db, `SELECT *, ${VENDOR_PICKUP_SQL} AS vendor_pickup, ${AREAS_SQL} AS areas, ${HOLDERS_SQL} AS holders, ${PRODUCTION_DONE_SQL} AS production_done FROM dockets WHERE ${listWhere} ${order} LIMIT :limit OFFSET :offset`),
+    sql.bind(db, `${withSections} SELECT section, count(*) AS n FROM sec GROUP BY section`),
+    sql.bind(db, `${withSections} SELECT count(*) AS n FROM sec WHERE ${listWhere}`),
+    sql.bind(
+      db,
+      `${withSections} SELECT *, ${VENDOR_PICKUP_SQL} AS vendor_pickup, ${AREAS_SQL} AS areas, ${HOLDERS_SQL} AS holders,
+         ${PRODUCTION_DONE_SQL} AS production_done FROM sec AS dockets WHERE ${listWhere} ${order} LIMIT :limit OFFSET :offset`,
+    ),
   ]);
-  const c = (countsRes.results[0] ?? {}) as Record<TimeBucket, number | null>;
+  const counts: Record<DashSection, number> = { rush_today: 0, upcoming: 0, new_orders: 0, no_due_date: 0, daily_complete: 0 };
+  for (const r of countsRes.results as { section: DashSection; n: number }[]) counts[r.section] = Number(r.n);
   return {
     items: (listRes.results as Row[]).map((r) => toSummary(r, today)),
     total: Number((totalRes.results[0] as { n: number }).n),
     page,
     pageSize: PAGE_SIZE,
-    counts: {
-      rush_today: Number(c.rush_today ?? 0),
-      this_week: Number(c.this_week ?? 0),
-      coming: Number(c.coming ?? 0),
-      no_due_date: Number(c.no_due_date ?? 0),
-    },
+    counts,
   };
 }
 
@@ -209,7 +228,10 @@ export async function listNonBilled(db: D1Database, p: NonBilledQuery, now: Date
 }
 
 export async function getDocket(db: D1Database, wo: string, now: Date): Promise<DocketDetail | null> {
-  const r = await db.prepare(`SELECT *, ${HOLDERS_SQL} AS holders FROM dockets WHERE work_order = ?`).bind(wo).first<Row>();
+  const r = await db
+    .prepare(`SELECT *, ${HOLDERS_SQL} AS holders, ${NEW_ORDER_SQL} AS new_order_flag, ${READY_SINCE_SQL} AS ready_since FROM dockets WHERE work_order = ?`)
+    .bind(wo)
+    .first<Row>();
   if (!r) return null;
   const s = (k: string) => (r[k] as string) ?? null;
   return {

@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import type { TimeBucket } from "../../shared/rules";
+import { TIME_BUCKETS, type TimeBucket } from "../../shared/rules";
 import type { CardDTO } from "../../shared/types";
 import type { AppEnv } from "../app";
 import { requireAuth, requireLevel } from "../auth/sessions";
@@ -33,7 +33,7 @@ function reply(c: Context<AppEnv>, dto: CardDTO) {
 }
 
 const managers = requireLevel("admin", "manager");
-const BUCKETS: TimeBucket[] = ["rush_today", "this_week", "coming", "no_due_date"];
+const BUCKETS: TimeBucket[] = TIME_BUCKETS;
 
 cardRoutes.get("/my-cards", requireAuth, async (c) => c.json(await listMyCards(c.env, c.get("user"))));
 cardRoutes.get("/my-cards/summary", requireAuth, async (c) => c.json(await myCardsSummary(c.env, c.get("user"))));

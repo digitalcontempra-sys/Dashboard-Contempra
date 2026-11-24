@@ -19,6 +19,8 @@ const page = (tab: string) => ({
       status: tab === "ready" ? "completed" : "active",
       billing: "not_billed",
       bucket: "no_due_date",
+      section: "no_due_date",
+      readySince: null,
       overdue: false,
       ageDays: 12,
     },

@@ -117,7 +117,7 @@ describe("card alerts", () => {
 
 describe("My Cards page", () => {
   const cards = [
-    makeCard({ id: 1, workOrder: "1", roleId: "printer_roll", header: { ...makeCard().header, bucket: "coming", customer: "Coming Co" } }),
+    makeCard({ id: 1, workOrder: "1", roleId: "printer_roll", header: { ...makeCard().header, bucket: "upcoming", customer: "Coming Co" } }),
     makeCard({ id: 2, workOrder: "2", roleId: "designer", returned: { reason: "Wrong size", by: "Erin" }, header: { ...makeCard().header, customer: "Back Co" } }),
     makeCard({ id: 3, workOrder: "3", roleId: "printer_roll", header: { ...makeCard().header, bucket: "rush_today", customer: "Rush Co" } }),
     makeCard({ id: 4, workOrder: "4", roleId: "printer_roll", status: "waiting", isNew: false, header: { ...makeCard().header, customer: "Later Co" } }),
@@ -128,7 +128,7 @@ describe("My Cards page", () => {
     app({ user: seb, cards });
     renderApp("/my-cards");
     const groups = await screen.findAllByRole("region");
-    expect(groups.map((g) => g.getAttribute("aria-label"))).toEqual(["Returned", "Rush / Today", "Coming", "Up next"]);
+    expect(groups.map((g) => g.getAttribute("aria-label"))).toEqual(["Returned", "Rush / Today", "Upcoming", "Up next"]);
     expect(within(groups[0]).getByText("Back Co")).toBeInTheDocument();
     expect(within(groups[3]).getByText("Later Co")).toBeInTheDocument();
   });

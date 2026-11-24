@@ -134,7 +134,7 @@ describe("formFromDocket", () => {
       {
         workOrder: "91376", customer: "Encore Lounge", project: "4x exterior letters", accountManager: "JB",
         dateIso: "2026-10-13", dueIso: null, dueRaw: "RUSH", status: "active", billing: "not_billed",
-        bucket: "rush_today", overdue: false, sheetRow: 5, dateRaw: null, comp: false, hold: false, seq: null,
+        bucket: "rush_today", section: "rush_today", readySince: null, overdue: false, sheetRow: 5, dateRaw: null, comp: false, hold: false, seq: null,
         address: "Portage Ave", roleNote: null, inv: false, invDateRaw: null, quotePo: "PO 30451", notes: null,
         link: null, syncedAt: "",
       },

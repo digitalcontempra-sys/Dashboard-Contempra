@@ -1,25 +1,27 @@
-import type { TimeBucket } from "../../shared/rules";
-import { BUCKET_TONE, BUCKETS } from "../format";
+import type { DashSection } from "../../shared/rules";
+import { BUCKET_TONE, BUCKETS, SECTION_TAG } from "../format";
 
-export function BucketTag({ bucket, overdue }: { bucket: TimeBucket; overdue?: boolean }) {
+export function BucketTag({ bucket, overdue }: { bucket: DashSection; overdue?: boolean }) {
   if (overdue) {
     return <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-danger">Overdue</span>;
   }
   const t = BUCKET_TONE[bucket];
-  const label = BUCKETS.find((b) => b.id === bucket)!.label;
-  return <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold whitespace-nowrap ${t.bg} ${t.fg}`}>{label}</span>;
+  return <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold whitespace-nowrap ${t.bg} ${t.fg}`}>{SECTION_TAG[bucket]}</span>;
 }
 
-export function BucketFilter({
+export function BucketFilter<T extends DashSection>({
   value,
   counts,
   onChange,
+  options = BUCKETS as { id: T; label: string }[],
 }: {
-  value: TimeBucket | null;
-  counts?: Record<TimeBucket, number>;
-  onChange: (b: TimeBucket | null) => void;
+  value: T | null;
+  counts?: Record<T, number>;
+  onChange: (b: T | null) => void;
+  /** The chips after All (default: the time groups). */
+  options?: { id: T; label: string }[];
 }) {
-  const total = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : undefined;
+  const total = counts ? (Object.values(counts) as number[]).reduce((a, b) => a + b, 0) : undefined;
   const chip = (active: boolean, tone?: string) =>
     `flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-all duration-200 active:scale-[0.97] backdrop-blur-xl ${
       active ? `border-transparent ${tone ?? "bg-text text-[var(--bg)]"}` : "border-border bg-surface text-text-2 shadow-card hover:bg-surface-strong hover:text-text"
@@ -35,7 +37,7 @@ export function BucketFilter({
       >
         All {total !== undefined && <span className="tabular-nums opacity-70">{total}</span>}
       </button>
-      {BUCKETS.map((b) => {
+      {options.map((b) => {
         const n = counts?.[b.id];
         const t = BUCKET_TONE[b.id];
         return (

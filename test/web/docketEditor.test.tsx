@@ -56,12 +56,40 @@ describe("New Docket", () => {
     expect(body.jobs).toBeUndefined();
   });
 
+  it("Save as New Order needs the customer and a note, nobody in Send to, and posts newOrder", async () => {
+    const { calls } = mockApi({
+      ...lists,
+      "GET /api/auth/me": () => managerUser,
+      "POST /api/virtual-dockets": (_u, init) => ({ ...saved(JSON.parse(String(init?.body)).form), inProduction: false, newOrder: true }),
+      "GET /api/virtual-dockets/91488": () => saved(emptyForm("2026-11-05", "x")),
+      "PUT /api/virtual-dockets/91488/pdf": () => ({ ok: true }),
+    });
+    renderApp("/dockets/new");
+    const btn = await screen.findByRole("button", { name: "Save as New Order" });
+    expect(btn).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("FOR"), "Encore Lounge");
+    expect(btn).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("Job details"), "Waiting for measurements");
+    expect(btn).toBeEnabled();
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Person 1" }), "7:designer");
+    expect(btn).toBeDisabled();
+    expect(screen.getByText("Clear Send to to save as a new order.")).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Person 1" }), "");
+    expect(btn).toBeEnabled();
+    await userEvent.click(btn);
+    await waitFor(() => expect(calls.some((c) => c.method === "POST")).toBe(true));
+    const body = calls.find((c) => c.method === "POST")!.body as Record<string, unknown>;
+    expect(body.newOrder).toBe(true);
+    expect(body.handoff).toBeUndefined();
+  });
+
   it("a docket already in production is not handed over again from the editor", async () => {
     mockApi({ ...lists, "GET /api/auth/me": () => managerUser, "GET /api/virtual-dockets/91488": () => saved(emptyForm("2026-11-05", "x")) });
     renderApp("/dockets/91488");
     expect(await screen.findByLabelText("Job details")).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Person 1" })).toBeNull();
     expect(screen.getByText("In production: it moves from card to card.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save as New Order" })).toBeNull();
   });
 
   it("Save takes you back to the Main Dashboard and says it was saved", async () => {
@@ -71,7 +99,7 @@ describe("New Docket", () => {
       "GET /api/virtual-dockets/91488": () => saved({ ...emptyForm("2026-11-05", "x"), forName: "Encore Lounge" }),
       "PUT /api/virtual-dockets/91488": (_u, init) => ({ ...saved(JSON.parse(String(init?.body)).form), version: 2 }),
       "PUT /api/virtual-dockets/91488/pdf": () => ({ ok: true }),
-      "GET /api/dockets": () => ({ items: [], total: 0, page: 1, pageSize: 50, counts: { rush_today: 0, this_week: 0, coming: 0, no_due_date: 0 } }),
+      "GET /api/dockets": () => ({ items: [], total: 0, page: 1, pageSize: 50, counts: { rush_today: 0, upcoming: 0, new_orders: 0, no_due_date: 0, daily_complete: 0 } }),
       "GET /api/my-cards/summary": () => ({ newCount: 0, activeCount: 0, soundOn: true }),
     });
     renderApp("/dockets/91488");

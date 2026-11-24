@@ -158,9 +158,14 @@ function holderStatus(c: SheetCard): string {
   return c.claimed_name ? "In progress" : c.returned_reason ? "Returned" : "Starting";
 }
 
+export const NEW_ORDER_STATUS = "Waiting for more info";
+
 /** ROLE (K) and STATUS: who has the docket now and in what state, in the same order. */
-function holderCells(cards: SheetCard[], names: Map<number, string>): RowCells {
-  if (!cards.length) return {}; // a docket without cards keeps whatever K holds
+function holderCells(cards: SheetCard[], names: Map<number, string>, newOrderBy: string | null): RowCells {
+  if (!cards.length) {
+    // A new order is with its creator, waiting for more info; any other docket without cards keeps whatever K holds.
+    return newOrderBy !== null ? { K: newOrderBy, [STATUS_KEY]: NEW_ORDER_STATUS } : {};
+  }
   const active = cards.filter((c) => c.status === "active");
   if (active.length) {
     const pairs = new Map<string, string>();
@@ -282,7 +287,13 @@ const AT = new Intl.DateTimeFormat("en-CA", {
 });
 
 /** Q–Z cells (plus D/E when the queue asks for COMP/HOLD). */
-export function stageRowCells(cards: SheetCard[], names: Map<number, string>, q: { hold: number | null; comp: number | null }): RowCells {
+export function stageRowCells(
+  cards: SheetCard[],
+  names: Map<number, string>,
+  q: { hold: number | null; comp: number | null },
+  /** The creator's name when the docket is a New Order. */
+  newOrderBy: string | null = null,
+): RowCells {
   const cells: RowCells = {};
   const active = cards.filter((c) => c.status === "active");
   const allDone = cards.length > 0 && cards.every((c) => c.status === "done");
@@ -308,7 +319,7 @@ export function stageRowCells(cards: SheetCard[], names: Map<number, string>, q:
       : "—";
   });
   cells.AC = active.length ? [...new Set(active.map((c) => assignedText(c, names)))].join(", ") : "";
-  Object.assign(cells, holderCells(cards, names));
+  Object.assign(cells, holderCells(cards, names, newOrderBy));
   if (q.comp === 1) cells.D = true;
   if (q.comp === 0) cells.D = false; // restored
   if (q.hold !== null) cells.E = q.hold === 1;
@@ -357,7 +368,14 @@ export async function flushCardSheet(env: Env, wo: string): Promise<void> {
         .bind(wo)
         .first<{ n: number; link: string | null }>();
       const hasPhotos = (photos?.n ?? 0) > 0 && photos?.link;
-      await sheet.updateCells(row, { ...stageRowCells(cards, names, q), ...(hasPhotos ? {} : { AD: "" }) });
+      const newOrder = await db
+        .prepare(
+          `SELECT coalesce(u.full_name, '') AS name FROM virtual_dockets v LEFT JOIN users u ON u.id = coalesce(v.created_by, v.updated_by)
+           WHERE v.work_order = ? AND v.new_order = 1`,
+        )
+        .bind(wo)
+        .first<{ name: string }>();
+      await sheet.updateCells(row, { ...stageRowCells(cards, names, q, newOrder?.name ?? null), ...(hasPhotos ? {} : { AD: "" }) });
       if (hasPhotos) {
         // A clickable "Photos (n)" that opens the docket's Drive folder (a formula, so it is written USER_ENTERED).
         const link = String(photos!.link).replace(/"/g, "");

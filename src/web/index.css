@@ -48,8 +48,8 @@
   --rush-soft: rgb(var(--p-rose-500) / 0.12);
   --week: rgb(var(--p-amber-600));
   --week-soft: rgb(var(--p-amber-600) / 0.13);
-  --coming: rgb(var(--p-blue-500));
-  --coming-soft: rgb(var(--p-blue-500) / 0.11);
+  --info: rgb(var(--p-blue-500));
+  --info-soft: rgb(var(--p-blue-500) / 0.11);
   --nodate: rgb(var(--p-slate-500));
   --nodate-soft: rgb(var(--p-slate-500) / 0.12);
   --ok: rgb(var(--p-green-600));
@@ -82,7 +82,7 @@
     --accent-soft: rgb(var(--p-brand-500) / 0.18);
     --rush: rgb(255 107 154);
     --week: rgb(245 190 70);
-    --coming: rgb(100 170 255);
+    --info: rgb(100 170 255);
     --nodate: rgb(160 168 180);
     --ok: rgb(80 210 120);
     --warn: rgb(255 175 80);
@@ -180,8 +180,8 @@
   --color-rush-soft: var(--rush-soft);
   --color-week: var(--week);
   --color-week-soft: var(--week-soft);
-  --color-coming: var(--coming);
-  --color-coming-soft: var(--coming-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
   --color-nodate: var(--nodate);
   --color-nodate-soft: var(--nodate-soft);
   --color-ok: var(--ok);

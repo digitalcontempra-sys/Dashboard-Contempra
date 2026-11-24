@@ -1,5 +1,6 @@
 import { hasCards, parseHandoff, startHandoff } from "../cards/handoff";
 import { reconcileCards } from "../cards/service";
+import { queueCardSheet } from "../cards/sheetSync";
 import {
   cancelStamp,
   emptyForm,
@@ -47,6 +48,7 @@ type VirtualRow = {
   updated_by: number | null;
   deleted_at: string | null;
   deleted_row_json: string | null;
+  new_order: number;
 };
 
 /** Google failures become user-facing errors; a disconnected account says so. */
@@ -126,11 +128,20 @@ function validateForm(form: DocketForm | undefined): DocketForm {
   return form;
 }
 
+/** "Save as New Order": only the customer and a note (the description), and nobody to hand it to yet. */
+function validateNewOrder(form: DocketForm, input: { newOrder?: unknown; handoff?: unknown }): boolean {
+  if (input.newOrder !== true) return false;
+  if (input.handoff !== undefined) throw new ServiceError(400, "A new order is saved without Send to.");
+  if (!form.body?.trim()) throw new ServiceError(400, "Write what's missing in the description (for example, waiting for measurements).");
+  return true;
+}
+
 async function toDto(db: D1Database, row: VirtualRow, jobs: ProductionJob[], actor: SessionUser): Promise<VirtualDocketDTO> {
   const form = JSON.parse(row.form_json) as DocketForm;
   return {
     workOrder: row.work_order,
     inProduction: await hasCards(db, row.work_order),
+    newOrder: row.new_order === 1,
     form: actor.accessLevel === "staff" ? stripPrices(form) : form,
     jobs,
     version: row.version,
@@ -163,10 +174,11 @@ export async function nextWorkOrder(env: Env): Promise<number> {
 export async function createDocket(
   env: Env,
   actor: SessionUser,
-  input: { form?: DocketForm; jobs?: ProductionJob[]; handoff?: unknown },
+  input: { form?: DocketForm; jobs?: ProductionJob[]; handoff?: unknown; newOrder?: unknown },
 ): Promise<VirtualDocketDTO> {
   const db = env.DB;
   const form = validateForm(input.form);
+  const newOrder = validateNewOrder(form, input);
   const jobs = await validateJobs(db, input.jobs);
   const targets = input.handoff === undefined ? null : await parseHandoff(db, input.handoff, actor);
   const now = new Date().toISOString();
@@ -178,10 +190,10 @@ export async function createDocket(
     for (let attempt = 0; attempt < MAX_WO_ATTEMPTS && !wo; attempt++, candidate++) {
       const ok = await db
         .prepare(
-          `INSERT INTO virtual_dockets (work_order, state, form_json, created_by, created_at, updated_by, updated_at)
-           VALUES (?, 'saving', ?, ?, ?, ?, ?) ON CONFLICT (work_order) DO NOTHING`,
+          `INSERT INTO virtual_dockets (work_order, state, form_json, created_by, created_at, updated_by, updated_at, new_order)
+           VALUES (?, 'saving', ?, ?, ?, ?, ?, ?) ON CONFLICT (work_order) DO NOTHING`,
         )
-        .bind(String(candidate), JSON.stringify(form), actor.id, now, actor.id, now)
+        .bind(String(candidate), JSON.stringify(form), actor.id, now, actor.id, now, newOrder ? 1 : 0)
         .run();
       if (ok.meta.changes > 0) wo = String(candidate);
     }
@@ -213,6 +225,8 @@ export async function createDocket(
   // An old fixed route (API only) still makes route cards; the app hands the docket to people.
   if (targets) await startHandoff(db, wo, actor.id, targets, now);
   else await reconcileCards(db, wo, jobs, actor.id, now);
+  // ROLE and STATUS say who has the new order and that it waits for more info.
+  if (newOrder) await queueCardSheet(db, wo);
   await upsertMirror(db, toRowValues(cells), 2);
   return toDto(db, (await loadVirtual(db, wo))!, jobs, actor);
 }
@@ -229,6 +243,7 @@ export async function getVirtualDocket(env: Env, actor: SessionUser, wo: string)
     form: actor.accessLevel === "staff" ? stripPrices(form) : form,
     jobs: [{ name: WHOLE_DOCKET, steps: [] }],
     inProduction: false,
+    newOrder: false,
     version: 0,
     source: "sheet",
     pdf: { stored: false, driveLink: null, driveStatus: "none" },
@@ -265,10 +280,11 @@ export async function updateDocket(
   env: Env,
   actor: SessionUser,
   wo: string,
-  input: { form?: DocketForm; jobs?: ProductionJob[]; version?: number; handoff?: unknown },
+  input: { form?: DocketForm; jobs?: ProductionJob[]; version?: number; handoff?: unknown; newOrder?: unknown },
 ): Promise<VirtualDocketDTO> {
   const db = env.DB;
   const form = validateForm(input.form);
+  const newOrder = validateNewOrder(form, input);
   // Without a route the docket's cards are left alone (they move by hand-off).
   const jobs = input.jobs === undefined ? null : await validateJobs(db, input.jobs);
   const targets = input.handoff === undefined ? null : await parseHandoff(db, input.handoff, actor);
@@ -283,7 +299,7 @@ export async function updateDocket(
         : null;
       throw new ServiceError(409, `This docket was changed by ${who?.full_name ?? "someone else"}. Reload to see the latest version.`);
     }
-    if (targets && (await hasCards(db, wo))) throw new ServiceError(409, "This docket is already in production.");
+    if ((targets || newOrder) && (await hasCards(db, wo))) throw new ServiceError(409, "This docket is already in production.");
     let baseline: DocketForm | null = existing ? (JSON.parse(existing.form_json) as DocketForm) : null;
     if (!baseline) {
       const detail = await getDocket(db, wo, new Date());
@@ -297,19 +313,23 @@ export async function updateDocket(
       throw googleError(e, UPDATE_FAILED);
     }
     const now = new Date().toISOString();
+    // Handing it to people ends a new order; a plain save leaves the flag as it was.
+    const flag = targets ? 0 : newOrder ? 1 : null;
     await db.batch([
       db
         .prepare(
-          `INSERT INTO virtual_dockets (work_order, state, form_json, version, created_by, created_at, updated_by, updated_at)
-           VALUES (?, 'saved', ?, ?, ?, ?, ?, ?)
+          `INSERT INTO virtual_dockets (work_order, state, form_json, version, created_by, created_at, updated_by, updated_at, new_order)
+           VALUES (?1, 'saved', ?2, ?3, ?4, ?5, ?4, ?5, coalesce(?6, 0))
            ON CONFLICT (work_order) DO UPDATE SET form_json = excluded.form_json, version = excluded.version,
-             updated_by = excluded.updated_by, updated_at = excluded.updated_at, state = 'saved'`,
+             updated_by = excluded.updated_by, updated_at = excluded.updated_at, state = 'saved',
+             new_order = coalesce(?6, new_order)`,
         )
-        .bind(wo, JSON.stringify(form), current + 1, actor.id, now, actor.id, now),
+        .bind(wo, JSON.stringify(form), current + 1, actor.id, now, flag),
       ...(jobs ? jobStatements(db, wo, jobs) : []),
     ]);
     if (jobs) await reconcileCards(db, wo, jobs, actor.id, now);
     if (targets) await startHandoff(db, wo, actor.id, targets, now);
+    if (newOrder) await queueCardSheet(db, wo);
     await upsertMirror(db, await readRow(env, row), row).catch(() => undefined);
     return toDto(db, (await loadVirtual(db, wo))!, jobs ?? (await loadJobs(db, wo)), actor);
   });

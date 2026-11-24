@@ -1,6 +1,10 @@
 export type DocketStatus = "active" | "on_hold" | "completed" | "cancelled";
 export type Billing = "billed" | "no_charge" | "not_billed" | "cancelled";
-export type TimeBucket = "rush_today" | "this_week" | "coming" | "no_due_date";
+export type TimeBucket = "rush_today" | "upcoming" | "no_due_date";
+/** Main Dashboard sections: the time buckets plus two production states (one section per docket). */
+export type DashSection = TimeBucket | "new_orders" | "daily_complete";
+export const DASH_SECTIONS: DashSection[] = ["rush_today", "upcoming", "new_orders", "no_due_date", "daily_complete"];
+export const TIME_BUCKETS: TimeBucket[] = ["rush_today", "upcoming", "no_due_date"];
 
 export const BUSINESS_TZ = "America/Winnipeg";
 
@@ -99,6 +103,5 @@ export function deriveTimeBucket(
   const overdue = dueIso != null && dueIso < todayIso;
   if (dueRush || (dueIso != null && dueIso <= todayIso)) return { bucket: "rush_today", overdue };
   if (dueIso == null) return { bucket: "no_due_date", overdue: false };
-  if (dueIso <= weekEnd(todayIso)) return { bucket: "this_week", overdue: false };
-  return { bucket: "coming", overdue: false };
+  return { bucket: "upcoming", overdue: false };
 }

@@ -31,7 +31,7 @@ export const makeCard = (over: Partial<CardDTO> = {}): CardDTO => ({
     accountManager: "JB",
     project: "Window letters",
     address: "12 Main St",
-    bucket: "this_week",
+    bucket: "upcoming",
     dueIso: "2026-11-12",
     dueRaw: null,
     proofRequired: false,

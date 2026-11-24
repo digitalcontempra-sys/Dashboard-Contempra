@@ -92,9 +92,9 @@ describe("deriveTimeBucket", () => {
   it("today is rush_today, not overdue", () => {
     expect(deriveTimeBucket("2026-10-19", false, today)).toEqual({ bucket: "rush_today", overdue: false });
   });
-  it("through Sunday is this_week, after is coming", () => {
-    expect(deriveTimeBucket("2026-10-25", false, today).bucket).toBe("this_week");
-    expect(deriveTimeBucket("2026-10-26", false, today).bucket).toBe("coming");
+  it("any later date is upcoming", () => {
+    expect(deriveTimeBucket("2026-10-20", false, today).bucket).toBe("upcoming");
+    expect(deriveTimeBucket("2026-12-26", false, today).bucket).toBe("upcoming");
   });
   it("no date is no_due_date", () => {
     expect(deriveTimeBucket(null, false, today).bucket).toBe("no_due_date");

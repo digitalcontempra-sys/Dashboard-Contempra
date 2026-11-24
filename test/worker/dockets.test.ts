@@ -45,9 +45,8 @@ describe("listDockets", () => {
     expect(r.items[0].workOrder).toBe("100"); // rush first
   });
 
-  it("this_week, coming and no_due_date split correctly", async () => {
-    expect(ids((await listDockets(env.DB, { view: "active", bucket: "this_week" }, NOW)).items)).toEqual(["102"]);
-    expect(ids((await listDockets(env.DB, { view: "active", bucket: "coming" }, NOW)).items)).toEqual(["103"]);
+  it("upcoming and no_due_date split correctly", async () => {
+    expect(ids((await listDockets(env.DB, { view: "active", bucket: "upcoming" }, NOW)).items)).toEqual(["102", "103"]);
     const none = await listDockets(env.DB, { view: "active", bucket: "no_due_date" }, NOW);
     expect(ids(none.items)).toEqual(["104", "200", "91487"]);
     expect(none.items.find((i) => i.workOrder === "104")?.dueRaw).toBe("in production");
@@ -57,7 +56,7 @@ describe("listDockets", () => {
     const r = await listDockets(env.DB, { view: "active" }, NOW);
     const sum = Object.values(r.counts).reduce((a, b) => a + b, 0);
     expect(sum).toBe(r.total);
-    expect(r.counts).toEqual({ rush_today: 2, this_week: 1, coming: 1, no_due_date: 3 });
+    expect(r.counts).toEqual({ rush_today: 2, upcoming: 2, new_orders: 0, no_due_date: 3, daily_complete: 0 });
   });
 
   it("on_hold and history views", async () => {
@@ -115,7 +114,8 @@ describe("docket routes", () => {
     await createUser("mgr", "manager");
     expect((await api("/api/dockets?view=active", { cookie: await login("ana") })).status).toBe(403);
     const mgr = await login("mgr");
-    const res = await api("/api/dockets?view=active&bucket=coming", { cookie: mgr });
+    expect((await api("/api/dockets?view=active&bucket=coming", { cookie: mgr })).status).toBe(400);
+    const res = await api("/api/dockets?view=active&bucket=daily_complete", { cookie: mgr });
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ page: 1, pageSize: 50 });
     expect((await api("/api/dockets/nope", { cookie: mgr })).status).toBe(404);

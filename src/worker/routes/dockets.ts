@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { TimeBucket } from "../../shared/rules";
+import { DASH_SECTIONS } from "../../shared/rules";
 import type { DocketView, HistoryFilter, NonBilledTab } from "../../shared/types";
 import type { AppEnv } from "../app";
 import { requireAuth, requireLevel } from "../auth/sessions";
@@ -7,7 +7,6 @@ import { getDocket, listAccountManagers, listDockets, listNonBilled, listReview 
 
 const VIEWS: DocketView[] = ["active", "on_hold", "history"];
 const HISTORY: HistoryFilter[] = ["all", "completed", "cancelled"];
-const BUCKETS: TimeBucket[] = ["rush_today", "this_week", "coming", "no_due_date"];
 const TABS: NonBilledTab[] = ["ready", "open"];
 
 function pick<T extends string>(value: string | undefined, allowed: T[], fallback?: T): T | undefined {
@@ -24,7 +23,7 @@ docketRoutes.get("/dockets", async (c) => {
   const q = c.req.query();
   const view = pick(q.view, VIEWS, "active");
   const history = pick(q.history, HISTORY, "all");
-  const bucket = pick(q.bucket, BUCKETS);
+  const bucket = pick(q.bucket, DASH_SECTIONS);
   if (view === null || history === null || bucket === null) return c.json({ error: "Invalid filter" }, 400);
   return c.json(
     await listDockets(c.env.DB, { view: view!, history, bucket, am: q.am, q: q.q, page: Number(q.page) || 1 }, new Date()),

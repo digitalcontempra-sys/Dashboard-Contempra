@@ -1,8 +1,9 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon";
-import type { TimeBucket } from "../../shared/rules";
+import { DASH_SECTIONS, type DashSection } from "../../shared/rules";
+import { SECTIONS } from "../format";
 import type { DocketListResponse, DocketView, HistoryFilter } from "../../shared/types";
 import { api, withQuery } from "../api";
 import { BucketFilter } from "../components/BucketChip";
@@ -44,10 +45,13 @@ export function Dashboard() {
     return () => clearTimeout(t);
   }, [saved]);
 
+  const navigate = useNavigate();
   const v = (view || "active") as DocketView;
+  // An old or unknown section in the URL (e.g. "coming") shows All.
+  const section = DASH_SECTIONS.includes(bucket as DashSection) ? (bucket as DashSection) : undefined;
   const h = (history || "all") as HistoryFilter;
   const isHistory = v === "history";
-  const params = { view: v, history: isHistory ? h : undefined, bucket: isHistory ? undefined : bucket, am, q };
+  const params = { view: v, history: isHistory ? h : undefined, bucket: isHistory ? undefined : section, am, q };
 
   const list = useInfiniteQuery({
     queryKey: ["dockets", params],
@@ -99,7 +103,7 @@ export function Dashboard() {
             <Tabs label="History filter" tabs={HISTORY} value={h} onChange={(id) => setHistory(id === "all" ? null : id)} />
           </div>
         ) : (
-          <BucketFilter value={(bucket || null) as TimeBucket | null} counts={first?.counts} onChange={(b) => setBucket(b)} />
+          <BucketFilter options={SECTIONS} value={section ?? null} counts={first?.counts} onChange={(b) => setBucket(b)} />
         )}
         <div className="flex flex-col gap-2 sm:flex-row">
           <SearchBox value={q} onChange={(t) => setQ(t || null)} />
@@ -114,7 +118,12 @@ export function Dashboard() {
           <EmptyState text="No work orders match these filters." />
         ) : (
           <>
-            <DocketList items={items} onOpen={setOpen} showStatus={isHistory} />
+            <DocketList
+              items={items}
+              // A New Order is opened to be completed: straight to the editor.
+              onOpen={(wo) => (!isHistory && items.find((i) => i.workOrder === wo)?.section === "new_orders" ? navigate(`/dockets/${wo}`) : setOpen(wo))}
+              showStatus={isHistory}
+            />
             {list.hasNextPage && (
               <div className="flex justify-center pt-2">
                 <button className="btn-ghost" onClick={() => list.fetchNextPage()} disabled={list.isFetchingNextPage}>

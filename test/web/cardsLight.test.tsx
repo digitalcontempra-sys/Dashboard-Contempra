@@ -61,6 +61,8 @@ describe("cards stay white in dark mode", () => {
                 status: "active",
                 billing: "not_billed",
                 bucket: "no_due_date",
+                section: "no_due_date",
+                readySince: null,
                 overdue: false,
               },
             ]}

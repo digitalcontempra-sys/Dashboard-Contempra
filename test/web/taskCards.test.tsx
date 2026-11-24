@@ -86,7 +86,7 @@ describe("New Task Card", () => {
   it("managers also have it on the Main Dashboard", async () => {
     mockApi({
       "GET /api/auth/me": () => managerUser,
-      "GET /api/dockets": () => ({ items: [], total: 0, page: 1, pageSize: 50, counts: { rush_today: 0, this_week: 0, coming: 0, no_due_date: 0 } }),
+      "GET /api/dockets": () => ({ items: [], total: 0, page: 1, pageSize: 50, counts: { rush_today: 0, upcoming: 0, new_orders: 0, no_due_date: 0, daily_complete: 0 } }),
       "GET /api/my-cards/summary": () => ({ newCount: 0, activeCount: 0, soundOn: true }),
     });
     renderApp("/dashboard");

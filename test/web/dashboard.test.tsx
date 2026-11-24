@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { emptyForm } from "../../src/shared/docketForm";
 import { managerUser, mockApi } from "./mockApi";
 import { renderApp } from "./render";
 
@@ -19,7 +20,9 @@ const item = (over: Record<string, unknown> = {}) => ({
   dueRaw: null,
   status: "active",
   billing: "not_billed",
-  bucket: "this_week",
+  bucket: "upcoming",
+  section: "upcoming",
+  readySince: null,
   overdue: false,
   ...over,
 });
@@ -32,7 +35,7 @@ function setup(syncOver: Record<string, unknown> = {}) {
       total: 2,
       page: 1,
       pageSize: 50,
-      counts: { rush_today: 3, this_week: 1, coming: 0, no_due_date: 1 },
+      counts: { rush_today: 3, upcoming: 1, new_orders: 0, no_due_date: 1, daily_complete: 0 },
     }),
     "GET /api/account-managers": () => [{ accountManager: "MB", count: 10 }],
     "GET /api/sync/status": () => ({
@@ -66,19 +69,79 @@ function setup(syncOver: Record<string, unknown> = {}) {
 }
 
 describe("Main Dashboard", () => {
+  it("shows the sections in order, without Coming", async () => {
+    setup();
+    renderApp("/dashboard");
+    await screen.findByRole("button", { name: "Rush / Today (3)" });
+    const chips = screen
+      .getAllByRole("button")
+      .map((b) => b.getAttribute("aria-label") ?? "")
+      .filter((n) => /\(\d+\)$/.test(n));
+    expect(chips).toEqual(["All (5)", "Rush / Today (3)", "Upcoming (1)", "New Orders (0)", "No Due Date (1)", "Daily Complete (0)"]);
+    expect(screen.queryByRole("button", { name: /Coming/ })).toBeNull();
+  });
+
+  it("an old section in the URL falls back to All", async () => {
+    const { calls } = setup();
+    renderApp("/dashboard?bucket=coming");
+    expect(await screen.findByRole("button", { name: "All (5)" })).toHaveAttribute("aria-pressed", "true");
+    expect(calls.filter((c) => c.url.pathname === "/api/dockets").every((c) => !c.url.searchParams.has("bucket"))).toBe(true);
+  });
+
+  it("a New Order tile opens the docket editor; a Daily Complete tile says since when it is ready", async () => {
+    mockApi({
+      "GET /api/auth/me": () => managerUser,
+      "GET /api/dockets": () => ({
+        items: [
+          item({ workOrder: "91490", customer: "New Co", project: "Waiting for measurements", section: "new_orders" }),
+          item({ workOrder: "91470", customer: "Done Co", section: "daily_complete", readySince: "2026-11-23T15:00:00Z" }),
+        ],
+        total: 2,
+        page: 1,
+        pageSize: 50,
+        counts: { rush_today: 0, upcoming: 0, new_orders: 1, no_due_date: 0, daily_complete: 1 },
+      }),
+      "GET /api/account-managers": () => [],
+      "GET /api/sync/status": () => ({ lastRunAt: null, lastSuccessAt: null, lastError: null, configured: true }),
+      "GET /api/roles": () => [],
+      "GET /api/assignees": () => [],
+      "GET /api/virtual-dockets/91490": () => ({
+        workOrder: "91490",
+        form: { ...emptyForm("2026-11-24", "mgr"), forName: "New Co", body: "Waiting for measurements" },
+        jobs: [],
+        inProduction: false,
+        newOrder: true,
+        version: 1,
+        source: "virtual",
+        pdf: { stored: true, driveLink: null, driveStatus: "done" },
+        deletedAt: null,
+        sheet: { notes: null },
+      }),
+    });
+    renderApp("/dashboard");
+    const done = (await screen.findByText("Done Co")).closest("li")!;
+    expect(within(done).getByText("Daily Complete")).toBeInTheDocument();
+    expect(within(done).getByText("Ready since Nov 23")).toBeInTheDocument();
+    const tile = screen.getByText("New Co").closest("li")!;
+    expect(within(tile).getByText("New Order")).toBeInTheDocument();
+    await userEvent.click(within(tile).getByRole("button"));
+    expect(await screen.findByRole("heading", { name: "Docket #91490" })).toBeInTheDocument();
+    expect(screen.getByText("New order · waiting for more info")).toBeInTheDocument();
+  });
+
   it("shows bucket counts", async () => {
     setup();
     renderApp("/dashboard");
     expect(await screen.findByRole("button", { name: "Rush / Today (3)" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "This Week (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Upcoming (1)" })).toBeInTheDocument();
   });
 
   it("filters by bucket through the request URL", async () => {
     const { calls } = setup();
     renderApp("/dashboard");
-    await userEvent.click(await screen.findByRole("button", { name: "This Week (1)" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Upcoming (1)" }));
     await waitFor(() =>
-      expect(calls.some((c) => c.url.pathname === "/api/dockets" && c.url.searchParams.get("bucket") === "this_week")).toBe(
+      expect(calls.some((c) => c.url.pathname === "/api/dockets" && c.url.searchParams.get("bucket") === "upcoming")).toBe(
         true,
       ),
     );
@@ -86,7 +149,7 @@ describe("Main Dashboard", () => {
 
   it("switching to On Hold and History requests those views", async () => {
     const { calls } = setup();
-    renderApp("/dashboard?bucket=this_week");
+    renderApp("/dashboard?bucket=upcoming");
     await userEvent.click(await screen.findByRole("tab", { name: "On Hold" }));
     await waitFor(() =>
       expect(calls.some((c) => c.url.pathname === "/api/dockets" && c.url.searchParams.get("view") === "on_hold")).toBe(true),
