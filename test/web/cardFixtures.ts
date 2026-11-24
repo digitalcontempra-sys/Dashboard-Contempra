@@ -9,6 +9,7 @@ export const makeCard = (over: Partial<CardDTO> = {}): CardDTO => ({
   status: "active",
   assigneeIds: [],
   team: true,
+  teamName: null,
   claimedBy: null,
   fields: {},
   returned: null,

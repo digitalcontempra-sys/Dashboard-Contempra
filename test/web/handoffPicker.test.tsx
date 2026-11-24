@@ -55,3 +55,53 @@ describe("HandoffPicker", () => {
     expect(within(document.body).getAllByRole("combobox")).toHaveLength(1);
   });
 });
+
+describe("HandoffPicker: teams and Sub Contract", () => {
+  const crew = [
+    { id: 3, fullName: "Gary", roles: ["installer"] },
+    { id: 4, fullName: "Dennis", roles: ["installer"] },
+    { id: 5, fullName: "Ali", roles: ["subcontract"] },
+  ];
+  const teams = [{ id: 7, name: "Team B", roleId: "installer", members: [{ id: 4, fullName: "Dennis" }, { id: 3, fullName: "Gary" }] }];
+  function TeamHarness({ canSubcontract, onRows }: { canSubcontract: boolean; onRows: (r: HandoffRow[]) => void }) {
+    const [rows, setRows] = useState<HandoffRow[]>([emptyRow()]);
+    return (
+      <HandoffPicker
+        people={crew}
+        teams={teams}
+        canSubcontract={canSubcontract}
+        rows={rows}
+        onChange={(r) => {
+          setRows(r);
+          onRows(r);
+        }}
+      />
+    );
+  }
+  const groupsOf = () =>
+    [...screen.getByRole("combobox", { name: "Person 1" }).querySelectorAll("optgroup")].map((g) => [
+      g.label,
+      [...g.querySelectorAll("option")].map((o) => o.textContent),
+    ]);
+
+  it("lists teams first, and Sub Contract only for managers", () => {
+    const { unmount } = render(<TeamHarness canSubcontract onRows={() => undefined} />);
+    expect(groupsOf()).toEqual([
+      ["Teams", ["Team B — Install (Dennis, Gary)"]],
+      ["Install", ["Gary — Install", "Dennis — Install"]],
+      ["Sub Contract", ["Ali — Sub Contract"]],
+    ]);
+    unmount();
+    render(<TeamHarness canSubcontract={false} onRows={() => undefined} />);
+    expect(groupsOf().map((g) => g[0])).toEqual(["Teams", "Install"]);
+  });
+
+  it("a team row becomes one team target", async () => {
+    let rows: HandoffRow[] = [];
+    render(<TeamHarness canSubcontract={false} onRows={(r) => (rows = r)} />);
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Person 1" }), "team:7");
+    await userEvent.type(screen.getByRole("textbox", { name: "What to do 1" }), "Install sign");
+    expect(rowsComplete(rows)).toBe(true);
+    expect(toTargets(rows)).toEqual([{ teamId: 7, instruction: "Install sign" }]);
+  });
+});

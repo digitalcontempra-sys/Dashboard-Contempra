@@ -10,6 +10,7 @@ import { SyncBadge } from "../components/SyncBadge";
 import { GoogleConnection } from "./GoogleConnection";
 import { ImportStaff } from "./ImportStaff";
 import { ProductionColumns } from "./ProductionColumns";
+import { TeamsPanel } from "./AdminTeams";
 
 const LEVELS: { id: AccessLevel; label: string; hint: string }[] = [
   { id: "staff", label: "Staff", hint: "Sees only their own cards" },
@@ -243,6 +244,7 @@ export function AdminUsers() {
         <SyncPanel />
         <ProductionColumns />
         <ImportStaff />
+        <TeamsPanel />
         {users.isPending ? (
           <ListSkeleton />
         ) : users.error ? (

@@ -78,8 +78,8 @@ export function DocketProduction({ workOrder }: { workOrder: string }) {
   if (error) return <p className="py-4 text-danger">{(error as Error).message}</p>;
   if (isPending) return <p className="py-4 text-text-3">Loading…</p>;
   const names = new Map((people.data ?? []).map((p) => [p.id, p.fullName]));
-  /** Whoever started the card, else the people it was sent to. */
-  const who = (c: CardDTO) => c.claimedBy?.name ?? c.assigneeIds.map((id) => names.get(id)).filter(Boolean).join(", ");
+  /** Whoever started the card, else the team or people it was sent to. */
+  const who = (c: CardDTO) => c.claimedBy?.name ?? c.teamName ?? c.assigneeIds.map((id) => names.get(id)).filter(Boolean).join(", ");
   const cards = data.columns.flatMap((c) => c.cards);
   if (cards.length === 0) return <p className="py-4 text-text-2">No production route yet.</p>;
   const jobs = [...new Set(cards.map((c) => c.jobName))];

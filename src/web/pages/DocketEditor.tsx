@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { emptyForm, WHOLE_DOCKET, type DocketForm, type ProductionJob } from "../../shared/docketForm";
 import { todayInBusinessTz } from "../../shared/rules";
-import type { AccountManagerCount, AssigneeDTO, VirtualDocketDTO } from "../../shared/types";
+import type { AccountManagerCount, AssigneeDTO, TeamDTO, VirtualDocketDTO } from "../../shared/types";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { emptyRow, HandoffPicker, rowsComplete, toTargets, type HandoffRow } from "../cards/HandoffPicker";
@@ -37,6 +37,7 @@ export function DocketEditor() {
     queryFn: () => api<AssigneeDTO[]>("/api/assignees"),
     enabled: canEdit,
   });
+  const teams = useQuery({ queryKey: ["teams"], queryFn: () => api<TeamDTO[]>("/api/teams"), enabled: canEdit, retry: false });
   const ams = useQuery({
     queryKey: ["account-managers"],
     queryFn: () => api<AccountManagerCount[]>("/api/account-managers"),
@@ -213,7 +214,14 @@ export function DocketEditor() {
             {canHandOff ? (
               <>
                 <p className="mt-1 mb-3 text-xs text-text-3">Not printed on the docket. Who gets it first, and what they must do.</p>
-                <HandoffPicker people={assignees.data ?? []} rows={rows} onChange={changeRows} disabled={saving} />
+                <HandoffPicker
+                  people={assignees.data ?? []}
+                  teams={teams.data ?? []}
+                  canSubcontract={canEdit}
+                  rows={rows}
+                  onChange={changeRows}
+                  disabled={saving}
+                />
               </>
             ) : (
               <p className="mt-1 text-sm text-text-2">

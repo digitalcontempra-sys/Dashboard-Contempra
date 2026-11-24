@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { AREA_LABEL, CARD_FIELDS, continueBlocker, type CardFields } from "../../shared/cards";
 import { STAGE_STATUS } from "../../shared/handoff";
-import type { AssigneeDTO, CardDTO } from "../../shared/types";
+import type { AssigneeDTO, CardDTO, TeamDTO } from "../../shared/types";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { AreaChip } from "../components/AreaChip";
@@ -28,6 +28,7 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
   const [next, setNext] = useState<HandoffRow[] | null>(null);
   const [reading, setReading] = useState(false);
   const people = useQuery({ queryKey: ["assignees"], queryFn: () => api<AssigneeDTO[]>("/api/assignees"), enabled: next !== null });
+  const teams = useQuery({ queryKey: ["teams"], queryFn: () => api<TeamDTO[]>("/api/teams"), enabled: next !== null, retry: false });
   // Edits not yet sent, and the version the next request must carry.
   const pending = useRef<CardFields | null>(null);
   const version = useRef(initial.version);
@@ -147,6 +148,8 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
   }
 
   const claimedByOther = card.claimedBy && card.claimedBy.id !== user?.id;
+  // A team card belongs to whoever started it first; the other members only see it.
+  const takenByOther = Boolean(card.teamName && claimedByOther && user?.accessLevel === "staff");
   // A hand-off card goes back to whoever handed it over; an old route card to an earlier area.
   const routeBack = !card.handoff && card.earlier.length > 0;
   const canSendBack = active && (routeBack || (card.handoff && card.from !== null));
@@ -169,6 +172,9 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
               <BucketTag bucket={card.header.bucket} />
               {card.status === "waiting" && (
                 <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-text-2">Up next</span>
+              )}
+              {card.teamName && (
+                <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-text-2">{card.teamName}</span>
               )}
               {card.stage && card.status === "active" && (
                 <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent">{STAGE_STATUS[card.stage]}</span>
@@ -216,7 +222,9 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
           </p>
         )}
         {claimedByOther && (
-          <p className="mx-5 mb-2 text-sm font-medium text-text-2 sm:mx-7">{firstName(card.claimedBy!.name)} is working on it</p>
+          <p className="mx-5 mb-2 text-sm font-medium text-text-2 sm:mx-7">
+            {firstName(card.claimedBy!.name)} {takenByOther ? "is on it" : "is working on it"}
+          </p>
         )}
         {card.claimedBy && !claimedByOther && <p className="mx-5 mb-2 text-sm font-medium text-ok sm:mx-7">You're on it</p>}
 
@@ -226,7 +234,7 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
               roleId={card.roleId}
               values={fields}
               onChange={change}
-              disabled={!active || busy}
+              disabled={!active || busy || takenByOther}
               placeholders={{ address: card.header.address ?? "" }}
               cardId={card.id}
             />
@@ -288,7 +296,14 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
               {people.isPending ? (
                 <p className="text-sm text-text-2">Loading people…</p>
               ) : (
-                <HandoffPicker people={people.data ?? []} rows={next} onChange={setNext} disabled={busy} />
+                <HandoffPicker
+                  people={people.data ?? []}
+                  teams={teams.data ?? []}
+                  canSubcontract={user?.accessLevel === "admin" || user?.accessLevel === "manager"}
+                  rows={next}
+                  onChange={setNext}
+                  disabled={busy}
+                />
               )}
               <div className="mt-3 flex justify-end gap-2">
                 <button type="button" className="btn-ghost" onClick={() => setNext(null)}>
@@ -313,7 +328,7 @@ export function CardView({ card: initial, onClose }: { card: CardDTO; onClose: (
           )}
         </div>
 
-        {active && (
+        {active && !takenByOther && (
           <footer className="border-t border-border px-5 py-4 sm:px-7">
             <div className="flex flex-wrap items-center gap-2">
               {canSendBack && !back.open && (

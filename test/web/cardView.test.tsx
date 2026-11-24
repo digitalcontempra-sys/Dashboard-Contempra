@@ -237,3 +237,22 @@ describe("CardView", () => {
     expect(screen.getByRole("checkbox", { name: "Laminated" })).toBeDisabled();
   });
 });
+
+describe("CardView: team cards", () => {
+  const teamCard = (over: Partial<CardDTO> = {}) =>
+    handed({ roleId: "installer", team: false, teamName: "Team B", assigneeIds: [staffUser.id, 99], ...over });
+
+  it("shows the team and lets any member start it", () => {
+    show(teamCard());
+    expect(screen.getByText("Team B")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "I'm on it" })).toBeEnabled();
+  });
+
+  it("once another member started it, it is theirs: no actions for the others", async () => {
+    show(teamCard({ claimedBy: { id: 99, name: "Gary Smith" } }));
+    expect(await screen.findByText("Gary is on it")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "I'm on it" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Continue →" })).toBeNull();
+  });
+});

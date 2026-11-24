@@ -36,6 +36,7 @@ export function CardTile({ card, onOpen, noMembers }: { card: CardDTO; onOpen: (
       <p className="mt-1 line-clamp-2 text-[13px] text-text-2">{card.instruction ?? (card.handoff ? "" : card.jobName)}</p>
       <div className="mt-auto flex flex-col items-start gap-1">
         {card.stage && <span className="text-[11px] font-bold text-accent">{STAGE_STATUS[card.stage]}</span>}
+        {card.teamName && <span className="text-[11px] font-semibold text-text-2">{card.teamName}</span>}
         {waiting ? (
           <span className="text-[11px] font-semibold text-text-3">Up next</span>
         ) : (

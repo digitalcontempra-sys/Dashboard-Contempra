@@ -1,41 +1,54 @@
 import { AREA_LABEL, ROLE_ORDER } from "../../shared/cards";
-import { GENERAL_ROLE, type HandoffTarget } from "../../shared/handoff";
-import type { AssigneeDTO } from "../../shared/types";
+import { GENERAL_ROLE, SUBCONTRACT_ROLE } from "../../shared/handoff";
+import type { AssigneeDTO, TeamDTO } from "../../shared/types";
 import { Icon } from "../components/Icon";
 
-/** One person the docket goes to: "<userId>:<roleId>" from the list, and what they must do. */
+/** One person ("<userId>:<roleId>") or team ("team:<id>") the docket goes to, and what they must do. */
 export type HandoffRow = { pick: string; instruction: string };
 
 export const emptyRow = (): HandoffRow => ({ pick: "", instruction: "" });
 
-/** Every row has a person and a note. */
-/** Every row names a person; What to do is optional. */
+/** Every row names a person or team; What to do is optional. */
 export const rowsComplete = (rows: HandoffRow[]) => rows.length > 0 && rows.every((r) => r.pick !== "");
 
-export function toTargets(rows: HandoffRow[]): HandoffTarget[] {
+/** What the API takes: a person in an area, or a team. */
+export type PickedTarget = { userId: number; roleId: string; instruction: string } | { teamId: number; instruction: string };
+
+export function toTargets(rows: HandoffRow[]): PickedTarget[] {
   return rows.map((r) => {
+    if (r.pick.startsWith("team:")) return { teamId: Number(r.pick.slice(5)), instruction: r.instruction.trim() };
     const [id, roleId] = r.pick.split(":");
     return { userId: Number(id), roleId, instruction: r.instruction.trim() };
   });
 }
 
 /**
- * Who gets the docket next, grouped by area. A person with several areas is listed in each (the
- * choice also picks the area); people without an area are under "Other" and get a general card.
+ * Who gets the docket next, grouped by area. Installer teams come first (one card for the whole
+ * crew). A person with several areas is listed in each (the choice also picks the area); people
+ * without an area are under "Other" and get a general card. Only managers see Sub Contract.
  */
 export function HandoffPicker({
   people,
   rows,
   onChange,
   disabled = false,
+  teams = [],
+  canSubcontract = false,
 }: {
   people: AssigneeDTO[];
   rows: HandoffRow[];
   onChange: (rows: HandoffRow[]) => void;
   disabled?: boolean;
+  teams?: TeamDTO[];
+  canSubcontract?: boolean;
 }) {
+  const crews = teams.filter((t) => t.members.length > 0);
   const groups = [
-    ...ROLE_ORDER.map((roleId) => ({ roleId: roleId as string, label: AREA_LABEL[roleId], people: people.filter((p) => p.roles.includes(roleId)) })),
+    ...ROLE_ORDER.filter((roleId) => canSubcontract || roleId !== SUBCONTRACT_ROLE).map((roleId) => ({
+      roleId: roleId as string,
+      label: AREA_LABEL[roleId],
+      people: people.filter((p) => p.roles.includes(roleId)),
+    })),
     { roleId: GENERAL_ROLE, label: "Other", people: people.filter((p) => p.roles.length === 0) },
   ].filter((g) => g.people.length > 0);
   const set = (i: number, row: HandoffRow) => onChange(rows.map((r, ri) => (ri === i ? row : r)));
@@ -53,6 +66,15 @@ export function HandoffPicker({
               onChange={(e) => set(i, { ...row, pick: e.target.value })}
             >
               <option value="">Choose a person…</option>
+              {crews.length > 0 && (
+                <optgroup label="Teams">
+                  {crews.map((t) => (
+                    <option key={t.id} value={`team:${t.id}`}>
+                      {`${t.name} — ${AREA_LABEL[t.roleId] ?? t.roleId} (${t.members.map((m) => m.fullName).join(", ")})`}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
               {groups.map((g) => (
                 <optgroup key={g.roleId} label={g.label}>
                   {g.people.map((p) => (
