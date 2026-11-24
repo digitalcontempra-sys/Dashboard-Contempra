@@ -303,7 +303,7 @@ Everything below is live and pushed to `main`:
 - calendar-only dates; material lists per area (Roll, Print FB, Laminate Roll);
 - staff accounts (imported; the owner's account has Printer Roll, Designer and Contour Cut).
 
-On branch `feature/dashboard-sections` (until merged): Main Dashboard sections (New Orders, Daily Complete, Upcoming), Save as New Order, migration 0012. No sheet layout change.
+- Main Dashboard sections (New Orders, Daily Complete, Upcoming), Save as New Order, migration 0012 (live 2026-11-24; no sheet layout change).
 
 ### Pending: owner
 
