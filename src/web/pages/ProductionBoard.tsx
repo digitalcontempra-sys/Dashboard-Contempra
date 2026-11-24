@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AREA_LABEL, ROLE_ORDER } from "../../shared/cards";
 import type { TimeBucket } from "../../shared/rules";
@@ -9,8 +9,32 @@ import { useAuth } from "../auth";
 import { CardTile } from "../cards/CardTile";
 import { CardView } from "../cards/CardView";
 import { areaColor } from "../components/AreaChip";
+import { BoardScrollbar } from "../components/BoardScrollbar";
 import { BucketFilter } from "../components/BucketChip";
+import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/Layout";
+
+/** Every word must appear in the card's work order, customer, project, job, note or people. */
+function matches(c: CardDTO, query: string, names: Map<number, string>): boolean {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const text = [
+    c.workOrder,
+    c.jobName,
+    c.instruction,
+    c.header.customer,
+    c.header.project,
+    c.header.address,
+    c.header.accountManager,
+    c.claimedBy?.name,
+    c.from?.name,
+    ...c.assigneeIds.map((id) => names.get(id)),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return words.every((w) => text.includes(w));
+}
 
 /** Managers: every active card, one column per area. */
 export function ProductionBoard() {
@@ -25,6 +49,12 @@ export function ProductionBoard() {
     queryFn: () => api<BoardDTO>(withQuery("/api/production-board", { area, user: person, bucket })),
     refetchInterval: 20_000,
   });
+  const [query, setQuery] = useState("");
+  const scroller = useRef<HTMLDivElement>(null);
+  const columns = useMemo(() => {
+    const names = new Map((people.data ?? []).map((p) => [p.id, p.fullName]));
+    return (data?.columns ?? []).map((col) => ({ ...col, cards: col.cards.filter((c) => matches(c, query, names)) }));
+  }, [data, people.data, query]);
 
   return (
     <>
@@ -61,14 +91,29 @@ export function ProductionBoard() {
               ))}
             </select>
           </label>
+          <label className="flex min-w-48 flex-1 flex-col gap-1 text-[13px] font-medium text-text-2 md:max-w-sm">
+            Search
+            <span className="relative block">
+              <Icon name="search" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-text-3" />
+              <input
+                type="search"
+                className="field pl-9"
+                placeholder="Work order, customer, person…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </span>
+          </label>
         </div>
         <BucketFilter value={bucket} onChange={setBucket} />
         {error && <p className="text-danger">{(error as Error).message}</p>}
 
+        <BoardScrollbar target={scroller} controls="board-columns" label="Scroll areas" deps={columns} />
+
         {/* The board scrolls sideways inside itself, never the page. */}
-        <div className="-mx-4 overflow-x-auto px-4 pb-4 md:mx-0 md:px-0">
+        <div id="board-columns" ref={scroller} className="-mx-4 overflow-x-auto px-4 pb-4 md:mx-0 md:px-0">
           <div className="flex gap-3">
-            {(data?.columns ?? []).map((col) => (
+            {columns.map((col) => (
               <section key={col.roleId} aria-label={col.area} className="card flex w-64 shrink-0 flex-col gap-2.5 p-3">
                 <h2 className="flex items-center gap-2 text-sm font-bold">
                   <span className="size-2.5 shrink-0 rounded-full" style={{ background: areaColor(col.roleId) }} aria-hidden="true" />

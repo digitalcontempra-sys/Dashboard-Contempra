@@ -49,6 +49,55 @@ describe("Production Board", () => {
     await waitFor(() => expect(calls.some((c) => c.url.pathname === "/api/production-board" && c.url.searchParams.get("user") === "5")).toBe(true));
   });
 
+  it("search narrows the cards by work order, customer or person", async () => {
+    mockApi({
+      ...base,
+      "GET /api/auth/me": () => managerUser,
+      "GET /api/production-board": () =>
+        board({
+          columns: [
+            {
+              roleId: "laminate_roll",
+              area: "Laminate",
+              cards: [
+                { ...makeCard({ id: 1, workOrder: "91480" }), noMembers: false },
+                { ...makeCard({ id: 2, workOrder: "91290", header: { ...makeCard().header, customer: "Central Display" }, assigneeIds: [5] }), noMembers: false },
+              ],
+            },
+          ],
+        }),
+    });
+    renderApp("/production");
+    await screen.findByRole("heading", { name: "Laminate (2)" });
+    const search = screen.getByRole("searchbox", { name: "Search" });
+    await userEvent.type(search, "central");
+    expect(screen.getByRole("heading", { name: "Laminate (1)" })).toBeInTheDocument();
+    expect(screen.getByText("#91290")).toBeInTheDocument();
+    await userEvent.clear(search);
+    await userEvent.type(search, "9148");
+    expect(screen.getByText("#91480")).toBeInTheDocument();
+    expect(screen.queryByText("#91290")).toBeNull();
+    await userEvent.clear(search);
+    await userEvent.type(search, "erin");
+    expect(screen.getByText("#91290")).toBeInTheDocument();
+    expect(screen.queryByText("#91480")).toBeNull();
+  });
+
+  it("has a scroll bar above the columns that moves the board sideways", async () => {
+    mockApi({ ...base, "GET /api/auth/me": () => managerUser, "GET /api/production-board": () => board() });
+    renderApp("/production");
+    await screen.findByRole("heading", { name: "Laminate (2)" });
+    const bar = screen.getByRole("scrollbar", { name: "Scroll areas" });
+    const board_ = document.getElementById(bar.getAttribute("aria-controls")!)!;
+    Object.defineProperty(board_, "scrollWidth", { configurable: true, value: 2000 });
+    Object.defineProperty(board_, "clientWidth", { configurable: true, value: 1000 });
+    bar.focus();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(board_.scrollLeft).toBeGreaterThan(0);
+    await userEvent.keyboard("{End}");
+    expect(board_.scrollLeft).toBe(1000);
+  });
+
   it("tells the admin when the sheet columns are not set up", async () => {
     mockApi({ ...base, "GET /api/auth/me": () => adminUser, "GET /api/production-board": () => board({ productionColumnsReady: false }) });
     renderApp("/production");
