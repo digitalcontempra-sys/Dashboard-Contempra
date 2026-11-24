@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { TASK_NOTE_MAX, taskBucket, type TaskDue, type TaskDueKind } from "../../shared/taskCards";
 import { todayInBusinessTz } from "../../shared/rules";
-import type { TaskCardDTO } from "../../shared/types";
+import type { TaskCardDTO, TaskHistoryPage } from "../../shared/types";
 import type { AppEnv } from "../app";
 import { requireAuth } from "../auth/sessions";
 
@@ -24,6 +24,7 @@ type Row = {
 const SELECT = `SELECT t.*, uf.full_name AS from_name, ut.full_name AS to_name FROM task_cards t
   JOIN users uf ON uf.id = t.from_user JOIN users ut ON ut.id = t.to_user`;
 const SENT_DAYS = 30;
+const HISTORY_PAGE = 50;
 const KINDS: TaskDueKind[] = ["none", "rush", "today", "date"];
 
 function toDto(r: Row, viewerId: number, today: string): TaskCardDTO {
@@ -57,17 +58,18 @@ taskCardRoutes.post("/task-cards", async (c) => {
   const b = await c.req.json<{ toUserId?: unknown; note?: unknown; due?: { kind?: unknown; date?: unknown } }>().catch(() => ({}) as Record<string, never>);
   const note = typeof b.note === "string" ? b.note.trim() : "";
   if (!note || note.length > TASK_NOTE_MAX) return bad(c, "Write a note (up to 1000 characters).");
-  if (b.toUserId === me.id) return bad(c, "You can't send a task to yourself.");
   const to = Number.isInteger(b.toUserId)
     ? await c.env.DB.prepare("SELECT id FROM users WHERE id = ? AND active = 1").bind(b.toUserId).first<{ id: number }>()
     : null;
   if (!to) return bad(c, "Choose someone to send it to.");
   const kind = KINDS.includes(b.due?.kind as TaskDueKind) ? (b.due!.kind as TaskDueKind) : "none";
   if (kind === "date" && !isIsoDate(b.due?.date)) return bad(c, "Choose a valid date.");
+  const now = new Date().toISOString();
+  // A note to self is seen from the start: no NEW tag, no badge, no chime.
   const row = await c.env.DB.prepare(
-    `INSERT INTO task_cards (from_user, to_user, note, due_kind, due_date, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+    `INSERT INTO task_cards (from_user, to_user, note, due_kind, due_date, created_at, seen_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
   )
-    .bind(me.id, to.id, note, kind, kind === "date" ? b.due!.date : null, new Date().toISOString())
+    .bind(me.id, to.id, note, kind, kind === "date" ? b.due!.date : null, now, to.id === me.id ? now : null)
     .first<{ id: number }>();
   const full = await c.env.DB.prepare(`${SELECT} WHERE t.id = ?`).bind(row!.id).first<Row>();
   return c.json(toDto(full!, me.id, todayInBusinessTz(new Date())));
@@ -79,11 +81,24 @@ taskCardRoutes.get("/task-cards", async (c) => {
   if (c.req.query("box") === "sent") {
     const since = new Date(Date.now() - SENT_DAYS * 86_400_000).toISOString();
     const { results } = await c.env.DB.prepare(
-      `${SELECT} WHERE t.from_user = ? AND (t.status = 'open' OR t.done_at >= ?) ORDER BY t.created_at DESC`,
+      `${SELECT} WHERE t.from_user = ? AND t.to_user <> t.from_user AND (t.status = 'open' OR t.done_at >= ?) ORDER BY t.created_at DESC`,
     )
       .bind(me.id, since)
       .all<Row>();
     return c.json(results.map((r) => toDto(r, me.id, today)));
+  }
+  if (c.req.query("box") === "history") {
+    const page = Math.max(1, Math.floor(Number(c.req.query("page")) || 1));
+    const { results } = await c.env.DB.prepare(
+      `${SELECT} WHERE (t.from_user = ?1 OR t.to_user = ?1) AND t.status = 'done' ORDER BY t.done_at DESC, t.id DESC LIMIT ?2 OFFSET ?3`,
+    )
+      .bind(me.id, HISTORY_PAGE + 1, (page - 1) * HISTORY_PAGE)
+      .all<Row>();
+    const page_: TaskHistoryPage = {
+      items: results.slice(0, HISTORY_PAGE).map((r) => toDto(r, me.id, today)),
+      hasMore: results.length > HISTORY_PAGE,
+    };
+    return c.json(page_);
   }
   const { results } = await c.env.DB.prepare(`${SELECT} WHERE t.to_user = ? AND t.status = 'open' ORDER BY t.created_at`)
     .bind(me.id)
@@ -119,9 +134,11 @@ taskCardRoutes.post("/task-cards/:id/done", async (c) => {
   if (t.to_user !== c.get("user").id) return c.json({ error: "This task is not yours." }, 403);
   const now = new Date().toISOString();
   const r = await c.env.DB.prepare(
-    "UPDATE task_cards SET status = 'done', done_at = ?, seen_at = coalesce(seen_at, ?) WHERE id = ? AND status = 'open'",
+    // A note to self raises no "done" alert: the sender is the one who finished it.
+    `UPDATE task_cards SET status = 'done', done_at = ?1, seen_at = coalesce(seen_at, ?1),
+       done_seen_at = CASE WHEN from_user = to_user THEN ?1 ELSE done_seen_at END WHERE id = ?2 AND status = 'open'`,
   )
-    .bind(now, now, t.id)
+    .bind(now, t.id)
     .run();
   if (r.meta.changes === 0) return c.json({ error: "This task is already done." }, 409);
   return c.json({ ok: true });

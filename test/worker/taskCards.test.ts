@@ -52,7 +52,6 @@ describe("task cards", () => {
     };
     await bad({ note: "  " }, "Write a note (up to 1000 characters).");
     await bad({ note: "x".repeat(1001) }, "Write a note (up to 1000 characters).");
-    await bad({ toUserId: ids.ana }, "You can't send a task to yourself.");
     await bad({ toUserId: 99999 }, "Choose someone to send it to.");
     await bad({ due: { kind: "date", date: "2026-13-45" } }, "Choose a valid date.");
     await env.DB.prepare("UPDATE users SET active = 0 WHERE id = ?").bind(ids.mgr).run();
@@ -107,6 +106,55 @@ describe("task cards", () => {
     await post(`/api/task-cards/${t.id}/done`, erin);
     await env.DB.prepare("UPDATE task_cards SET done_at = '2026-01-01T00:00:00Z' WHERE id = ?").bind(t.id).run();
     expect(await box(ana, "sent")).toEqual([]);
+  });
+
+  it("a note to self is a quiet personal note", async () => {
+    const t = await send({ toUserId: ids.ana });
+    expect(t).toMatchObject({ from: { id: ids.ana }, to: { id: ids.ana }, isNew: false, status: "open" });
+    expect((await box(ana, "inbox")).map((x) => x.id)).toEqual([t.id]);
+    let s = await summary(ana);
+    expect(s).toMatchObject({ newTasks: 0, newCount: 0, activeCount: 1, doneTasks: 0 });
+    // Not in Sent by me: that list is for tasks to other people.
+    expect(await box(ana, "sent")).toEqual([]);
+    expect((await post(`/api/task-cards/${t.id}/done`, ana)).status).toBe(200);
+    s = await summary(ana);
+    expect(s).toMatchObject({ newCount: 0, doneTasks: 0, activeCount: 0 });
+    // Its owner can delete it while open.
+    const u = await send({ toUserId: ids.ana });
+    expect((await api(`/api/task-cards/${u.id}`, { method: "DELETE", cookie: ana })).status).toBe(200);
+  });
+
+  it("history lists finished tasks sent and received, newest first, 50 a page", async () => {
+    const history = async (cookie: string, page = 1) =>
+      (await (await api(`/api/task-cards?box=history&page=${page}`, { cookie })).json()) as { items: TaskCardDTO[]; hasMore: boolean };
+    const sent = await send({ note: "Sent by ana" });
+    const got = (await (await post("/api/task-cards", erin, { toUserId: ids.ana, note: "Sent to ana" })).json()) as TaskCardDTO;
+    const self = await send({ toUserId: ids.ana, note: "Self" });
+    const open = await send({ note: "Still open" });
+    await post(`/api/task-cards/${sent.id}/done`, erin);
+    await post(`/api/task-cards/${got.id}/done`, ana);
+    await post(`/api/task-cards/${self.id}/done`, ana);
+    const at = (id: number, iso: string) => env.DB.prepare("UPDATE task_cards SET done_at = ? WHERE id = ?").bind(iso, id).run();
+    await at(sent.id, "2026-11-20T10:00:00Z");
+    await at(got.id, "2026-11-22T10:00:00Z");
+    await at(self.id, "2026-01-02T10:00:00Z");
+    const h = await history(ana);
+    expect(h.items.map((x) => x.note)).toEqual(["Sent to ana", "Sent by ana", "Self"]);
+    expect(h.hasMore).toBe(false);
+    expect(h.items.some((x) => x.id === open.id)).toBe(false);
+    // Mgr is not part of any of them.
+    expect((await history(mgr)).items).toEqual([]);
+    // Paging: 50 per page.
+    const stmt = env.DB.prepare(
+      "INSERT INTO task_cards (from_user, to_user, note, status, created_at, done_at) VALUES (?, ?, 'Bulk', 'done', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+    );
+    await env.DB.batch(Array.from({ length: 50 }, () => stmt.bind(ids.erin, ids.ana)));
+    const p1 = await history(ana);
+    expect(p1.items).toHaveLength(50);
+    expect(p1.hasMore).toBe(true);
+    const p2 = await history(ana, 2);
+    expect(p2.items).toHaveLength(3);
+    expect(p2.hasMore).toBe(false);
   });
 
   it("managers use the same rules", async () => {

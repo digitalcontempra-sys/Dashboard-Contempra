@@ -167,6 +167,9 @@ export type TaskCardDTO = {
   isNew: boolean;
 };
 
+/** One page of finished Task Cards I sent or received, newest first. */
+export type TaskHistoryPage = { items: TaskCardDTO[]; hasMore: boolean };
+
 export type BoardCard = CardDTO & { noMembers: boolean };
 
 export type BoardDTO = {
