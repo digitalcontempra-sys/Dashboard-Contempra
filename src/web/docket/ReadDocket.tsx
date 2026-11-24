@@ -129,6 +129,11 @@ export function ReadDocket({ workOrder, onClose }: { workOrder: string; onClose:
     setError(null);
     // Open the tab now, inside the tap: iPhone Safari blocks a window opened after an await.
     const win = window.open("", "_blank");
+    if (!win) {
+      setBusy(false);
+      setError("Your browser blocked the PDF tab. Allow pop-ups for this site and try again.");
+      return;
+    }
     try {
       let url: string;
       if (canEdit && d.pdf.stored) url = `/api/virtual-dockets/${encodeURIComponent(workOrder)}/pdf`;
@@ -137,10 +142,9 @@ export function ReadDocket({ workOrder, onClose }: { workOrder: string; onClose:
         url = URL.createObjectURL(await renderDocketPdf(d.form, workOrder, canEdit));
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
       }
-      if (win) win.location.href = url;
-      else window.location.href = url;
+      win.location.href = url;
     } catch (e) {
-      win?.close();
+      win.close();
       setError((e as Error).message || "Could not create the PDF");
     } finally {
       setBusy(false);

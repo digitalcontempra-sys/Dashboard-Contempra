@@ -35,7 +35,8 @@ const dto = (over: Record<string, unknown> = {}) => ({
   source: "virtual",
   pdf: { stored: true, driveLink: null, driveStatus: "done" },
   deletedAt: null,
-  sheet: { notes: "Call before going", link: "https://example.com/art" },
+  // The server never sends Staff the Link (column P holds the priced PDF in Drive).
+  sheet: { notes: "Call before going", link: null },
   ...over,
 });
 
@@ -88,7 +89,7 @@ describe("Read Docket", () => {
     expect(p.getByText("Nov 20, 2026")).toBeInTheDocument();
     expect(p.getByText("Installation")).toBeInTheDocument();
     expect(p.getByText("Call before going")).toBeInTheDocument();
-    expect(p.getByRole("link", { name: "https://example.com/art" })).toHaveAttribute("href", "https://example.com/art");
+    expect(p.queryByText("Link")).toBeNull();
     expect(p.queryByRole("textbox")).toBeNull();
     expect(panel.textContent).not.toMatch(/\$|Total|GST|PST|Deposit/);
   });
@@ -98,9 +99,10 @@ describe("Read Docket", () => {
     priced.materials[0] = { name: "IJ35 vinyl", cost: "$100.00" };
     priced.deposit = "$50.00";
     priced.delivery = "$20.00";
-    show(managerUser, dto({ form: priced }));
+    show(managerUser, dto({ form: priced, sheet: { notes: null, link: "https://example.com/art" } }));
     const panel = await openPanel();
     await within(panel).findByText("IJ35 vinyl");
+    expect(within(panel).getByRole("link", { name: "https://example.com/art" })).toHaveAttribute("href", "https://example.com/art");
     expect(panel.textContent).not.toMatch(/\$|100|Deposit/);
   });
 
@@ -127,6 +129,17 @@ describe("Read Docket", () => {
     await userEvent.click(within(panel).getByRole("button", { name: "View PDF" }));
     await waitFor(() => expect(opened.location.href).toBe("blob:pdf"));
     expect(renderDocketPdf).toHaveBeenCalledWith(expect.objectContaining({ forName: "Encore Lounge" }), "91488", false);
+  });
+
+  it("a blocked PDF tab shows a message and keeps the card open", async () => {
+    vi.mocked(window.open).mockImplementation(() => null);
+    const { onClose } = show();
+    const panel = await openPanel();
+    await within(panel).findByText("Encore Lounge");
+    await userEvent.click(within(panel).getByRole("button", { name: "View PDF" }));
+    expect(await within(panel).findByRole("alert")).toHaveTextContent("blocked the PDF tab");
+    expect(renderDocketPdf).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("View PDF opens the stored PDF for a manager", async () => {
