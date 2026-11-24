@@ -126,7 +126,7 @@ cardPhotoRoutes.post("/cards/:id/photos", async (c) => {
     await c.env.DOCKETS_BUCKET.put(thumbKey(row!.id), await thumb.arrayBuffer(), { httpMetadata: { contentType: "image/jpeg" } });
   }
   await syncCount(c.env.DB, card);
-  // The sheet's Photos link (column AB) updates right away, not on the next 5-minute cron.
+  // The sheet's Photos link (column AC) updates right away, not on the next 5-minute cron.
   c.executionCtx.waitUntil(flushCardSheet(c.env, card.work_order));
   return c.json(await list(c.env.DB, card.id));
 });
@@ -152,7 +152,7 @@ cardPhotoRoutes.delete("/cards/:id/photos/:photoId", async (c) => {
   await c.env.DB.prepare("DELETE FROM card_photos WHERE id = ?").bind(photoId).run();
   await c.env.DOCKETS_BUCKET.delete(thumbKey(photoId));
   await syncCount(c.env.DB, card);
-  // The sheet's Photos link (column AB) updates right away, not on the next 5-minute cron.
+  // The sheet's Photos link (column AC) updates right away, not on the next 5-minute cron.
   c.executionCtx.waitUntil(flushCardSheet(c.env, card.work_order));
   return c.json(await list(c.env.DB, card.id));
 });

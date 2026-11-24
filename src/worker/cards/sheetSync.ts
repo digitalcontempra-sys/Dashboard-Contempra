@@ -65,7 +65,7 @@ export function trackingLine(name: string, kind: string, iso: string): string {
   const p = Object.fromEntries(WHEN.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
   return `${name} - ${kind} - ${p.month} ${p.day} ${p.year} - ${p.hour}:${p.minute} ${String(p.dayPeriod).toUpperCase()}`;
 }
-/** Sheet columns R..Z, one per area, in role order; AA is Assigned. */
+/** Sheet columns R..AA, one per area, in role order; AB is Assigned. */
 const AREA_COLS = ["R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA"];
 const RETRY_BATCH = 20;
 

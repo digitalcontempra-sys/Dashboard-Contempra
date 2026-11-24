@@ -35,7 +35,7 @@ Una nueva área de producción para cuando alguien va al sitio a tomar medidas a
 ## Personas
 
 - La migración da el área Measure a: Jeff Whitaker, Kharash Ibrahim, Gary, Dennis, Larry, Nick (por usuario: `jeff.w`, `kharash`, `gary`, `dennis`, `larry`, `nick`; si alguno no existe, se ignora).
-- **Cory** no tiene cuenta: el dueño la crea en Admin → Users y le asigna Measure.
+- **Cory** ya tiene cuenta (usuario `Cory`): la migración también le da Measure.
 
 ## Fuera de alcance
 
