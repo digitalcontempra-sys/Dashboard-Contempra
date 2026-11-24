@@ -43,6 +43,15 @@ export async function toCardDTOs(db: D1Database, userId: number, rows: CardRow[]
       .all<{ id: number; full_name: string }>();
     for (const u of results) names.set(u.id, u.full_name);
   }
+  const teamIds = [...new Set(rows.map((r) => r.team_id).filter((x): x is number => x !== null))];
+  const teams = new Map<number, string>();
+  if (teamIds.length) {
+    const { results } = await db
+      .prepare(`SELECT id, name FROM teams WHERE id IN (${marks(teamIds.length)})`)
+      .bind(...teamIds)
+      .all<{ id: number; name: string }>();
+    for (const t of results) teams.set(t.id, t.name);
+  }
   const seen = new Map<number, string>();
   const { results: seenRows } = await db
     .prepare(`SELECT card_id, seen_at FROM card_seen WHERE user_id = ? AND card_id IN (${marks(rows.length)})`)
@@ -66,6 +75,7 @@ export async function toCardDTOs(db: D1Database, userId: number, rows: CardRow[]
       status: r.status,
       assigneeIds: assignees,
       team: assignees.length === 0,
+      teamName: r.team_id !== null ? (teams.get(r.team_id) ?? null) : null,
       claimedBy: r.claimed_by ? { id: r.claimed_by, name: names.get(r.claimed_by) ?? "Someone" } : null,
       fields: JSON.parse(r.fields_json) as CardFields,
       returned: r.returned_reason ? { reason: r.returned_reason, by: names.get(r.returned_by ?? -1) ?? "Someone" } : null,

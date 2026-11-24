@@ -102,6 +102,7 @@ type SheetCard = {
   done_at: string | null;
   updated_at: string;
   claimed_name: string | null;
+  team_name: string | null;
   done_name: string | null;
   last_actor: string | null;
   stage: CardStage | null;
@@ -112,9 +113,10 @@ async function sheetCards(db: D1Database, wo: string): Promise<SheetCard[]> {
     .prepare(
       `SELECT c.id, c.job_name, c.job_sort, c.step, c.role_id, r.label AS role_label, c.status, c.assignee_ids, c.fields_json,
          c.returned_reason, c.done_at, c.updated_at, c.stage, uc.full_name AS claimed_name, ud.full_name AS done_name,
+         tm.name AS team_name,
          (SELECT u.full_name FROM card_events e JOIN users u ON u.id = e.user_id WHERE e.card_id = c.id ORDER BY e.id DESC LIMIT 1) AS last_actor
        FROM cards c JOIN roles r ON r.id = c.role_id
-       LEFT JOIN users uc ON uc.id = c.claimed_by LEFT JOIN users ud ON ud.id = c.done_by
+       LEFT JOIN users uc ON uc.id = c.claimed_by LEFT JOIN users ud ON ud.id = c.done_by LEFT JOIN teams tm ON tm.id = c.team_id
        WHERE c.work_order = ? ORDER BY c.job_sort, c.step`,
     )
     .bind(wo)
@@ -137,13 +139,15 @@ const assigneeIds = (c: SheetCard) => JSON.parse(c.assignee_ids) as number[];
 
 function assignedText(c: SheetCard, names: Map<number, string>): string {
   if (c.claimed_name) return c.claimed_name;
+  if (c.team_name) return c.team_name;
   const ids = assigneeIds(c);
   return ids.length ? ids.map((id) => names.get(id) ?? "?").join(", ") : "Team";
 }
 
-/** Who has an active card: whoever took it, else its assignees, else its area. */
+/** Who has an active card: whoever took it, else its team or assignees, else its area. */
 function holderText(c: SheetCard, names: Map<number, string>): string {
   if (c.claimed_name) return c.claimed_name;
+  if (c.team_name) return c.team_name;
   const ids = assigneeIds(c);
   return ids.length ? ids.map((id) => names.get(id) ?? "?").join(", ") : c.role_label;
 }
@@ -199,7 +203,9 @@ type Detail = {
   from?: number;
   returned?: boolean;
   toCreator?: boolean;
-  to?: string | { userId: number; instruction: string }[];
+  to?: string | { userId: number; instruction: string; team?: { name: string } }[];
+  /** A team received the card (one line with its name, not each member). */
+  team?: string;
   toUser?: number;
   back?: number;
   reason?: string;
@@ -242,7 +248,10 @@ export function trackingText(events: TrackingEvent[], names: Map<number, string>
         case "restored":
           return line("restored");
         case "continued":
-          if (Array.isArray(d.to)) return line(`sent to ${d.to.map((t) => (t.instruction ? `${name(t.userId)} (${t.instruction})` : name(t.userId))).join(", ")}`);
+          if (Array.isArray(d.to)) {
+            const to = (t: { userId: number; team?: { name: string } }) => t.team?.name ?? name(t.userId);
+            return line(`sent to ${d.to.map((t) => (t.instruction ? `${to(t)} (${t.instruction})` : to(t))).join(", ")}`);
+          }
           // Old route: its last Continue is logged as "completed" too, one "done" line is enough.
           return d.to && d.to !== "Done" ? line(`sent to ${d.to}`) : null;
         case "sent_back": {
@@ -253,7 +262,7 @@ export function trackingText(events: TrackingEvent[], names: Map<number, string>
           // activated: someone received the docket. A return already has its own line.
           if (d.returned || d.toCreator) return null;
           const ids = d.assignees ?? [];
-          const who = ids.length ? ids.map((id) => name(id)).join(", ") : e.role_label;
+          const who = d.team ?? (ids.length ? ids.map((id) => name(id)).join(", ") : e.role_label);
           return trackingLine(who, d.from !== undefined ? `received from ${name(d.from)}` : "received", e.at);
         }
       }
@@ -287,7 +296,8 @@ export function stageRowCells(cards: SheetCard[], names: Map<number, string>, q:
               status: c.status,
               returnedReason: c.returned_reason,
               // A card for named people shows them; a team card says "Team".
-              claimedByName: c.claimed_name ?? (assigneeIds(c).length ? assignedText(c, names) : null),
+              claimedByName: c.claimed_name ?? (assigneeIds(c).length && !c.team_name ? assignedText(c, names) : null),
+              teamName: c.team_name,
               doneByName: c.done_name,
               doneAt: c.done_at,
               fields: JSON.parse(c.fields_json) as CardFields,

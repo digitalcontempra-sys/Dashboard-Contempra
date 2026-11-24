@@ -81,6 +81,7 @@ export async function setupCards() {
     env.DB.prepare("DELETE FROM docket_jobs"),
     env.DB.prepare("DELETE FROM virtual_dockets"),
     env.DB.prepare("DELETE FROM dockets"),
+    env.DB.prepare("DELETE FROM teams"),
   ]);
   await resetAuthTables();
   const ids: Record<string, number> = {};

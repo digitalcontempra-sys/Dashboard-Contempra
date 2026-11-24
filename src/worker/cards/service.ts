@@ -26,6 +26,8 @@ export type CardRow = {
   from_card_id: number | null;
   stage: CardStage | null;
   handoff: number;
+  /** Team the card was sent to (all its members are in assignee_ids). */
+  team_id: number | null;
 };
 
 export async function loadCards(db: D1Database, wo: string): Promise<CardRow[]> {

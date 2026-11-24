@@ -93,6 +93,9 @@ export type AssigneeDTO = { id: number; fullName: string; roles: string[] };
 
 export type RoleDTO = { id: string; label: string };
 
+/** An Installer crew: sending the docket to it gives one card to all its members. */
+export type TeamDTO = { id: number; name: string; roleId: string; members: { id: number; fullName: string }[] };
+
 export type UserDTO = {
   id: number;
   username: string;
@@ -121,6 +124,8 @@ export type CardDTO = {
   status: import("./cards").CardStatus;
   assigneeIds: number[];
   team: boolean;
+  /** Installer crew the card was sent to ("Team B"); null for a card sent to one person. */
+  teamName: string | null;
   claimedBy: { id: number; name: string } | null;
   fields: import("./cards").CardFields;
   returned: { reason: string; by: string } | null;

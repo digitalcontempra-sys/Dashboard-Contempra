@@ -168,7 +168,7 @@ export async function createDocket(
   const db = env.DB;
   const form = validateForm(input.form);
   const jobs = await validateJobs(db, input.jobs);
-  const targets = input.handoff === undefined ? null : await parseHandoff(db, input.handoff);
+  const targets = input.handoff === undefined ? null : await parseHandoff(db, input.handoff, actor);
   const now = new Date().toISOString();
 
   // Reserve the number in D1 first: the primary key makes two saves at once pick different numbers.
@@ -271,7 +271,7 @@ export async function updateDocket(
   const form = validateForm(input.form);
   // Without a route the docket's cards are left alone (they move by hand-off).
   const jobs = input.jobs === undefined ? null : await validateJobs(db, input.jobs);
-  const targets = input.handoff === undefined ? null : await parseHandoff(db, input.handoff);
+  const targets = input.handoff === undefined ? null : await parseHandoff(db, input.handoff, actor);
   return withLock(db, SHEET_LOCK, async () => {
     // Inside the lock, read-check-write is atomic for the app's own saves.
     const existing = await loadVirtual(db, wo);

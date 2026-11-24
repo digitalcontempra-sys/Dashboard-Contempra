@@ -17,8 +17,17 @@ export async function loadForAction(db: D1Database, user: SessionUser, id: numbe
   const card = await db.prepare("SELECT * FROM cards WHERE id = ?").bind(id).first<CardRow>();
   if (!card) throw new ServiceError(404, "Card not found");
   if (!canAct(card, user)) throw new ServiceError(403, "You can't work on this card.");
+  await assertTaken(db, card, user);
   await assertLive(db, card.work_order);
   return card;
+}
+
+/** A team card is taken by whoever started it first: the other members can no longer move it. */
+async function assertTaken(db: D1Database, card: CardRow, user: SessionUser): Promise<void> {
+  if (card.team_id === null || card.claimed_by === null || card.claimed_by === user.id) return;
+  if (user.accessLevel === "admin" || user.accessLevel === "manager") return;
+  const who = await db.prepare("SELECT full_name FROM users WHERE id = ?").bind(card.claimed_by).first<{ full_name: string }>();
+  throw new ServiceError(409, `${who?.full_name ?? "Someone else"} is already on it.`);
 }
 
 /** Cards of a cancelled docket, or one in the Trash, stay as they are (same rule as the card lists). */
@@ -72,10 +81,21 @@ export async function claimCard(env: Env, user: SessionUser, id: number): Promis
   const card = await loadForAction(db, user, id);
   if (card.status !== "active") throw await movedError(db, id);
   const now = new Date().toISOString();
-  await db.batch([
-    db.prepare("UPDATE cards SET claimed_by = ?, updated_at = ? WHERE id = ? AND status = 'active'").bind(user.id, now, id),
-    eventStmt(db, card, card.work_order, "claimed", user.id, now),
-  ]);
+  // Two members of a team pressing at once: only the first one takes the card.
+  const staff = user.accessLevel === "staff" ? 1 : 0;
+  const r = await db
+    .prepare(
+      `UPDATE cards SET claimed_by = ?1, updated_at = ?2 WHERE id = ?3 AND status = 'active'
+         AND (?4 = 0 OR team_id IS NULL OR claimed_by IS NULL OR claimed_by = ?1)`,
+    )
+    .bind(user.id, now, id, staff)
+    .run();
+  if (r.meta.changes === 0) {
+    const fresh = (await db.prepare("SELECT * FROM cards WHERE id = ?").bind(id).first<CardRow>())!;
+    await assertTaken(db, fresh, user);
+    throw await movedError(db, id);
+  }
+  await eventStmt(db, card, card.work_order, "claimed", user.id, now).run();
   await queueCardSheet(db, card.work_order);
   return cardDTO(db, user.id, id);
 }

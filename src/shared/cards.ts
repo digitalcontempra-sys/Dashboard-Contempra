@@ -274,13 +274,15 @@ export function areaCellText(
     doneAt: string | null;
     fields: CardFields;
     roleId: string;
+    /** Installer crew of a card nobody has started yet ("Team B"). */
+    teamName?: string | null;
   } | null,
 ): string {
   if (!c) return "—";
   if (c.status === "waiting") return "Pending";
   if (c.status === "active") {
     if (c.returnedReason) return `Returned · ${c.returnedReason}`;
-    return `Active · ${c.claimedByName ? firstName(c.claimedByName) : "Team"}`;
+    return `Active · ${c.claimedByName ? firstName(c.claimedByName) : (c.teamName ?? "Team")}`;
   }
   let s = `✓ ${c.doneByName ? firstName(c.doneByName) : ""}${c.doneAt ? ` ${MD.format(new Date(c.doneAt))}` : ""}`.replace("✓  ", "✓ ");
   if (c.roleId === "finishing" && (c.fields.packaged === "ready" || c.fields.packaged === "shipped")) {

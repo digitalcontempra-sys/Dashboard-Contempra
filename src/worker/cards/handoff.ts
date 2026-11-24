@@ -1,6 +1,15 @@
 import { AREA_LABEL } from "../../shared/cards";
 import { WHOLE_DOCKET } from "../../shared/docketForm";
-import { approvalKind, GENERAL_ROLE, parseTargets, type CardStage, type HandoffTarget, type Person } from "../../shared/handoff";
+import {
+  approvalKind,
+  GENERAL_ROLE,
+  parseTargets,
+  SUBCONTRACT_ROLE,
+  type CardStage,
+  type HandoffTarget,
+  type Person,
+  type Team,
+} from "../../shared/handoff";
 import type { CardDTO, SessionUser } from "../../shared/types";
 import { ServiceError } from "../dockets/errors";
 import type { Env } from "../env";
@@ -21,13 +30,25 @@ export async function loadPeople(db: D1Database): Promise<Person[]> {
   return results.map((r) => ({ id: r.id, name: r.full_name, roles: r.roles ? r.roles.split(",") : [] }));
 }
 
-/** The people a docket goes to, checked against the active staff. */
-export async function parseHandoff(db: D1Database, raw: unknown): Promise<HandoffTarget[]> {
+export async function loadTeams(db: D1Database): Promise<Team[]> {
+  const { results } = await db
+    .prepare("SELECT t.id, t.name, t.role_id, group_concat(m.user_id) AS members FROM teams t LEFT JOIN team_members m ON m.team_id = t.id GROUP BY t.id")
+    .all<{ id: number; name: string; role_id: string; members: string | null }>();
+  return results.map((r) => ({ id: r.id, name: r.name, roleId: r.role_id, memberIds: r.members ? r.members.split(",").map(Number) : [] }));
+}
+
+/** The people (or teams) a docket goes to, checked against the active staff. Only managers send to Sub Contract. */
+export async function parseHandoff(db: D1Database, raw: unknown, sender: Pick<SessionUser, "accessLevel">): Promise<HandoffTarget[]> {
+  let targets: HandoffTarget[];
   try {
-    return parseTargets(raw, await loadPeople(db));
+    targets = parseTargets(raw, await loadPeople(db), await loadTeams(db));
   } catch (e) {
     throw new ServiceError(400, (e as Error).message);
   }
+  if (sender.accessLevel === "staff" && targets.some((t) => t.roleId === SUBCONTRACT_ROLE)) {
+    throw new ServiceError(403, "Only a manager can send work to Sub Contract.");
+  }
+  return targets;
 }
 
 export async function hasCards(db: D1Database, wo: string): Promise<boolean> {
@@ -35,8 +56,9 @@ export async function hasCards(db: D1Database, wo: string): Promise<boolean> {
 }
 
 /**
- * Gives one person a card: reuses the card they had parked in this docket and area (after a send
- * back), keeping its fields, else creates a new one. Logs that they received it. Returns its id.
+ * Gives one person (or one team) a card: reuses the card they had parked in this docket and area
+ * (after a send back), keeping its fields, else creates a new one. Logs that they received it.
+ * A team card lists every member; the first to start it takes it. Returns its id.
  */
 export async function giveCard(
   db: D1Database,
@@ -45,37 +67,43 @@ export async function giveCard(
   from: { userId: number; cardId: number | null },
   now: string,
 ): Promise<number> {
-  const assignees = JSON.stringify([t.userId]);
+  const members = t.team ? t.team.memberIds : [t.userId];
+  const assignees = JSON.stringify(members);
+  // A team's parked card is found by team (its members may have changed since).
   const parked = await db
     .prepare(
       `SELECT id FROM cards WHERE work_order = ? AND handoff = 1 AND stage IS NULL AND status = 'waiting'
-         AND role_id = ? AND assignee_ids = ? ORDER BY id DESC LIMIT 1`,
+         AND role_id = ? AND ${t.team ? "team_id = ?" : "team_id IS NULL AND assignee_ids = ?"} ORDER BY id DESC LIMIT 1`,
     )
-    .bind(wo, t.roleId, assignees)
+    .bind(wo, t.roleId, t.team ? t.team.id : assignees)
     .first<{ id: number }>();
   let id: number;
   if (parked) {
     id = parked.id;
     await db
       .prepare(
-        `UPDATE cards SET status = 'active', instruction = ?, from_user_id = ?, from_card_id = ?, claimed_by = NULL,
+        `UPDATE cards SET status = 'active', assignee_ids = ?, instruction = ?, from_user_id = ?, from_card_id = ?, claimed_by = NULL,
            returned_reason = NULL, returned_by = NULL, activated_at = ?, version = version + 1, updated_at = ? WHERE id = ?`,
       )
-      .bind(t.instruction || null, from.userId, from.cardId, now, now, id)
+      .bind(assignees, t.instruction || null, from.userId, from.cardId, now, now, id)
       .run();
   } else {
     const row = await db
       .prepare(
         `INSERT INTO cards (work_order, job_sort, job_name, step, role_id, assignee_ids, status, instruction, from_user_id,
-           from_card_id, handoff, activated_at, updated_at)
+           from_card_id, handoff, team_id, activated_at, updated_at)
          VALUES (?1, 0, ?2, (SELECT coalesce(max(step), -1) + 1 FROM cards WHERE work_order = ?1 AND job_sort = 0),
-           ?3, ?4, 'active', ?5, ?6, ?7, 1, ?8, ?8) RETURNING id`,
+           ?3, ?4, 'active', ?5, ?6, ?7, 1, ?8, ?9, ?9) RETURNING id`,
       )
-      .bind(wo, WHOLE_DOCKET, t.roleId, assignees, t.instruction || null, from.userId, from.cardId, now)
+      .bind(wo, WHOLE_DOCKET, t.roleId, assignees, t.instruction || null, from.userId, from.cardId, t.team?.id ?? null, now)
       .first<{ id: number }>();
     id = row!.id;
   }
-  await eventStmt(db, { id, role_id: t.roleId }, wo, "activated", from.userId, now, { assignees: [t.userId], from: from.userId }).run();
+  await eventStmt(db, { id, role_id: t.roleId }, wo, "activated", from.userId, now, {
+    assignees: members,
+    from: from.userId,
+    ...(t.team ? { team: t.team.name } : {}),
+  }).run();
   return id;
 }
 
@@ -166,7 +194,7 @@ export async function continueTo(env: Env, user: SessionUser, id: number, to: un
   const db = env.DB;
   const card = await loadForAction(db, user, id);
   await assertFresh(db, card, version);
-  const targets = await parseHandoff(db, to);
+  const targets = await parseHandoff(db, to, user);
   await assertComplete(db, card);
   const now = new Date().toISOString();
   await guardedUpdate(db, card, DONE_SQL, user.id, now, now);
