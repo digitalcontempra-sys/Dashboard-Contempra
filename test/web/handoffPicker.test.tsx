@@ -39,7 +39,9 @@ describe("HandoffPicker", () => {
     let rows: HandoffRow[] = [];
     render(<Harness onRows={(r) => (rows = r)} />);
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Person 1" }), "1:printer_roll");
-    expect(rowsComplete(rows)).toBe(false);
+    // What to do is optional: a person is enough.
+    expect(rowsComplete(rows)).toBe(true);
+    expect(toTargets(rows)).toEqual([{ userId: 1, roleId: "printer_roll", instruction: "" }]);
     await userEvent.type(screen.getByRole("textbox", { name: "What to do 1" }), "Print 2 banners");
     await userEvent.click(screen.getByRole("button", { name: "Add person" }));
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Person 2" }), "2:general");

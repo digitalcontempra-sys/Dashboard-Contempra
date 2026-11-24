@@ -57,15 +57,20 @@ describe("starting a docket", () => {
     expect((await myCards(kristy)).map((c) => c.roleId)).toEqual(["general"]);
   });
 
-  it("refuses a missing note", async () => {
-    await t.staffWith("seb", "printer_fb");
+  it("hands over without a note (What to do is optional)", async () => {
+    const kristy = await t.staffWith("kristy");
     const res = await api("/api/virtual-dockets", {
       method: "POST",
       cookie: t.manager,
-      json: { form: docketForm(), handoff: [{ userId: t.ids.seb, instruction: "" }] },
+      json: { form: docketForm(), handoff: [{ userId: t.ids.kristy, instruction: "" }] },
     });
-    expect(res.status).toBe(400);
-    expect(await errorOf(res)).toBe("Write what to do for seb.");
+    expect(res.ok).toBe(true);
+    const [mine] = await myCards(kristy);
+    expect(mine.instruction).toBeNull();
+    const lee = await t.staffWith("lee");
+    const card = await cardOf(mine.workOrder, t.ids.kristy);
+    expect((await move(card, "continue", kristy, { to: [{ userId: t.ids.lee, instruction: " " }] })).status).toBe(200);
+    expect((await myCards(lee))[0].instruction).toBeNull();
   });
 
   it("a saved docket without cards can be handed over once; then it is in production", async () => {

@@ -44,8 +44,8 @@ describe("New Docket", () => {
     await userEvent.type(screen.getByLabelText("Job details"), "exterior letters?");
     expect(screen.queryByRole("region", { name: "Production" })).toBeNull();
     await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Person 1" }), "7:designer");
-    // A person without a note cannot be saved.
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    // What to do is optional.
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
     await userEvent.type(screen.getByRole("textbox", { name: "What to do 1" }), "Logo proof");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(calls.some((c) => c.method === "POST")).toBe(true));

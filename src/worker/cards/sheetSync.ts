@@ -238,7 +238,7 @@ export function trackingText(events: TrackingEvent[], names: Map<number, string>
         case "restored":
           return line("restored");
         case "continued":
-          if (Array.isArray(d.to)) return line(`sent to ${d.to.map((t) => `${name(t.userId)} (${t.instruction})`).join(", ")}`);
+          if (Array.isArray(d.to)) return line(`sent to ${d.to.map((t) => (t.instruction ? `${name(t.userId)} (${t.instruction})` : name(t.userId))).join(", ")}`);
           // Old route: its last Continue is logged as "completed" too, one "done" line is enough.
           return d.to && d.to !== "Done" ? line(`sent to ${d.to}`) : null;
         case "sent_back": {

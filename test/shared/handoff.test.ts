@@ -54,8 +54,9 @@ describe("parseTargets", () => {
     expect(() => parseTargets([{ userId: 1, instruction: "x" }], people)).toThrow("Choose an area for Ira Doe.");
   });
 
-  it("requires a note for each person", () => {
-    expect(() => parseTargets([{ userId: 2, roleId: "printer_fb", instruction: "  " }], people)).toThrow("Write what to do for Sebastian.");
+  it("the note is optional", () => {
+    expect(parseTargets([{ userId: 2, roleId: "printer_fb", instruction: "  " }], people)).toEqual([{ userId: 2, roleId: "printer_fb", instruction: "" }]);
+    expect(parseTargets([{ userId: 2, roleId: "printer_fb" }], people)).toEqual([{ userId: 2, roleId: "printer_fb", instruction: "" }]);
   });
 
   it("requires at least one known person", () => {

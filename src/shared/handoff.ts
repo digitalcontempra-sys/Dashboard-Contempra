@@ -45,8 +45,8 @@ export function parseTargets(raw: unknown, people: Person[]): HandoffTarget[] {
     if (roleId === null || (roleId !== GENERAL_ROLE && !person.roles.includes(roleId)) || (roleId === GENERAL_ROLE && person.roles.length > 0)) {
       throw new Error(`Choose an area for ${person.name}.`);
     }
+    // What to do is optional.
     const instruction = typeof t.instruction === "string" ? t.instruction.trim().slice(0, MAX_NOTE) : "";
-    if (!instruction) throw new Error(`Write what to do for ${person.name}.`);
     if (out.some((o) => o.userId === person.id && o.roleId === roleId)) continue;
     out.push({ userId: person.id, roleId, instruction });
   }

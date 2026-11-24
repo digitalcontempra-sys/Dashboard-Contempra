@@ -76,6 +76,7 @@ describe("CardView", () => {
     const send = screen.getByRole("button", { name: "Send" });
     expect(send).toBeDisabled();
     await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Person 1" }), "4:finishing");
+    expect(send).toBeEnabled(); // What to do is optional
     await userEvent.type(screen.getByRole("textbox", { name: "What to do 1" }), "Grommets");
     await userEvent.click(send);
     finishPut();

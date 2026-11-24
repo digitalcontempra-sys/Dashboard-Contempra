@@ -61,7 +61,7 @@ export async function giveCard(
         `UPDATE cards SET status = 'active', instruction = ?, from_user_id = ?, from_card_id = ?, claimed_by = NULL,
            returned_reason = NULL, returned_by = NULL, activated_at = ?, version = version + 1, updated_at = ? WHERE id = ?`,
       )
-      .bind(t.instruction, from.userId, from.cardId, now, now, id)
+      .bind(t.instruction || null, from.userId, from.cardId, now, now, id)
       .run();
   } else {
     const row = await db
@@ -71,7 +71,7 @@ export async function giveCard(
          VALUES (?1, 0, ?2, (SELECT coalesce(max(step), -1) + 1 FROM cards WHERE work_order = ?1 AND job_sort = 0),
            ?3, ?4, 'active', ?5, ?6, ?7, 1, ?8, ?8) RETURNING id`,
       )
-      .bind(wo, WHOLE_DOCKET, t.roleId, assignees, t.instruction, from.userId, from.cardId, now)
+      .bind(wo, WHOLE_DOCKET, t.roleId, assignees, t.instruction || null, from.userId, from.cardId, now)
       .first<{ id: number }>();
     id = row!.id;
   }

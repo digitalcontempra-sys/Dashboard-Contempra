@@ -9,7 +9,8 @@ export type HandoffRow = { pick: string; instruction: string };
 export const emptyRow = (): HandoffRow => ({ pick: "", instruction: "" });
 
 /** Every row has a person and a note. */
-export const rowsComplete = (rows: HandoffRow[]) => rows.length > 0 && rows.every((r) => r.pick !== "" && r.instruction.trim() !== "");
+/** Every row names a person; What to do is optional. */
+export const rowsComplete = (rows: HandoffRow[]) => rows.length > 0 && rows.every((r) => r.pick !== "");
 
 export function toTargets(rows: HandoffRow[]): HandoffTarget[] {
   return rows.map((r) => {
