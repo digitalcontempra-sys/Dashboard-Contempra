@@ -22,6 +22,8 @@ export type DocketQuery = {
   am?: string;
   q?: string;
   page?: number;
+  /** My Dockets: only dockets whose J is one of these codes (upper case). An empty list matches nothing. */
+  codes?: string[];
 };
 
 export type NonBilledQuery = { tab: NonBilledTab; am?: string; q?: string; page?: number };
@@ -162,6 +164,11 @@ export async function listDockets(db: D1Database, p: DocketQuery, now: Date): Pr
   if (p.view === "history" && p.history === "completed") where.push("status = 'completed'");
   if (p.view === "history" && p.history === "cancelled") where.push("status = 'cancelled'");
   commonFilters(where, named, p.am, p.q);
+  if (p.codes) {
+    // J is stored trimmed and upper case by the sync (normalizeAccountManager).
+    p.codes.forEach((c, i) => (named[`code${i}`] = c.toUpperCase()));
+    where.push(p.codes.length ? `account_manager IN (${p.codes.map((_, i) => `:code${i}`).join(", ")})` : "0");
+  }
   // Each docket's section is computed once; the outer queries read it like a column.
   // History has no sections: it skips the per-docket subqueries (D1 rows read).
   const flags =

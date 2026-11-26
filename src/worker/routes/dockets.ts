@@ -3,6 +3,7 @@ import { DASH_SECTIONS } from "../../shared/rules";
 import type { DocketView, HistoryFilter, NonBilledTab } from "../../shared/types";
 import type { AppEnv } from "../app";
 import { requireAuth, requireLevel } from "../auth/sessions";
+import { userCodes } from "../users/codes";
 import { getDocket, listAccountManagers, listDockets, listNonBilled, listReview } from "../db/dockets";
 
 const VIEWS: DocketView[] = ["active", "on_hold", "history"];
@@ -25,8 +26,10 @@ docketRoutes.get("/dockets", async (c) => {
   const history = pick(q.history, HISTORY, "all");
   const bucket = pick(q.bucket, DASH_SECTIONS);
   if (view === null || history === null || bucket === null) return c.json({ error: "Invalid filter" }, 400);
+  // My Dockets: the dockets whose J is one of my codes.
+  const codes = q.mine === "1" ? await userCodes(c.env.DB, c.get("user").id) : undefined;
   return c.json(
-    await listDockets(c.env.DB, { view: view!, history, bucket, am: q.am, q: q.q, page: Number(q.page) || 1 }, new Date()),
+    await listDockets(c.env.DB, { view: view!, history, bucket, am: q.am, q: q.q, page: Number(q.page) || 1, codes }, new Date()),
   );
 });
 

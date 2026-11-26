@@ -1,12 +1,19 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app";
 import { hashPassword, isValidPassword, PASSWORD_ERROR, verifyPassword } from "../auth/password";
+import type { SessionUser } from "../../shared/types";
 import { createSession, destroySession, loadUser, requireAuth } from "../auth/sessions";
+import { userCodes } from "../users/codes";
 
 const MAX_FAILURES = 5;
 const LOCK_MINUTES = 15;
 
 export const authRoutes = new Hono<AppEnv>();
+
+/** The signed-in user plus their sheet J codes (for Salesperson and My Dockets). */
+async function withCodes(db: D1Database, user: SessionUser | null): Promise<SessionUser | null> {
+  return user && { ...user, codes: await userCodes(db, user.id) };
+}
 
 authRoutes.post("/setup", async (c) => {
   const b = await c.req.json<{ setupToken?: string; username?: string; fullName?: string; password?: string }>();
@@ -47,7 +54,7 @@ authRoutes.post("/auth/login", async (c) => {
   }
   await db.prepare("DELETE FROM login_attempts WHERE username = ?").bind(username).run();
   await createSession(c, u.id);
-  return c.json(await loadUser(db, u.id));
+  return c.json(await withCodes(db, await loadUser(db, u.id)));
 });
 
 authRoutes.post("/auth/logout", async (c) => {
@@ -55,7 +62,7 @@ authRoutes.post("/auth/logout", async (c) => {
   return c.json({ ok: true });
 });
 
-authRoutes.get("/auth/me", requireAuth, (c) => c.json(c.get("user")));
+authRoutes.get("/auth/me", requireAuth, async (c) => c.json(await withCodes(c.env.DB, c.get("user"))));
 
 authRoutes.post("/auth/change-password", requireAuth, async (c) => {
   const db = c.env.DB;
@@ -71,5 +78,5 @@ authRoutes.post("/auth/change-password", requireAuth, async (c) => {
     .prepare("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?")
     .bind(await hashPassword(b.newPassword), me.id)
     .run();
-  return c.json(await loadUser(db, me.id));
+  return c.json(await withCodes(db, await loadUser(db, me.id)));
 });

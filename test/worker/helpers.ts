@@ -7,6 +7,7 @@ export const BASE = "https://dash.test";
 export async function resetAuthTables(): Promise<void> {
   await env.DB.batch([
     env.DB.prepare("DELETE FROM sessions"),
+    env.DB.prepare("DELETE FROM user_codes"),
     env.DB.prepare("DELETE FROM user_roles"),
     env.DB.prepare("DELETE FROM users"),
     env.DB.prepare("DELETE FROM login_attempts"),
@@ -23,6 +24,11 @@ export async function createUser(
   )
     .bind(username, username, accessLevel, await hashPassword(password), new Date().toISOString())
     .first<{ id: number }>();
+  // Admins and managers create dockets, which needs a code (sheet J): give them their username.
+  if (accessLevel !== "staff") {
+    const code = username.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+    await env.DB.prepare("INSERT OR IGNORE INTO user_codes (code, user_id, sort) VALUES (?, ?, 0)").bind(code, r!.id).run();
+  }
   return r!.id;
 }
 

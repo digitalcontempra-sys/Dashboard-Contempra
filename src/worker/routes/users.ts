@@ -3,6 +3,7 @@ import type { AccessLevel, AssigneeDTO, RoleDTO, UserDTO } from "../../shared/ty
 import type { AppEnv } from "../app";
 import { hashPassword, isValidPassword, PASSWORD_ERROR } from "../auth/password";
 import { deleteUserSessions, requireAuth, requireLevel } from "../auth/sessions";
+import { assertCodesFree, codeStatements, CodesError, normalizeCodes, userCodes } from "../users/codes";
 
 const LEVELS: AccessLevel[] = ["admin", "manager", "staff"];
 
@@ -50,6 +51,7 @@ async function getUser(db: D1Database, id: number): Promise<UserDTO | null> {
     accessLevel: u.access_level,
     roles: results.map((r) => r.role_id),
     active: u.active === 1,
+    codes: await userCodes(db, id),
   };
 }
 
@@ -62,6 +64,7 @@ function roleStatements(db: D1Database, userId: number, roles: string[]): D1Prep
 
 userRoutes.onError((e, c) => {
   if (e instanceof BadRequest) return c.json({ error: e.message }, 400);
+  if (e instanceof CodesError) return c.json({ error: e.message }, e.status);
   throw e;
 });
 
@@ -84,15 +87,17 @@ userRoutes.post("/users", async (c) => {
   const level = validateLevel(b.accessLevel);
   const roles = await validateRoles(db, b.roles ?? []);
   if (!isValidPassword(b.password)) throw new BadRequest(PASSWORD_ERROR);
+  const codes = normalizeCodes(b.codes ?? []);
   const dup = await db.prepare("SELECT 1 FROM users WHERE username = ?").bind(username).first();
   if (dup) return c.json({ error: "Username already exists" }, 409);
+  await assertCodesFree(db, codes, null);
   const created = await db
     .prepare(
       "INSERT INTO users (username, full_name, access_level, password_hash, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(username, fullName, level, await hashPassword(b.password), new Date().toISOString())
     .first<{ id: number }>();
-  await db.batch(roleStatements(db, created!.id, roles));
+  await db.batch([...roleStatements(db, created!.id, roles), ...codeStatements(db, created!.id, codes)]);
   return c.json(await getUser(db, created!.id));
 });
 
@@ -116,6 +121,11 @@ userRoutes.patch("/users/:id", async (c) => {
     stmts.push(db.prepare("UPDATE users SET access_level = ? WHERE id = ?").bind(validateLevel(b.accessLevel), id));
   }
   if (b.roles !== undefined) stmts.push(...roleStatements(db, id, await validateRoles(db, b.roles)));
+  if (b.codes !== undefined) {
+    const codes = normalizeCodes(b.codes);
+    await assertCodesFree(db, codes, id);
+    stmts.push(...codeStatements(db, id, codes));
+  }
   if (b.active !== undefined) {
     stmts.push(db.prepare("UPDATE users SET active = ? WHERE id = ?").bind(b.active ? 1 : 0, id));
     if (!b.active) stmts.push(db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id));

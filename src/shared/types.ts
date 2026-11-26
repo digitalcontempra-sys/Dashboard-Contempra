@@ -109,6 +109,8 @@ export type UserDTO = {
   accessLevel: AccessLevel;
   roles: string[];
   active: boolean;
+  /** Codes in sheet column J (Account Manager); the first is the main one. */
+  codes: string[];
 };
 
 export type SessionUser = {
@@ -119,6 +121,8 @@ export type SessionUser = {
   roles: string[];
   /** Set on imported or reset accounts until the person chooses their own password. */
   mustChangePassword?: boolean;
+  /** Codes in sheet column J (Account Manager); the first is the main one. Sent by /auth/me and login. */
+  codes?: string[];
 };
 
 export type CardDTO = {

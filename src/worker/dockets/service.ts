@@ -21,6 +21,7 @@ import { EXPECTED_HEADERS, mapSheet } from "../sheet/mapRows";
 import { UPSERT_SQL, upsertParams } from "../sync/syncDockets";
 import { ServiceError } from "./errors";
 import { SHEET_LOCK, withLock } from "./lock";
+import { userCodes } from "../users/codes";
 
 /** All app writes to the sheet go through this lease. */
 export { SHEET_LOCK } from "./lock";
@@ -178,7 +179,10 @@ export async function createDocket(
   input: { form?: DocketForm; jobs?: ProductionJob[]; handoff?: unknown; newOrder?: unknown },
 ): Promise<VirtualDocketDTO> {
   const db = env.DB;
-  const form = validateForm(input.form);
+  // SALESPERSON (sheet J) is the creator's main code: it makes the docket theirs in My Dockets.
+  const [code] = await userCodes(db, actor.id);
+  if (!code) throw new ServiceError(400, "Ask an admin to set your initials first.");
+  const form = { ...validateForm(input.form), salesperson: code };
   const newOrder = validateNewOrder(form, input);
   const jobs = await validateJobs(db, input.jobs);
   const targets = input.handoff === undefined ? null : await parseHandoff(db, input.handoff, actor);
@@ -284,7 +288,7 @@ export async function updateDocket(
   input: { form?: DocketForm; jobs?: ProductionJob[]; version?: number; handoff?: unknown; newOrder?: unknown },
 ): Promise<VirtualDocketDTO> {
   const db = env.DB;
-  const form = validateForm(input.form);
+  const form = { ...validateForm(input.form) };
   const newOrder = validateNewOrder(form, input);
   // Without a route the docket's cards are left alone (they move by hand-off).
   const jobs = input.jobs === undefined ? null : await validateJobs(db, input.jobs);
@@ -306,6 +310,8 @@ export async function updateDocket(
       const detail = await getDocket(db, wo, new Date());
       baseline = detail ? formFromDocket(detail) : null;
     }
+    // SALESPERSON never changes on edit: the docket stays with its owner (sheet J is typed by hand there).
+    if (baseline) form.salesperson = baseline.salesperson;
     const { row } = await locateRow(env, wo);
     const cells = changedCells(toSheetCells(form, wo, "edit"), baseline ? toSheetCells(baseline, wo, "edit") : null);
     try {
