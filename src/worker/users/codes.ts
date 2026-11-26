@@ -50,3 +50,15 @@ export function codeStatements(db: D1Database, userId: number, codes: string[]):
     ...codes.map((code, i) => db.prepare("INSERT INTO user_codes (code, user_id, sort) VALUES (?, ?, ?)").bind(code, userId, i)),
   ];
 }
+
+/** Two admins giving the same code at once: the primary key refuses the second one. */
+export async function withCodeConflict<T>(codes: string[], run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (e) {
+    if (/UNIQUE constraint failed: user_codes/i.test(String((e as Error)?.message ?? e))) {
+      throw new CodesError(409, `Initials ${codes.join(", ")} were just given to someone else. Reload and try again.`);
+    }
+    throw e;
+  }
+}

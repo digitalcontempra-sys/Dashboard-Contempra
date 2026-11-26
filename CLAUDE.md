@@ -37,6 +37,7 @@ A production dashboard for **Contempra Signs** (a sign shop in Winnipeg). It sit
   - **New Orders:** saved with **Save as New Order** (editor, only while not in production): customer + a note in the description, nobody in Send to. Flag `virtual_dockets.new_order`; sheet K = creator, STATUS `Waiting for more info`. Its tile opens the editor. It leaves New Orders when it is handed to people.
   - **Daily Complete:** the creator's card is `Ready to close` with nobody else on the docket (done, waiting for delivery). `Close docket` (= delivered) moves it to History.
   - Order: All by creation date (newest first); Rush and Upcoming by Due Date (soonest first); New Orders and No Due Date newest first; Daily Complete longest waiting first. Coming no longer exists anywhere (`TimeBucket` = `rush_today | upcoming | no_due_date`).
+  - **All dockets | My Dockets** (selector above the views, remembered per user in `localStorage` `dashboard.scope.<id>`): My Dockets = dockets whose J (Account Manager) is one of my codes (`GET /api/dockets?mine=1`). Same sections, orders and counts. Without codes: "Ask an admin to set your initials." Spec `2026-11-26-my-dockets-design.md`.
   - Each tile (and the docket header, "Now with") shows who has it now, per area. It also has On Hold and History views, an account-manager filter and search. The docket detail links to the editor with **Edit Docket** (pencil icon) and offers **Download PDF**; it has no Drive button (the Drive copy stays as a backup).
 - **Virtual Docket.** A replica of the paper docket form that writes the docket's row to the sheet, renders a PDF in the browser and stores it in R2 and Google Drive. Dockets can be cancelled, moved to Trash and restored.
 - **Production cards (hand to hand, like the paper docket).** The creator sends the new docket to one or more people, each with a `What to do` note. Each card belongs to one person, in one area (or `General` for people without one), with:
@@ -54,6 +55,7 @@ A production dashboard for **Contempra Signs** (a sign shop in Winnipeg). It sit
   - **History** lists every finished Task Card I sent or received (labels `Sent by me`, `Sent by <name>`, `Note to self`), newest `done_at` first, 50 per page with Show more (`GET /api/task-cards?box=history&page=N`).
 - **Installer photos.** Taken with the phone camera, resized in the browser, uploaded to one Drive folder per docket. Thumbnails are kept in R2.
 - **Area colors** with a legend, current-area chips on the Main Dashboard, and white cards even in dark mode.
+- **User codes (Initials)** = the codes people type in sheet column J (table `user_codes`, one owner per code, the first is the main one; Admin → Users → Initials). A docket created in the portal gets SALESPERSON (J) = the creator's main code (read-only; 400 `Ask an admin to set your initials first.` without one). Editing never changes SALESPERSON.
 - **Staff accounts** with three access levels:
   - Admin: everything, including users.
   - Manager: all work orders and billing.
@@ -123,13 +125,14 @@ src/worker/
   google/              oauth, sheets gateway, drive gateway
   sheet/               raw sheet reading + row mapping (A–P)
   sync/                incremental + nightly sync
+  users/codes.ts       user codes (sheet J initials): normalize, check owner, replace
 src/web/
   pages/               Dashboard, MyCards, ProductionBoard, DocketEditor, AdminUsers, ImportStaff, ProductionColumns, ChangePassword, NonBilled, NeedsReview, Trash, Login, GoogleConnection
   cards/               CardTile, CardView, fields, PhotoField, resizePhoto, chime, useCardAlerts
   tasks/               NewTaskCard, TaskCards (tile, view, Sent by me)
   components/          Layout (nav, badge, sound toggle), DocketList, DocketDetail (tabs), DocketHistory, AreaChip/AreaLegend, BucketChip
   docket/              DocketPaper (paper replica), ProductionPanel (route editor), DocketPdf, afterSave
-migrations/            0001–0012 (D1). Add new ones as 0013_*.sql; never edit an applied one
+migrations/            0001–0013 (D1). Add new ones as 0014_*.sql; never edit an applied one
 data/catalogs/         material lists: roll-print, flatbed (Print FB), laminate (Laminate Roll)
 scripts/               publish.ps1, set-google-secrets.ps1, dev-setup.mjs, create-admin.mjs, import-fixture.mjs, xlsx_to_values.py
 test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), web/ (jsdom + mockApi)
@@ -188,7 +191,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
    5. Have a fresh reviewer check the whole branch, and fix what it finds that matters.
    6. Ask "¿Hago merge a main y publico?"
 3. **Verification before saying "done":**
-   - `npx vitest run` passes (today 495 tests).
+   - `npx vitest run` passes (today 515 tests).
    - `npm run typecheck` is clean.
    - For UI changes, check the page in the local preview, including phone width 375 px: no horizontal scroll.
 4. **Commit messages:**
@@ -304,6 +307,7 @@ Everything below is live and pushed to `main`:
 - staff accounts (imported; the owner's account has Printer Roll, Designer and Contour Cut).
 
 - Main Dashboard sections (New Orders, Daily Complete, Upcoming), Save as New Order, migration 0012 (live 2026-11-24; no sheet layout change).
+- My Dockets + user codes (Initials), migration 0013 (branch `feature/my-dockets`, 2026-11-26). Codes `CF` and `MN` in J belong to nobody.
 
 ### Pending: owner
 

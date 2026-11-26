@@ -3,7 +3,7 @@ import type { AccessLevel, AssigneeDTO, RoleDTO, UserDTO } from "../../shared/ty
 import type { AppEnv } from "../app";
 import { hashPassword, isValidPassword, PASSWORD_ERROR } from "../auth/password";
 import { deleteUserSessions, requireAuth, requireLevel } from "../auth/sessions";
-import { assertCodesFree, codeStatements, CodesError, normalizeCodes, userCodes } from "../users/codes";
+import { assertCodesFree, codeStatements, CodesError, normalizeCodes, userCodes, withCodeConflict } from "../users/codes";
 
 const LEVELS: AccessLevel[] = ["admin", "manager", "staff"];
 
@@ -97,7 +97,13 @@ userRoutes.post("/users", async (c) => {
     )
     .bind(username, fullName, level, await hashPassword(b.password), new Date().toISOString())
     .first<{ id: number }>();
-  await db.batch([...roleStatements(db, created!.id, roles), ...codeStatements(db, created!.id, codes)]);
+  try {
+    await withCodeConflict(codes, () => db.batch([...roleStatements(db, created!.id, roles), ...codeStatements(db, created!.id, codes)]));
+  } catch (e) {
+    // No half-made account: a retry must not hit "Username already exists".
+    await db.prepare("DELETE FROM users WHERE id = ?").bind(created!.id).run();
+    throw e;
+  }
   return c.json(await getUser(db, created!.id));
 });
 
@@ -130,7 +136,7 @@ userRoutes.patch("/users/:id", async (c) => {
     stmts.push(db.prepare("UPDATE users SET active = ? WHERE id = ?").bind(b.active ? 1 : 0, id));
     if (!b.active) stmts.push(db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id));
   }
-  if (stmts.length) await db.batch(stmts);
+  if (stmts.length) await withCodeConflict(Array.isArray(b.codes) ? normalizeCodes(b.codes) : [], () => db.batch(stmts));
   return c.json(await getUser(db, id));
 });
 

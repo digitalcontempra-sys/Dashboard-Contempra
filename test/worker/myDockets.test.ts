@@ -145,3 +145,16 @@ describe("My Dockets", () => {
     expect(r.total).toBe(0);
   });
 });
+
+describe("code collisions", () => {
+  it("a code taken at the same moment becomes a 409, not a 500", async () => {
+    const { withCodeConflict, CodesError } = await import("../../src/worker/users/codes");
+    const ali = await createUser("ali", "manager");
+    await setCodes(ali, ["AR"]);
+    const err = await withCodeConflict(["AR"], () =>
+      env.DB.prepare("INSERT INTO user_codes (code, user_id, sort) VALUES ('AR', ?, 0)").bind(s.ids.mgr).run(),
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CodesError);
+    expect((err as InstanceType<typeof CodesError>).status).toBe(409);
+  });
+});

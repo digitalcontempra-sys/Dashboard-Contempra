@@ -312,7 +312,9 @@ export async function updateDocket(
     }
     // SALESPERSON never changes on edit: the docket stays with its owner (sheet J is typed by hand there).
     if (baseline) form.salesperson = baseline.salesperson;
-    const { row } = await locateRow(env, wo);
+    const { row, values } = await locateRow(env, wo);
+    // Not mirrored yet: keep the J the sheet row has.
+    if (!baseline) form.salesperson = String(values[9] ?? "").trim().toUpperCase();
     const cells = changedCells(toSheetCells(form, wo, "edit"), baseline ? toSheetCells(baseline, wo, "edit") : null);
     try {
       await getGateways(env).sheet.updateCells(row, cells);
