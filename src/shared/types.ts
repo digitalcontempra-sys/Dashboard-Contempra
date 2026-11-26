@@ -48,6 +48,10 @@ export type DocketSummary = {
   productionDone?: boolean;
   /** Who has the docket now, per area in production order (names empty for a team card nobody started). */
   holders?: Holder[];
+  /** In the viewer's My List (dashboard list and detail only). */
+  followed?: boolean;
+  /** The viewer's open notes pinned to this docket (dashboard list and detail only). */
+  myOpenNotes?: number;
 };
 
 export type Holder = { roleId: string; names: string[] };
@@ -182,6 +186,8 @@ export type TaskCardDTO = {
   createdAt: string;
   doneAt: string | null;
   isNew: boolean;
+  /** A note to self pinned to this docket, or null. */
+  workOrder: string | null;
 };
 
 /** One page of finished Task Cards I sent or received, newest first. */

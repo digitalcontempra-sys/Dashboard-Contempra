@@ -19,6 +19,7 @@ type Row = {
   seen_at: string | null;
   done_at: string | null;
   done_seen_at: string | null;
+  work_order: string | null;
 };
 
 const SELECT = `SELECT t.*, uf.full_name AS from_name, ut.full_name AS to_name FROM task_cards t
@@ -41,6 +42,7 @@ function toDto(r: Row, viewerId: number, today: string): TaskCardDTO {
     createdAt: r.created_at,
     doneAt: r.done_at,
     isNew: inbox ? r.status === "open" && !r.seen_at : r.status === "done" && !r.done_seen_at,
+    workOrder: r.work_order ?? null,
   };
 }
 
@@ -55,7 +57,9 @@ const bad = (c: Context<AppEnv>, msg: string) => c.json({ error: msg }, 400);
 
 taskCardRoutes.post("/task-cards", async (c) => {
   const me = c.get("user");
-  const b = await c.req.json<{ toUserId?: unknown; note?: unknown; due?: { kind?: unknown; date?: unknown } }>().catch(() => ({}) as Record<string, never>);
+  const b = await c.req
+    .json<{ toUserId?: unknown; note?: unknown; due?: { kind?: unknown; date?: unknown }; workOrder?: unknown }>()
+    .catch(() => ({}) as Record<string, never>);
   const note = typeof b.note === "string" ? b.note.trim() : "";
   if (!note || note.length > TASK_NOTE_MAX) return bad(c, "Write a note (up to 1000 characters).");
   const to = Number.isInteger(b.toUserId)
@@ -64,12 +68,20 @@ taskCardRoutes.post("/task-cards", async (c) => {
   if (!to) return bad(c, "Choose someone to send it to.");
   const kind = KINDS.includes(b.due?.kind as TaskDueKind) ? (b.due!.kind as TaskDueKind) : "none";
   if (kind === "date" && !isIsoDate(b.due?.date)) return bad(c, "Choose a valid date.");
+  // A note pinned to a docket: only to self, only for people who see the Main Dashboard.
+  const workOrder = typeof b.workOrder === "string" && b.workOrder.trim() ? b.workOrder.trim() : null;
+  if (workOrder) {
+    if (to.id !== me.id) return bad(c, "A docket note is a note to self.");
+    if (me.accessLevel !== "admin" && me.accessLevel !== "manager") return c.json({ error: "Only managers can add notes to a docket." }, 403);
+    const exists = await c.env.DB.prepare("SELECT 1 FROM dockets WHERE work_order = ?").bind(workOrder).first();
+    if (!exists) return c.json({ error: "Work order not found" }, 404);
+  }
   const now = new Date().toISOString();
   // A note to self is seen from the start: no NEW tag, no badge, no chime.
   const row = await c.env.DB.prepare(
-    `INSERT INTO task_cards (from_user, to_user, note, due_kind, due_date, created_at, seen_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+    `INSERT INTO task_cards (from_user, to_user, note, due_kind, due_date, created_at, seen_at, work_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
   )
-    .bind(me.id, to.id, note, kind, kind === "date" ? b.due!.date : null, now, to.id === me.id ? now : null)
+    .bind(me.id, to.id, note, kind, kind === "date" ? b.due!.date : null, now, to.id === me.id ? now : null, workOrder)
     .first<{ id: number }>();
   const full = await c.env.DB.prepare(`${SELECT} WHERE t.id = ?`).bind(row!.id).first<Row>();
   return c.json(toDto(full!, me.id, todayInBusinessTz(new Date())));
@@ -78,6 +90,14 @@ taskCardRoutes.post("/task-cards", async (c) => {
 taskCardRoutes.get("/task-cards", async (c) => {
   const me = c.get("user");
   const today = todayInBusinessTz(new Date());
+  const wo = c.req.query("workOrder");
+  if (wo) {
+    // My open notes pinned to one docket.
+    const { results } = await c.env.DB.prepare(`${SELECT} WHERE t.to_user = ? AND t.work_order = ? AND t.status = 'open' ORDER BY t.created_at`)
+      .bind(me.id, wo)
+      .all<Row>();
+    return c.json(results.map((r) => toDto(r, me.id, today)));
+  }
   if (c.req.query("box") === "sent") {
     const since = new Date(Date.now() - SENT_DAYS * 86_400_000).toISOString();
     const { results } = await c.env.DB.prepare(

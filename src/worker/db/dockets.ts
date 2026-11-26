@@ -24,6 +24,10 @@ export type DocketQuery = {
   page?: number;
   /** My Dockets: only dockets whose J is one of these codes (upper case). An empty list matches nothing. */
   codes?: string[];
+  /** Signed-in user: adds `followed` and `myOpenNotes` to each item. */
+  viewerId?: number;
+  /** My List: only dockets the viewer follows. */
+  followed?: boolean;
 };
 
 export type NonBilledQuery = { tab: NonBilledTab; am?: string; q?: string; page?: number };
@@ -77,6 +81,10 @@ const HOLDERS_SQL = `(SELECT group_concat(c.role_id || char(31) || coalesce(u.fu
 /** Every card of the docket is done (and it has at least one). */
 const PRODUCTION_DONE_SQL = `(EXISTS (SELECT 1 FROM cards c WHERE c.work_order = dockets.work_order)
   AND NOT EXISTS (SELECT 1 FROM cards c WHERE c.work_order = dockets.work_order AND c.status != 'done'))`;
+
+/** The viewer's My List flag and open pinned notes (`:me`). */
+const MARKS_SQL = `EXISTS (SELECT 1 FROM docket_follows f WHERE f.user_id = :me AND f.work_order = dockets.work_order) AS followed,
+  (SELECT count(*) FROM task_cards t WHERE t.to_user = :me AND t.work_order = dockets.work_order AND t.status = 'open') AS my_open_notes`;
 
 const HISTORY_ORDER = `ORDER BY ${WO_DESC}`;
 
@@ -139,6 +147,7 @@ function toSummary(r: Row, today: string): DocketSummary {
     areas: typeof r.areas === "string" ? sortAreas(r.areas.split(",")) : [],
     productionDone: r.production_done === 1,
     holders: parseHolders(r.holders),
+    ...(r.followed === undefined ? {} : { followed: r.followed === 1, myOpenNotes: Number(r.my_open_notes) || 0 }),
   };
 }
 
@@ -169,6 +178,8 @@ export async function listDockets(db: D1Database, p: DocketQuery, now: Date): Pr
     p.codes.forEach((c, i) => (named[`code${i}`] = c.toUpperCase()));
     where.push(p.codes.length ? `account_manager IN (${p.codes.map((_, i) => `:code${i}`).join(", ")})` : "0");
   }
+  named.me = p.viewerId ?? null;
+  if (p.followed) where.push("work_order IN (SELECT work_order FROM docket_follows WHERE user_id = :me)");
   // Each docket's section is computed once; the outer queries read it like a column.
   // History has no sections: it skips the per-docket subqueries (D1 rows read).
   const flags =
@@ -189,7 +200,7 @@ export async function listDockets(db: D1Database, p: DocketQuery, now: Date): Pr
     sql.bind(
       db,
       `${withSections} SELECT *, ${VENDOR_PICKUP_SQL} AS vendor_pickup, ${AREAS_SQL} AS areas, ${HOLDERS_SQL} AS holders,
-         ${PRODUCTION_DONE_SQL} AS production_done FROM sec AS dockets WHERE ${listWhere} ${order} LIMIT :limit OFFSET :offset`,
+         ${PRODUCTION_DONE_SQL} AS production_done${p.viewerId === undefined ? "" : `, ${MARKS_SQL}`} FROM sec AS dockets WHERE ${listWhere} ${order} LIMIT :limit OFFSET :offset`,
     ),
   ]);
   const counts: Record<DashSection, number> = { rush_today: 0, upcoming: 0, new_orders: 0, no_due_date: 0, daily_complete: 0 };
@@ -236,10 +247,14 @@ export async function listNonBilled(db: D1Database, p: NonBilledQuery, now: Date
   };
 }
 
-export async function getDocket(db: D1Database, wo: string, now: Date): Promise<DocketDetail | null> {
-  const r = await db
-    .prepare(`SELECT *, ${HOLDERS_SQL} AS holders, ${NEW_ORDER_SQL} AS new_order_flag, ${READY_SINCE_SQL} AS ready_since FROM dockets WHERE work_order = ?`)
-    .bind(wo)
+export async function getDocket(db: D1Database, wo: string, now: Date, viewerId?: number): Promise<DocketDetail | null> {
+  const marks = viewerId === undefined ? "" : `, ${MARKS_SQL}`;
+  const r = await new Sql({ me: viewerId ?? null, wo })
+    .bind(
+      db,
+      `SELECT *, ${HOLDERS_SQL} AS holders, ${NEW_ORDER_SQL} AS new_order_flag, ${READY_SINCE_SQL} AS ready_since${marks}
+       FROM dockets WHERE work_order = :wo`,
+    )
     .first<Row>();
   if (!r) return null;
   const s = (k: string) => (r[k] as string) ?? null;

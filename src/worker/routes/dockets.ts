@@ -27,15 +27,38 @@ docketRoutes.get("/dockets", async (c) => {
   const bucket = pick(q.bucket, DASH_SECTIONS);
   if (view === null || history === null || bucket === null) return c.json({ error: "Invalid filter" }, 400);
   // My Dockets: the dockets whose J is one of my codes.
-  const codes = q.mine === "1" ? await userCodes(c.env.DB, c.get("user").id) : undefined;
+  const me = c.get("user").id;
+  const codes = q.mine === "1" ? await userCodes(c.env.DB, me) : undefined;
+  // My List: the dockets I follow.
+  const followed = q.list === "1";
   return c.json(
-    await listDockets(c.env.DB, { view: view!, history, bucket, am: q.am, q: q.q, page: Number(q.page) || 1, codes }, new Date()),
+    await listDockets(
+      c.env.DB,
+      { view: view!, history, bucket, am: q.am, q: q.q, page: Number(q.page) || 1, codes, viewerId: me, followed },
+      new Date(),
+    ),
   );
 });
 
 docketRoutes.get("/dockets/:wo", async (c) => {
-  const d = await getDocket(c.env.DB, c.req.param("wo"), new Date());
+  const d = await getDocket(c.env.DB, c.req.param("wo"), new Date(), c.get("user").id);
   return d ? c.json(d) : c.json({ error: "Work order not found" }, 404);
+});
+
+// My List: follow or unfollow a docket. Personal; nothing else changes on the docket.
+docketRoutes.put("/dockets/:wo/follow", async (c) => {
+  const wo = c.req.param("wo");
+  const exists = await c.env.DB.prepare("SELECT 1 FROM dockets WHERE work_order = ?").bind(wo).first();
+  if (!exists) return c.json({ error: "Work order not found" }, 404);
+  await c.env.DB.prepare("INSERT OR IGNORE INTO docket_follows (user_id, work_order, added_at) VALUES (?, ?, ?)")
+    .bind(c.get("user").id, wo, new Date().toISOString())
+    .run();
+  return c.json({ followed: true });
+});
+
+docketRoutes.delete("/dockets/:wo/follow", async (c) => {
+  await c.env.DB.prepare("DELETE FROM docket_follows WHERE user_id = ? AND work_order = ?").bind(c.get("user").id, c.req.param("wo")).run();
+  return c.json({ followed: false });
 });
 
 docketRoutes.get("/non-billed", async (c) => {
