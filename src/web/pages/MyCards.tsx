@@ -8,6 +8,7 @@ import { CardTile } from "../cards/CardTile";
 import { CardView } from "../cards/CardView";
 import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/Layout";
+import { Segmented, type SegmentItem } from "../components/Segmented";
 import { BUCKETS } from "../format";
 import { NewTaskCardButton } from "../tasks/NewTaskCard";
 import { HistoryList, SentList, TaskTile, TaskView } from "../tasks/TaskCards";
@@ -32,32 +33,19 @@ export function groupCards(cards: CardDTO[], tasks: TaskCardDTO[] = []): Group[]
 }
 
 type Show = "all" | "docket" | "task" | "sent" | "history";
-const SHOW: { id: Show; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "docket", label: "Docket cards" },
-  { id: "task", label: "Task cards" },
-  { id: "sent", label: "Sent by me" },
-  { id: "history", label: "History" },
+const SHOW: SegmentItem<Show>[] = [
+  { id: "all", label: "All", icon: "layers" },
+  { id: "docket", label: "Docket cards", icon: "doc" },
+  { id: "task", label: "Task cards", icon: "note" },
+  { id: "sent", label: "Sent by me", icon: "send" },
+  { id: "history", label: "History", icon: "history" },
 ];
 
-function Tabs<T extends string | null>({ label, items, value, onChange }: { label: string; items: { id: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+function Tabs<T extends string | null>({ label, items, value, onChange }: { label: string; items: SegmentItem<T>[]; value: T; onChange: (v: T) => void }) {
+  // Wraps instead of scrolling sideways, so every segment (History included) is visible on a phone.
   return (
-    // Wraps instead of scrolling sideways, so every chip (History included) is visible on a phone.
-    <div role="tablist" aria-label={label} className="mb-3 flex flex-wrap gap-2">
-      {items.map((it) => (
-        <button
-          key={String(it.id)}
-          role="tab"
-          type="button"
-          aria-selected={value === it.id}
-          onClick={() => onChange(it.id)}
-          className={`flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm font-semibold transition ${
-            value === it.id ? "border-transparent bg-text text-[var(--bg)]" : "border-border bg-surface text-text-2 shadow-card"
-          }`}
-        >
-          {it.label}
-        </button>
-      ))}
+    <div className="mb-3 w-fit max-w-full">
+      <Segmented label={label} items={items} value={value} onChange={onChange} wrap />
     </div>
   );
 }

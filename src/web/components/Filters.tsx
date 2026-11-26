@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAccountManagers, useDebounced } from "../hooks";
 import { Icon } from "./Icon";
+import { Segmented, type SegmentItem } from "./Segmented";
 
 export function SearchBox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [text, setText] = useState(value);
@@ -46,29 +47,13 @@ export function Tabs<T extends string>({
   value,
   onChange,
   label,
+  tone,
 }: {
-  tabs: { id: T; label: string; count?: number }[];
+  tabs: SegmentItem<T>[];
   value: T;
   onChange: (v: T) => void;
   label: string;
+  tone?: "brand" | "ink";
 }) {
-  return (
-    <div role="tablist" aria-label={label} className="glass flex gap-1 rounded-[16px] p-1">
-      {tabs.map((t) => (
-        <button
-          key={t.id}
-          role="tab"
-          type="button"
-          aria-selected={value === t.id}
-          onClick={() => onChange(t.id)}
-          className={`flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-[12px] px-3 text-sm font-semibold whitespace-nowrap transition-all duration-200 ${
-            value === t.id ? "bg-surface-strong text-text shadow-card" : "text-text-2 hover:text-text"
-          }`}
-        >
-          {t.label}
-          {t.count !== undefined && <span className="tabular-nums text-text-3">{t.count}</span>}
-        </button>
-      ))}
-    </div>
-  );
+  return <Segmented items={tabs} value={value} onChange={onChange} label={label} tone={tone} />;
 }

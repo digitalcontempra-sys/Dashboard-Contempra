@@ -46,8 +46,8 @@ export function NonBilled() {
             value={tab}
             onChange={(t) => setTab(t === "ready" ? null : t)}
             tabs={[
-              { id: "ready", label: "Ready to Bill", count: counts.ready },
-              { id: "open", label: "Open – Not Billed", count: counts.open },
+              { id: "ready", label: "Ready to Bill", icon: "check", count: counts.ready },
+              { id: "open", label: "Open – Not Billed", icon: "billing", count: counts.open },
             ]}
           />
         </div>

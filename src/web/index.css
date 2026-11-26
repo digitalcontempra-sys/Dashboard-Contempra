@@ -155,6 +155,28 @@
   }
 }
 
+/* ---------- Segmented control (active segment = solid pill; AA checked by a test) ---------- */
+:root {
+  /* brand: "All dockets | My Dockets", so "only mine" is obvious. */
+  --seg-brand-bg: rgb(204 20 40);
+  --seg-brand-ink: rgb(255 255 255);
+  /* ink: same as the "All" section chip (text color as fill). */
+  --seg-ink-bg: rgb(11 15 25);
+  --seg-ink-ink: rgb(255 255 255);
+  --seg-idle: rgb(61 70 86);
+  --seg-hover: rgb(var(--p-ink-950) / 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --seg-brand-bg: rgb(204 20 40);
+    --seg-brand-ink: rgb(255 255 255);
+    --seg-ink-bg: rgb(243 245 248);
+    --seg-ink-ink: rgb(13 15 20);
+    --seg-idle: rgb(196 202 212);
+    --seg-hover: rgb(var(--p-white) / 0.08);
+  }
+}
+
 /* ---------- Layer 3: component tokens ---------- */
 :root {
   --radius-tile: 22px;
@@ -219,6 +241,39 @@ body {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* Segmented control: [data-tone] on the tablist picks the active pill colors. */
+[data-tone="brand"] {
+  --seg-on-bg: var(--seg-brand-bg);
+  --seg-on-ink: var(--seg-brand-ink);
+}
+[data-tone="ink"] {
+  --seg-on-bg: var(--seg-ink-bg);
+  --seg-on-ink: var(--seg-ink-ink);
+}
+@utility seg {
+  @apply flex min-h-10 items-center justify-center gap-1.5 rounded-[12px] px-3 text-sm font-semibold whitespace-nowrap;
+  color: var(--seg-idle);
+  transition:
+    background-color 200ms ease,
+    color 200ms ease,
+    box-shadow 200ms ease;
+  &:hover {
+    background: var(--seg-hover);
+    color: var(--text);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  /* The active segment is styled from its ARIA state, so look and semantics never disagree. */
+  &[aria-selected="true"],
+  &[aria-selected="true"]:hover {
+    background: var(--seg-on-bg);
+    color: var(--seg-on-ink);
+    box-shadow: var(--shadow);
+  }
 }
 
 /* Translucent surface used by panels, bars, tiles and dialogs. */

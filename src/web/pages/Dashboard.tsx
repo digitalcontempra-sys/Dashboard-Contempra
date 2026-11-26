@@ -11,21 +11,22 @@ import { BucketFilter } from "../components/BucketChip";
 import { DocketDetail } from "../components/DocketDetail";
 import { DocketList, EmptyState, ListSkeleton } from "../components/DocketList";
 import { AccountManagerSelect, SearchBox, Tabs } from "../components/Filters";
+import type { SegmentItem } from "../components/Segmented";
 import { AreaLegend } from "../components/AreaChip";
 import { NewTaskCardButton } from "../tasks/NewTaskCard";
 import { PageHeader } from "../components/Layout";
 import { SyncBadge } from "../components/SyncBadge";
 import { useParam, useSetParams } from "../hooks";
 
-const VIEWS: { id: DocketView; label: string }[] = [
-  { id: "active", label: "Active" },
-  { id: "on_hold", label: "On Hold" },
-  { id: "history", label: "History" },
+const VIEWS: SegmentItem<DocketView>[] = [
+  { id: "active", label: "Active", icon: "activity" },
+  { id: "on_hold", label: "On Hold", icon: "pause" },
+  { id: "history", label: "History", icon: "history" },
 ];
 type Scope = "all" | "mine";
-const SCOPES: { id: Scope; label: string }[] = [
-  { id: "all", label: "All dockets" },
-  { id: "mine", label: "My Dockets" },
+const SCOPES: SegmentItem<Scope>[] = [
+  { id: "all", label: "All dockets", icon: "layers" },
+  { id: "mine", label: "My Dockets", icon: "user" },
 ];
 const scopeKey = (userId: number | undefined) => `dashboard.scope.${userId ?? "anon"}`;
 
@@ -49,10 +50,10 @@ function useScope(userId: number | undefined): [Scope, (s: Scope) => void] {
   return [scope, change];
 }
 
-const HISTORY: { id: HistoryFilter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "completed", label: "Completed" },
-  { id: "cancelled", label: "Cancelled" },
+const HISTORY: SegmentItem<HistoryFilter>[] = [
+  { id: "all", label: "All", icon: "layers" },
+  { id: "completed", label: "Completed", icon: "check" },
+  { id: "cancelled", label: "Cancelled", icon: "ban" },
 ];
 
 export function Dashboard() {
@@ -124,7 +125,7 @@ export function Dashboard() {
           </p>
         )}
         <div className="max-w-xs">
-          <Tabs label="Whose dockets" tabs={SCOPES} value={scope} onChange={setScope} />
+          <Tabs label="Whose dockets" tone="brand" tabs={SCOPES} value={scope} onChange={setScope} />
         </div>
         <div className="max-w-md">
           <Tabs

@@ -8,6 +8,7 @@ import { dueLabel, longDate } from "../format";
 import { HolderList } from "./AreaChip";
 import { BucketTag } from "./BucketChip";
 import { Icon } from "./Icon";
+import { Segmented } from "./Segmented";
 import { DocketActions } from "../docket/DocketActions";
 
 const STATUS: Record<Detail["status"], { label: string; cls: string }> = {
@@ -124,27 +125,17 @@ export function DocketDetail({ workOrder, onClose }: { workOrder: string; onClos
         <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-5 pb-7 sm:px-7">
           {error && <p className="py-6 text-danger">{(error as Error).message}</p>}
           {d && managers && (
-            <div role="tablist" aria-label="Docket sections" className="mb-4 flex gap-1 rounded-full bg-surface-2 p-1">
-              {(
-                [
-                  ["details", "Details"],
-                  ["production", "Production"],
-                  ["history", "History"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === id}
-                  onClick={() => setTab(id)}
-                  className={`min-h-10 flex-1 rounded-full text-sm font-semibold transition ${
-                    tab === id ? "bg-surface-strong text-text shadow-card" : "text-text-2"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+            <div className="mb-4">
+              <Segmented
+                label="Docket sections"
+                value={tab}
+                onChange={setTab}
+                items={[
+                  { id: "details", label: "Details", icon: "doc" },
+                  { id: "production", label: "Production", icon: "board" },
+                  { id: "history", label: "History", icon: "history" },
+                ]}
+              />
             </div>
           )}
           {d && managers && tab === "production" && <DocketProduction workOrder={workOrder} />}
