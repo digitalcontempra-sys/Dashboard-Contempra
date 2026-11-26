@@ -127,7 +127,7 @@ export function Dashboard() {
           </p>
         )}
         <div className="max-w-md">
-          <Tabs label="Whose dockets" tone="brand" tabs={SCOPES} value={scope} onChange={setScope} />
+          <Tabs label="Whose dockets" tone="brand" compact tabs={SCOPES} value={scope} onChange={setScope} />
         </div>
         <div className="max-w-md">
           <Tabs

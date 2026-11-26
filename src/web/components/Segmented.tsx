@@ -15,6 +15,7 @@ export function Segmented<T extends string | null>({
   label,
   tone = "ink",
   wrap = false,
+  compact = false,
 }: {
   items: SegmentItem<T>[];
   value: T;
@@ -23,6 +24,8 @@ export function Segmented<T extends string | null>({
   tone?: "brand" | "ink";
   /** Many segments: wrap onto new lines instead of sharing one row (never scroll sideways). */
   wrap?: boolean;
+  /** Long labels: icons only from the sm breakpoint, so phone labels are not cut. */
+  compact?: boolean;
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const onKey = (e: KeyboardEvent, i: number) => {
@@ -56,7 +59,7 @@ export function Segmented<T extends string | null>({
             onKeyDown={(e) => onKey(e, i)}
             className={`seg ${wrap ? "shrink-0" : "min-w-0 flex-1"}`}
           >
-            {it.icon && <Icon name={it.icon} className="size-4 shrink-0" />}
+            {it.icon && <Icon name={it.icon} className={`size-4 shrink-0 ${compact ? "max-sm:hidden" : ""}`} />}
             <span className={wrap ? "" : "truncate"}>{it.label}</span>
             {it.count !== undefined && <span className="tabular-nums opacity-80">{it.count}</span>}
           </button>

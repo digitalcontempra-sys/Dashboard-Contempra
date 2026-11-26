@@ -7,7 +7,7 @@ import { BucketTag } from "../components/BucketChip";
 import { Icon } from "../components/Icon";
 import { NewTaskCardDialog } from "../tasks/NewTaskCard";
 
-const ROUND = "grid shrink-0 place-items-center rounded-full transition";
+const ROUND = "inline-flex shrink-0 items-center justify-center rounded-full transition";
 const TASK_STYLE = { background: "var(--task-bg)", borderColor: "var(--task-border)", color: "var(--task-ink)" };
 
 function refresh(qc: ReturnType<typeof useQueryClient>, workOrder: string) {
@@ -65,7 +65,7 @@ export function NoteButton({ workOrder, count, size = "sm" }: { workOrder: strin
         title={count > 0 ? `${count} open note${count === 1 ? "" : "s"}. Add a note` : "Add a note"}
         onClick={() => setOpen(true)}
         style={count > 0 ? TASK_STYLE : undefined}
-        className={`${ROUND} ${dim} gap-0.5 ${count > 0 ? "flex border px-1.5 text-[11px] font-black" : "bg-surface-2 text-text-3 hover:text-text"}`}
+        className={`${ROUND} ${dim} gap-0.5 ${count > 0 ? "border px-1.5 text-[11px] font-black" : "bg-surface-2 text-text-3 hover:text-text"}`}
       >
         <Icon name="note" filled={false} className={size === "md" ? "size-4" : "size-3.5"} />
         {count > 0 && <span className="tabular-nums">{count}</span>}

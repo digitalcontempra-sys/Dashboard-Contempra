@@ -29,14 +29,15 @@ function DocketTile({ d, onOpen, extra, showStatus }: { d: Item; onOpen: (wo: st
         className="tile force-light group peer"
         aria-label={`Work order ${d.workOrder}, ${d.customer ?? "no customer"}`}
       >
-      <div className={`flex items-center gap-1.5 ${marks ? "pr-[3.75rem]" : ""}`}>
+      <div className={`flex items-center gap-1.5 ${marks ? (d.myOpenNotes ? "pr-[4.75rem]" : "pr-[3.75rem]") : ""}`}>
         <span className="font-mono text-[11px] font-semibold tracking-tight text-text-3 tabular-nums">#{d.workOrder}</span>
         {d.accountManager && (
           <span className="rounded-md bg-surface-2 px-1.5 py-px text-[10px] font-bold text-text-2" title="Account Manager">
             {d.accountManager}
           </span>
         )}
-        {live && <span className={`ml-auto size-2 shrink-0 rounded-full ${tone}`} aria-hidden="true" />}
+        {/* On a phone the corner holds the bookmark and note buttons; the bucket tag below still shows the color. */}
+        {live && <span className={`ml-auto size-2 shrink-0 rounded-full ${tone} ${marks ? "max-sm:hidden" : ""}`} aria-hidden="true" />}
         {showStatus && !live && (
           <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-text-3">{STATUS_LABEL[d.status]}</span>
         )}

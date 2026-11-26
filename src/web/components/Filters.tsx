@@ -48,12 +48,14 @@ export function Tabs<T extends string>({
   onChange,
   label,
   tone,
+  compact,
 }: {
   tabs: SegmentItem<T>[];
   value: T;
   onChange: (v: T) => void;
   label: string;
   tone?: "brand" | "ink";
+  compact?: boolean;
 }) {
-  return <Segmented items={tabs} value={value} onChange={onChange} label={label} tone={tone} />;
+  return <Segmented items={tabs} value={value} onChange={onChange} label={label} tone={tone} compact={compact} />;
 }
