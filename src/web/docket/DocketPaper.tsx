@@ -24,10 +24,9 @@ type Props = {
   workOrder: string | null;
   /** Shown in grey while the docket is new: the number it will most likely get. */
   nextWorkOrder?: string | null;
-  salespeople?: string[];
 };
 
-export function DocketPaper({ form, onChange, readOnly = false, showPrices, workOrder, nextWorkOrder = null, salespeople = [] }: Props) {
+export function DocketPaper({ form, onChange, readOnly = false, showPrices, workOrder, nextWorkOrder = null }: Props) {
   const set = <K extends keyof DocketForm>(k: K, v: DocketForm[K]) => onChange?.({ ...form, [k]: v });
   const totals = computeTotals(form);
   const ctx: Ctx = { form, set, readOnly };
@@ -106,19 +105,14 @@ export function DocketPaper({ form, onChange, readOnly = false, showPrices, work
             <Line ctx={ctx} label="ORDER TAKEN BY" field="orderTakenBy" />
             <label className={`flex min-h-11 items-center gap-2 px-2`}>
               <span className={LABEL}>SALESPERSON</span>
+              {/* Always the creator's code (sheet J): it makes the docket theirs in My Dockets. */}
               <input
                 aria-label="SALESPERSON"
-                list="salespeople"
                 className={`${INK} uppercase`}
                 value={form.salesperson}
-                readOnly={readOnly}
-                onChange={(e) => set("salesperson", e.target.value.toUpperCase())}
+                readOnly
+                title="Set from the creator's initials"
               />
-              <datalist id="salespeople">
-                {salespeople.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
             </label>
           </div>
           <div className="flex flex-col justify-center px-3 py-2">

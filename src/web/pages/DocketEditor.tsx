@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { emptyForm, WHOLE_DOCKET, type DocketForm, type ProductionJob } from "../../shared/docketForm";
 import { todayInBusinessTz } from "../../shared/rules";
-import type { AccountManagerCount, AssigneeDTO, TeamDTO, VirtualDocketDTO } from "../../shared/types";
+import type { AssigneeDTO, TeamDTO, VirtualDocketDTO } from "../../shared/types";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { emptyRow, HandoffPicker, rowsComplete, toTargets, type HandoffRow } from "../cards/HandoffPicker";
@@ -22,7 +22,10 @@ export function DocketEditor() {
   const canEdit = user?.accessLevel === "admin" || user?.accessLevel === "manager";
   const isNew = !wo;
 
-  const [form, setForm] = useState<DocketForm>(() => emptyForm(todayInBusinessTz(new Date()), user?.fullName ?? ""));
+  // SALESPERSON is the creator's main code (sheet J); the server stamps it too.
+  const myCode = user?.codes?.[0] ?? "";
+  const blankForm = () => ({ ...emptyForm(todayInBusinessTz(new Date()), user?.fullName ?? ""), salesperson: myCode });
+  const [form, setForm] = useState<DocketForm>(blankForm);
   // Who gets the docket first; an untouched single row means "not sent to anyone yet".
   const [rows, setRows] = useState<HandoffRow[]>([emptyRow()]);
   const [version, setVersion] = useState(0);
@@ -38,11 +41,6 @@ export function DocketEditor() {
     enabled: canEdit,
   });
   const teams = useQuery({ queryKey: ["teams"], queryFn: () => api<TeamDTO[]>("/api/teams"), enabled: canEdit, retry: false });
-  const ams = useQuery({
-    queryKey: ["account-managers"],
-    queryFn: () => api<AccountManagerCount[]>("/api/account-managers"),
-    enabled: canEdit,
-  });
   const nextNumber = useQuery({
     queryKey: ["next-work-order"],
     queryFn: () => api<{ workOrder: string }>("/api/virtual-dockets/next-number"),
@@ -88,6 +86,7 @@ export function DocketEditor() {
   const hasNote = Boolean(form.forName.trim() && form.body.trim());
   const newOrderReady = canHandOff && untouched && hasNote;
   const isNewOrder = existing.data?.newOrder === true;
+  const needsInitials = isNew && canEdit && !myCode;
 
   async function save(andNew: boolean, asNewOrder = false) {
     setSaving(true);
@@ -106,7 +105,7 @@ export function DocketEditor() {
       qc.setQueryData(["virtual-docket", dto.workOrder], dto);
       void afterDocketSaved(dto, qc);
       if (andNew) {
-        setForm(emptyForm(todayInBusinessTz(new Date()), user?.fullName ?? ""));
+        setForm(blankForm());
         setRows([emptyRow()]);
         setVersion(0);
         navigate("/dockets/new");
@@ -163,7 +162,7 @@ export function DocketEditor() {
               Cancel
             </button>
             {isNew && (
-              <button className="btn-ghost" type="button" disabled={saving || !handoffReady} onClick={() => save(true)}>
+              <button className="btn-ghost" type="button" disabled={saving || !handoffReady || needsInitials} onClick={() => save(true)}>
                 Save &amp; New
               </button>
             )}
@@ -171,14 +170,14 @@ export function DocketEditor() {
               <button
                 className="btn-ghost"
                 type="button"
-                disabled={saving || !newOrderReady}
+                disabled={saving || !newOrderReady || needsInitials}
                 title={hasNote && !untouched ? "Clear Send to to save as a new order." : undefined}
                 onClick={() => save(false, true)}
               >
                 Save as New Order
               </button>
             )}
-            <button className="btn-primary" type="button" disabled={saving || !handoffReady} onClick={() => save(false)}>
+            <button className="btn-primary" type="button" disabled={saving || !handoffReady || needsInitials} onClick={() => save(false)}>
               Save
             </button>
           </>
@@ -198,7 +197,8 @@ export function DocketEditor() {
           <button
             className="btn-ghost min-h-9"
             onClick={() => {
-              setForm(draft.form);
+              // The draft never changes who the docket belongs to.
+              setForm({ ...draft.form, salesperson: form.salesperson });
               // Keep the version the draft was written against, so a stale draft still gets the conflict warning.
               if (typeof draft.version === "number") setVersion(draft.version);
               setDirty(true);
@@ -219,6 +219,12 @@ export function DocketEditor() {
         </div>
       )}
 
+      {needsInitials && (
+        <p role="alert" className="mx-4 mt-4 rounded-2xl bg-warn-soft px-4 py-3 text-sm font-medium text-warn md:mx-6">
+          Ask an admin to set your initials first.
+        </p>
+      )}
+
       {error && (
         <p role="alert" className="mx-4 mt-4 rounded-2xl bg-danger-soft px-4 py-3 text-sm font-medium text-danger md:mx-6">
           {error}
@@ -233,7 +239,6 @@ export function DocketEditor() {
           showPrices={canEdit}
           workOrder={workOrder}
           nextWorkOrder={nextNumber.data?.workOrder ?? null}
-          salespeople={ams.data?.map((a) => a.accountManager) ?? []}
         />
         <div className="min-[1180px]:sticky min-[1180px]:top-24">
           <section className="card p-4" aria-label="Send to">

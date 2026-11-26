@@ -18,7 +18,10 @@ const LEVELS: { id: AccessLevel; label: string; hint: string }[] = [
   { id: "admin", label: "Admin", hint: "Everything, including users" },
 ];
 
-type Draft = { id?: number; username: string; fullName: string; accessLevel: AccessLevel; roles: string[]; password: string };
+/** `codes` is the Initials box as typed: comma- or space-separated, the first is the main one. */
+type Draft = { id?: number; username: string; fullName: string; accessLevel: AccessLevel; roles: string[]; password: string; codes: string };
+
+const splitCodes = (text: string) => text.split(/[\s,;]+/).map((c) => c.toUpperCase()).filter(Boolean);
 
 function UserForm({ initial, roles, onClose }: { initial: Draft; roles: RoleDTO[]; onClose: () => void }) {
   const qc = useQueryClient();
@@ -28,10 +31,10 @@ function UserForm({ initial, roles, onClose }: { initial: Draft; roles: RoleDTO[
   const save = useMutation({
     mutationFn: (payload: Draft) =>
       isNew
-        ? api<UserDTO>("/api/users", { method: "POST", json: payload })
+        ? api<UserDTO>("/api/users", { method: "POST", json: { ...payload, codes: splitCodes(payload.codes) } })
         : api<UserDTO>(`/api/users/${initial.id}`, {
             method: "PATCH",
-            json: { fullName: payload.fullName, accessLevel: payload.accessLevel, roles: payload.roles },
+            json: { fullName: payload.fullName, accessLevel: payload.accessLevel, roles: payload.roles, codes: splitCodes(payload.codes) },
           }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["users"] });
@@ -82,6 +85,22 @@ function UserForm({ initial, roles, onClose }: { initial: Draft; roles: RoleDTO[
             <span className="mb-1.5 block text-sm font-medium">Full name</span>
             <input className="field" value={d.fullName} onChange={(e) => setD({ ...d, fullName: e.target.value })} required />
           </label>
+        </div>
+
+        <div className="mt-4">
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium">Initials</span>
+            <input
+              className="field uppercase"
+              value={d.codes}
+              autoCapitalize="characters"
+              placeholder="e.g. AR, ALI"
+              onChange={(e) => setD({ ...d, codes: e.target.value })}
+            />
+          </label>
+          <p className="mt-1 text-xs text-text-3">
+            As written in the sheet's Account Manager column. The first one goes on the dockets they create.
+          </p>
         </div>
 
         <fieldset className="mt-5">
@@ -232,7 +251,7 @@ export function AdminUsers() {
         actions={
           <button
             className="btn-primary"
-            onClick={() => setEditing({ username: "", fullName: "", accessLevel: "staff", roles: [], password: "" })}
+            onClick={() => setEditing({ username: "", fullName: "", accessLevel: "staff", roles: [], password: "", codes: "" })}
           >
             <Icon name="plus" className="size-4" />
             Add user
@@ -261,7 +280,15 @@ export function AdminUsers() {
                     </span>
                     {!u.active && <span className="text-[11px] font-semibold uppercase text-danger">Inactive</span>}
                   </div>
-                  <p className="text-xs text-text-3">@{u.username}</p>
+                  <p className="text-xs text-text-3">
+                    @{u.username}
+                    {u.codes?.length ? (
+                      <>
+                        {" · "}
+                        <span>{`Initials: ${u.codes.join(", ")}`}</span>
+                      </>
+                    ) : null}
+                  </p>
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {u.roles.length === 0 && <span className="text-xs text-text-3">No production roles</span>}
                     {u.roles.map((r) => (
@@ -274,7 +301,7 @@ export function AdminUsers() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     className="btn-ghost text-xs"
-                    onClick={() => setEditing({ ...u, password: "" })}
+                    onClick={() => setEditing({ ...u, password: "", codes: (u.codes ?? []).join(", ") })}
                     aria-label={`Edit ${u.fullName}`}
                   >
                     Edit

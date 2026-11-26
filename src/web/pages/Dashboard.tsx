@@ -6,6 +6,7 @@ import { DASH_SECTIONS, type DashSection } from "../../shared/rules";
 import { SECTIONS } from "../format";
 import type { DocketListResponse, DocketView, HistoryFilter } from "../../shared/types";
 import { api, withQuery } from "../api";
+import { useAuth } from "../auth";
 import { BucketFilter } from "../components/BucketChip";
 import { DocketDetail } from "../components/DocketDetail";
 import { DocketList, EmptyState, ListSkeleton } from "../components/DocketList";
@@ -21,6 +22,33 @@ const VIEWS: { id: DocketView; label: string }[] = [
   { id: "on_hold", label: "On Hold" },
   { id: "history", label: "History" },
 ];
+type Scope = "all" | "mine";
+const SCOPES: { id: Scope; label: string }[] = [
+  { id: "all", label: "All dockets" },
+  { id: "mine", label: "My Dockets" },
+];
+const scopeKey = (userId: number | undefined) => `dashboard.scope.${userId ?? "anon"}`;
+
+/** All dockets | My Dockets, remembered per user on this device. */
+function useScope(userId: number | undefined): [Scope, (s: Scope) => void] {
+  const [scope, setScope] = useState<Scope>(() => {
+    try {
+      return localStorage.getItem(scopeKey(userId)) === "mine" ? "mine" : "all";
+    } catch {
+      return "all";
+    }
+  });
+  const change = (s: Scope) => {
+    setScope(s);
+    try {
+      localStorage.setItem(scopeKey(userId), s);
+    } catch {
+      // Private mode or blocked storage: the choice lasts for this visit only.
+    }
+  };
+  return [scope, change];
+}
+
 const HISTORY: { id: HistoryFilter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "completed", label: "Completed" },
@@ -34,6 +62,10 @@ export function Dashboard() {
   const [am, setAm] = useParam("am");
   const [q, setQ] = useParam("q");
   const setParams = useSetParams();
+  const { user } = useAuth();
+  const [scope, setScope] = useScope(user?.id);
+  // My Dockets = dockets whose Account Manager (sheet J) is one of my codes.
+  const noCodes = scope === "mine" && !user?.codes?.length;
   const [open, setOpen] = useState<string | null>(null);
   // Set by the docket editor after Save: confirm it here, then fade out.
   const location = useLocation();
@@ -51,7 +83,7 @@ export function Dashboard() {
   const section = DASH_SECTIONS.includes(bucket as DashSection) ? (bucket as DashSection) : undefined;
   const h = (history || "all") as HistoryFilter;
   const isHistory = v === "history";
-  const params = { view: v, history: isHistory ? h : undefined, bucket: isHistory ? undefined : section, am, q };
+  const params = { view: v, history: isHistory ? h : undefined, bucket: isHistory ? undefined : section, am, q, mine: scope === "mine" ? "1" : undefined };
 
   const list = useInfiniteQuery({
     queryKey: ["dockets", params],
@@ -59,6 +91,7 @@ export function Dashboard() {
     initialPageParam: 1,
     getNextPageParam: (last) => (last.page * last.pageSize < last.total ? last.page + 1 : undefined),
     refetchInterval: 30_000,
+    enabled: !noCodes,
   });
 
   const first = list.data?.pages[0];
@@ -66,7 +99,7 @@ export function Dashboard() {
 
   return (
     <>
-      <PageHeader title="Main Dashboard" subtitle={first ? `${first.total} work orders` : undefined} actions={
+      <PageHeader title="Main Dashboard" subtitle={first && !noCodes ? `${first.total} work orders` : undefined} actions={
           <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:items-end">
             <div className="flex items-center gap-3 md:justify-end">
               <SyncBadge />
@@ -90,6 +123,9 @@ export function Dashboard() {
             Docket #{saved} saved.
           </p>
         )}
+        <div className="max-w-xs">
+          <Tabs label="Whose dockets" tabs={SCOPES} value={scope} onChange={setScope} />
+        </div>
         <div className="max-w-md">
           <Tabs
             label="View"
@@ -110,7 +146,9 @@ export function Dashboard() {
           <AccountManagerSelect value={am} onChange={(a) => setAm(a || null)} />
         </div>
 
-        {list.isPending ? (
+        {noCodes ? (
+          <EmptyState text="Ask an admin to set your initials." />
+        ) : list.isPending ? (
           <ListSkeleton />
         ) : list.error ? (
           <EmptyState text={(list.error as Error).message} />

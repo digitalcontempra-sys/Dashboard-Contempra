@@ -30,5 +30,5 @@ export function mockApi(routes: Record<string, Handler>) {
 }
 
 export const staffUser = { id: 2, username: "ana", fullName: "Ana Lopez", accessLevel: "staff", roles: ["printer_roll"] };
-export const managerUser = { id: 3, username: "mb", fullName: "Meinrad", accessLevel: "manager", roles: [] };
-export const adminUser = { id: 1, username: "boss", fullName: "Jeff Baumer", accessLevel: "admin", roles: [] };
+export const managerUser = { id: 3, username: "mb", fullName: "Meinrad", accessLevel: "manager", roles: [], codes: ["MB"] };
+export const adminUser = { id: 1, username: "boss", fullName: "Jeff Baumer", accessLevel: "admin", roles: [], codes: ["JB"] };
