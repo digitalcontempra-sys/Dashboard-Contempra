@@ -307,7 +307,7 @@ Everything below is live and pushed to `main`:
 - staff accounts (imported; the owner's account has Printer Roll, Designer and Contour Cut).
 
 - Main Dashboard sections (New Orders, Daily Complete, Upcoming), Save as New Order, migration 0012 (live 2026-11-24; no sheet layout change).
-- My Dockets + user codes (Initials), migration 0013 (branch `feature/my-dockets`, 2026-11-26). Codes `CF` and `MN` in J belong to nobody.
+- My Dockets + user codes (Initials), migration 0013 (live 2026-11-26; no sheet layout change). Codes `CF` and `MN` in J belong to nobody.
 
 ### Pending: owner
 
