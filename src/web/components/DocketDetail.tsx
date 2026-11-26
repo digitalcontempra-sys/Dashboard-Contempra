@@ -10,6 +10,8 @@ import { BucketTag } from "./BucketChip";
 import { Icon } from "./Icon";
 import { Segmented } from "./Segmented";
 import { DocketActions } from "../docket/DocketActions";
+import { DocketNotes, FollowButton, NoteButton } from "../docket/DocketMarks";
+import { isTopDialog } from "./topDialog";
 
 const STATUS: Record<Detail["status"], { label: string; cls: string }> = {
   active: { label: "Active", cls: "bg-info-soft text-info" },
@@ -65,12 +67,13 @@ export function DocketDetail({ workOrder, onClose }: { workOrder: string; onClos
   const closeRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const dialogRef = useRef<HTMLElement>(null);
 
   // Focus, Escape and scroll lock run once per open dialog, not on every parent refresh.
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
     closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCloseRef.current();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && isTopDialog(dialogRef.current) && onCloseRef.current();
     document.addEventListener("keydown", onKey);
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -87,6 +90,7 @@ export function DocketDetail({ workOrder, onClose }: { workOrder: string; onClos
     <div className="fixed inset-0 z-40 flex items-end justify-center sm:items-center sm:p-6">
       <div className="animate-fade-in absolute inset-0 bg-black/25 backdrop-blur-[3px]" onClick={onClose} aria-hidden="true" />
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={`Work order ${workOrder}`}
@@ -112,6 +116,12 @@ export function DocketDetail({ workOrder, onClose }: { workOrder: string; onClos
               </div>
             )}
           </div>
+          {d && d.followed !== undefined && (
+            <div className="flex shrink-0 gap-1.5">
+              <NoteButton workOrder={workOrder} count={d.myOpenNotes ?? 0} size="md" />
+              <FollowButton workOrder={workOrder} followed={d.followed} size="md" />
+            </div>
+          )}
           <button
             ref={closeRef}
             className="grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-text-2 transition hover:bg-border hover:text-text"
@@ -142,6 +152,7 @@ export function DocketDetail({ workOrder, onClose }: { workOrder: string; onClos
           {d && managers && tab === "history" && <DocketHistory workOrder={workOrder} />}
           {d && tab === "details" && (
             <>
+              <DocketNotes workOrder={workOrder} count={d.myOpenNotes ?? 0} />
               <dl className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
                 <Fact label="Account Manager" value={d.accountManager} />
                 <Fact label="Due Date" value={d.dueIso || d.dueRaw ? dueLabel(d.dueIso, d.dueRaw) : null} />

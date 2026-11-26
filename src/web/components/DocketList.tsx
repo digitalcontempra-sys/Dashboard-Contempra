@@ -3,6 +3,7 @@ import { BUCKET_TONE, dueLabel, shortDate } from "../format";
 import { todayInBusinessTz } from "../../shared/rules";
 import { AreaChip, HolderList } from "./AreaChip";
 import { BucketTag } from "./BucketChip";
+import { FollowButton, NoteButton } from "../docket/DocketMarks";
 
 const STATUS_LABEL: Record<DocketSummary["status"], string> = {
   active: "Active",
@@ -18,14 +19,17 @@ const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:g
 function DocketTile({ d, onOpen, extra, showStatus }: { d: Item; onOpen: (wo: string) => void; extra?: (d: Item) => React.ReactNode; showStatus?: boolean }) {
   const live = d.status === "active" || d.status === "on_hold";
   const tone = d.overdue && d.section === "rush_today" ? "bg-danger" : `${BUCKET_TONE[d.section].fg} bg-current`;
+  // My List + pinned notes: only where the list says whose they are (the Main Dashboard).
+  const marks = d.followed !== undefined;
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(d.workOrder)}
-      className="tile force-light group"
-      aria-label={`Work order ${d.workOrder}, ${d.customer ?? "no customer"}`}
-    >
-      <div className="flex items-center gap-1.5">
+    <div className="relative h-full">
+      <button
+        type="button"
+        onClick={() => onOpen(d.workOrder)}
+        className="tile force-light group peer"
+        aria-label={`Work order ${d.workOrder}, ${d.customer ?? "no customer"}`}
+      >
+      <div className={`flex items-center gap-1.5 ${marks ? "pr-[3.75rem]" : ""}`}>
         <span className="font-mono text-[11px] font-semibold tracking-tight text-text-3 tabular-nums">#{d.workOrder}</span>
         {d.accountManager && (
           <span className="rounded-md bg-surface-2 px-1.5 py-px text-[10px] font-bold text-text-2" title="Account Manager">
@@ -60,7 +64,15 @@ function DocketTile({ d, onOpen, extra, showStatus }: { d: Item; onOpen: (wo: st
         </div>
         {live && <BucketTag bucket={d.section} overdue={d.overdue && d.section === "rush_today"} />}
       </div>
-    </button>
+      </button>
+      {/* My List + pinned notes: siblings over the tile's corner (no nested buttons); they lift with it. */}
+      {marks && (
+        <div className="absolute top-2.5 right-2.5 z-10 flex gap-1 transition-transform duration-[260ms] peer-hover:-translate-y-[3px] peer-focus-visible:-translate-y-[3px]">
+          <NoteButton workOrder={d.workOrder} count={d.myOpenNotes ?? 0} />
+          <FollowButton workOrder={d.workOrder} followed={d.followed!} />
+        </div>
+      )}
+    </div>
   );
 }
 

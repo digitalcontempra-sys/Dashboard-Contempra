@@ -45,6 +45,7 @@ describe("cards stay white in dark mode", () => {
               createdAt: "2026-11-10T15:00:00Z",
               doneAt: null,
               isNew: false,
+              workOrder: null,
             }}
             onOpen={() => undefined}
           />

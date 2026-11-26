@@ -23,18 +23,20 @@ const VIEWS: SegmentItem<DocketView>[] = [
   { id: "on_hold", label: "On Hold", icon: "pause" },
   { id: "history", label: "History", icon: "history" },
 ];
-type Scope = "all" | "mine";
+type Scope = "all" | "mine" | "list";
 const SCOPES: SegmentItem<Scope>[] = [
   { id: "all", label: "All dockets", icon: "layers" },
   { id: "mine", label: "My Dockets", icon: "user" },
+  { id: "list", label: "My List", icon: "bookmark" },
 ];
 const scopeKey = (userId: number | undefined) => `dashboard.scope.${userId ?? "anon"}`;
 
-/** All dockets | My Dockets, remembered per user on this device. */
+/** All dockets | My Dockets | My List, remembered per user on this device. */
 function useScope(userId: number | undefined): [Scope, (s: Scope) => void] {
   const [scope, setScope] = useState<Scope>(() => {
     try {
-      return localStorage.getItem(scopeKey(userId)) === "mine" ? "mine" : "all";
+      const saved = localStorage.getItem(scopeKey(userId));
+      return saved === "mine" || saved === "list" ? saved : "all";
     } catch {
       return "all";
     }
@@ -84,7 +86,7 @@ export function Dashboard() {
   const section = DASH_SECTIONS.includes(bucket as DashSection) ? (bucket as DashSection) : undefined;
   const h = (history || "all") as HistoryFilter;
   const isHistory = v === "history";
-  const params = { view: v, history: isHistory ? h : undefined, bucket: isHistory ? undefined : section, am, q, mine: scope === "mine" ? "1" : undefined };
+  const params = { view: v, history: isHistory ? h : undefined, bucket: isHistory ? undefined : section, am, q, mine: scope === "mine" ? "1" : undefined, list: scope === "list" ? "1" : undefined };
 
   const list = useInfiniteQuery({
     queryKey: ["dockets", params],
@@ -124,7 +126,7 @@ export function Dashboard() {
             Docket #{saved} saved.
           </p>
         )}
-        <div className="max-w-xs">
+        <div className="max-w-md">
           <Tabs label="Whose dockets" tone="brand" tabs={SCOPES} value={scope} onChange={setScope} />
         </div>
         <div className="max-w-md">
@@ -154,7 +156,13 @@ export function Dashboard() {
         ) : list.error ? (
           <EmptyState text={(list.error as Error).message} />
         ) : items.length === 0 ? (
-          <EmptyState text="No work orders match these filters." />
+          <EmptyState
+            text={
+              scope === "list" && !q && !am && !section && !isHistory
+                ? "Your list is empty. Tap the bookmark on a docket to add it."
+                : "No work orders match these filters."
+            }
+          />
         ) : (
           <>
             <DocketList

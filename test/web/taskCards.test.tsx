@@ -26,6 +26,7 @@ const task = (over: Partial<TaskCardDTO> = {}): TaskCardDTO => ({
   createdAt: "2026-11-10T15:00:00Z",
   doneAt: null,
   isNew: true,
+  workOrder: null,
   ...over,
 });
 

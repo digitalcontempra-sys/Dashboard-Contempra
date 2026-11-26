@@ -40,6 +40,7 @@ describe("modals keep focus when the page refreshes behind them", () => {
       createdAt: "2026-11-10T15:00:00Z",
       doneAt: null,
       isNew: true,
+      workOrder: null,
     };
     const { rerender } = render(wrap(<TaskView task={task} onClose={() => undefined} />));
     await waitFor(() => expect(calls.filter((c) => c.url.pathname === "/api/task-cards/3/seen")).toHaveLength(1));

@@ -5,6 +5,7 @@ import type { AssigneeDTO } from "../../shared/types";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { Icon } from "../components/Icon";
+import { isTopDialog } from "../components/topDialog";
 
 const firstName = (n: string) => n.trim().split(/\s+/)[0] ?? n;
 const WHEN: { kind: TaskDueKind; label: string }[] = [
@@ -47,12 +48,26 @@ export function NewTaskCardButton({ className = "btn-ghost" }: { className?: str
   );
 }
 
-function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (name: string, self: boolean) => void }) {
+/**
+ * The New Task Card form. With `workOrder` it is a note to self pinned to that docket:
+ * To is fixed to Me and the docket is linked.
+ */
+export function NewTaskCardDialog({
+  onClose,
+  onSent,
+  workOrder,
+}: {
+  onClose: () => void;
+  onSent: (name: string, self: boolean) => void;
+  workOrder?: string;
+}) {
   const qc = useQueryClient();
   const { user } = useAuth();
-  const people = useQuery({ queryKey: ["assignees"], queryFn: () => api<AssigneeDTO[]>("/api/assignees"), staleTime: 60_000 });
+  const people = useQuery({ queryKey: ["assignees"], queryFn: () => api<AssigneeDTO[]>("/api/assignees"), staleTime: 60_000, enabled: !workOrder });
   const [query, setQuery] = useState("");
-  const [to, setTo] = useState<AssigneeDTO | null>(null);
+  const [to, setTo] = useState<AssigneeDTO | null>(workOrder && user ? { id: user.id, fullName: user.fullName, roles: [] } : null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
   const [note, setNote] = useState("");
   const [kind, setKind] = useState<TaskDueKind>("none");
   const [date, setDate] = useState("");
@@ -64,8 +79,8 @@ function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (
 
   // Once per open dialog: a refresh behind it must not move the cursor while someone types.
   useEffect(() => {
-    toRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCloseRef.current();
+    (toRef.current ?? noteRef.current)?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && isTopDialog(dialogRef.current) && onCloseRef.current();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
@@ -86,9 +101,13 @@ function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (
     try {
       await api("/api/task-cards", {
         method: "POST",
-        json: { toUserId: to.id, note: note.trim(), due: kind === "date" ? { kind, date } : { kind } },
+        json: { toUserId: to.id, note: note.trim(), due: kind === "date" ? { kind, date } : { kind }, ...(workOrder ? { workOrder } : {}) },
       });
       void qc.invalidateQueries({ queryKey: ["tasks"] });
+      if (workOrder) {
+        void qc.invalidateQueries({ queryKey: ["dockets"] });
+        void qc.invalidateQueries({ queryKey: ["docket", workOrder] });
+      }
       onSent(to.fullName, self);
     } catch (e) {
       setError((e as Error).message);
@@ -101,6 +120,7 @@ function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (
     <div className="fixed inset-0 z-40 flex items-end justify-center sm:items-center sm:p-6">
       <div className="animate-fade-in absolute inset-0 bg-black/25 backdrop-blur-[3px]" onClick={onClose} aria-hidden="true" />
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="New Task Card"
@@ -114,9 +134,11 @@ function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (
         {to ? (
           <div className="flex min-h-11 items-center justify-between rounded-[var(--radius-control)] bg-surface-2 px-3">
             <span className="font-semibold">{self ? `Me (${to.fullName})` : to.fullName}</span>
-            <button type="button" className="text-sm text-accent" onClick={() => setTo(null)}>
-              Change
-            </button>
+            {!workOrder && (
+              <button type="button" className="text-sm text-accent" onClick={() => setTo(null)}>
+                Change
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -153,7 +175,14 @@ function NewTaskCardDialog({ onClose, onSent }: { onClose: () => void; onSent: (
         <label htmlFor="task-note" className="mt-4 mb-1 block text-[13px] font-medium text-text-2">
           Note
         </label>
+        {workOrder && (
+          <p className="-mt-1 mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-text-2">
+            <Icon name="doc" className="size-4" />
+            <span>Docket #{workOrder}</span>
+          </p>
+        )}
         <textarea
+          ref={noteRef}
           id="task-note"
           className="field min-h-24 py-2"
           maxLength={TASK_NOTE_MAX}

@@ -1,10 +1,13 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { TaskCardDTO, TaskHistoryPage } from "../../shared/types";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { BucketTag } from "../components/BucketChip";
+import { DocketDetail } from "../components/DocketDetail";
 import { Icon } from "../components/Icon";
+import { isTopDialog } from "../components/topDialog";
 
 const firstName = (n: string) => n.trim().split(/\s+/)[0] ?? n;
 const NARROW_SPACE = new RegExp(String.fromCharCode(0x202f), "g");
@@ -31,6 +34,7 @@ export function TaskTile({ task, onOpen }: { task: TaskCardDTO; onOpen: () => vo
       <div className="flex items-center gap-1.5">
         <span className="rounded-md bg-black/10 px-1.5 py-px text-[10px] font-black uppercase tracking-wide">{self ? "Note" : "Task"}</span>
         {task.isNew && <span className="rounded-md bg-accent px-1.5 py-px text-[10px] font-black text-accent-ink">NEW</span>}
+        {task.workOrder && <span className="ml-auto font-mono text-[11px] font-bold tabular-nums">#{task.workOrder}</span>}
       </div>
       <p className="mt-2 text-[12px] font-semibold opacity-80">{self ? "Note to self" : `From ${firstName(task.from.name)}`}</p>
       <p className="mt-1 line-clamp-3 text-[14px] leading-snug font-semibold">{task.note}</p>
@@ -47,6 +51,8 @@ export function TaskView({ task, onClose }: { task: TaskCardDTO; onClose: () => 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+  const [docket, setDocket] = useState(false);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
@@ -59,7 +65,7 @@ export function TaskView({ task, onClose }: { task: TaskCardDTO; onClose: () => 
       })
       .catch(() => undefined);
     closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCloseRef.current();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && isTopDialog(dialogRef.current) && onCloseRef.current();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [task.id, qc]);
@@ -86,6 +92,7 @@ export function TaskView({ task, onClose }: { task: TaskCardDTO; onClose: () => 
     <div className="fixed inset-0 z-40 flex items-end justify-center sm:items-center sm:p-6">
       <div className="animate-fade-in absolute inset-0 bg-black/25 backdrop-blur-[3px]" onClick={onClose} aria-hidden="true" />
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={self ? "Note to self" : `Task from ${task.from.name}`}
@@ -104,8 +111,14 @@ export function TaskView({ task, onClose }: { task: TaskCardDTO; onClose: () => 
           </button>
         </div>
         <p className="mt-3 text-[16px] leading-relaxed whitespace-pre-wrap">{task.note}</p>
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <BucketTag bucket={task.bucket} />
+          {task.workOrder && (
+            <button type="button" className="flex min-h-9 items-center gap-1.5 rounded-full bg-black/10 px-3 text-sm font-bold" onClick={() => setDocket(true)}>
+              <Icon name="doc" className="size-4" />
+              Docket #{task.workOrder}
+            </button>
+          )}
         </div>
         {error && (
           <p role="alert" className="mt-3 text-sm font-medium text-danger">
@@ -122,6 +135,8 @@ export function TaskView({ task, onClose }: { task: TaskCardDTO; onClose: () => 
             Done
           </button>
         </div>
+        {/* Portal: this sheet animates with a transform, which would trap a fixed overlay inside it. */}
+        {docket && task.workOrder && createPortal(<DocketDetail workOrder={task.workOrder} onClose={() => setDocket(false)} />, document.body)}
       </section>
     </div>
   );
@@ -157,6 +172,7 @@ export function HistoryList() {
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold ${k.cls}`}>{k.label}</span>
                 {k.who && <span className="text-sm font-semibold">{k.who}</span>}
+                {t.workOrder && <span className="font-mono text-xs font-bold text-text-2 tabular-nums">#{t.workOrder}</span>}
               </div>
               <p className="line-clamp-3 text-sm break-words whitespace-pre-wrap text-text-2">{t.note}</p>
               <span className="text-xs font-semibold text-ok">{`Done ✓ · ${taskTime(t.doneAt ?? t.createdAt)}`}</span>
