@@ -17,7 +17,10 @@ const S = (iso: string) => (Date.parse(`${iso}T00:00:00Z`) / 86_400_000) + 25569
 
 beforeAll(async () => {
   await env.DB.prepare("DELETE FROM dockets").run();
-  await runSync(env, [
+  await runSync(env, ROWS);
+});
+
+const ROWS = [
     HEADER,
     row(100, { 1: "RUSH", 6: "Rush Co", 9: "MB" }),
     row(101, { 1: S("2026-10-15"), 6: "Late Co", 9: "JB" }),
@@ -32,8 +35,7 @@ beforeAll(async () => {
     row(91487, { 6: "Tartan Towing", 7: "Blockout Decals" }),
     row(200, { 6: "Dup A" }),
     row(200, { 6: "Dup B" }),
-  ]);
-});
+];
 
 const ids = (items: { workOrder: string }[]) => items.map((i) => i.workOrder).sort();
 
@@ -104,6 +106,20 @@ describe("detail, review, account managers", () => {
   it("lists account managers by count", async () => {
     const r = await listAccountManagers(env.DB);
     expect(r[0]).toEqual({ accountManager: "JB", count: 10 });
+  });
+  it("caches account managers (D1 rows read); a sync that brings a new code refreshes them", async () => {
+    await listAccountManagers(env.DB);
+    // A docket written behind the cache's back does not show: the list is served from the cache.
+    await env.DB.prepare(
+      `INSERT INTO dockets (work_order, sheet_row, account_manager, comp, hold, inv, status, billing, row_hash, synced_at)
+       VALUES ('999', 99, 'ZZ', 0, 0, 0, 'active', 'not_billed', 'h', 't')`,
+    ).run();
+    expect((await listAccountManagers(env.DB)).map((a) => a.accountManager)).not.toContain("ZZ");
+    // A sync bringing a code the cache has never seen refreshes it.
+    await runSync(env, [...ROWS, row(300, { 6: "New AM Co", 9: "QQ" })]);
+    const codes = (await listAccountManagers(env.DB)).map((a) => a.accountManager);
+    expect(codes).toContain("QQ");
+    await runSync(env, ROWS);
   });
 });
 

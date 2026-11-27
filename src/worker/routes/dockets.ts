@@ -6,6 +6,8 @@ import type { AppEnv } from "../app";
 import { requireAuth, requireLevel } from "../auth/sessions";
 import { userCodes } from "../users/codes";
 import { getDocket, listAccountManagers, listDockets, listNonBilled, listReview } from "../db/dockets";
+import { cachedJson, timeSlot } from "../http/etag";
+import { todayInBusinessTz } from "../../shared/rules";
 
 const VIEWS: DocketView[] = ["active", "on_hold", "history"];
 const HISTORY: HistoryFilter[] = ["all", "completed", "cancelled"];
@@ -34,11 +36,14 @@ docketRoutes.get("/dockets", async (c) => {
   // Otherwise My Dockets = the dockets whose J is one of my codes, My List = the dockets I follow.
   const codes = focus === "risk" || (!focus && q.mine === "1") ? await userCodes(c.env.DB, me) : undefined;
   const followed = !focus && q.list === "1";
-  return c.json(
-    await listDockets(
+  const now = new Date();
+  // Sections depend on the date; Waiting on you also ages with the clock.
+  const extra = [todayInBusinessTz(now), focus ? timeSlot(now) : ""];
+  return cachedJson(c, extra, () =>
+    listDockets(
       c.env.DB,
       { view: focus ? "active" : view!, history, bucket, am: q.am, q: q.q, page: Number(q.page) || 1, codes, viewerId: me, followed, focus },
-      new Date(),
+      now,
     ),
   );
 });

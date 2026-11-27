@@ -54,8 +54,13 @@ const READY_SINCE_SQL = `(SELECT coalesce(c.activated_at, c.updated_at) FROM car
 const SECTION_SQL = `CASE WHEN new_order_flag = 1 THEN 'new_orders' WHEN ready_since IS NOT NULL THEN 'daily_complete'
   WHEN due_rush = 1 OR due_iso <= :today THEN 'rush_today' WHEN due_iso IS NULL THEN 'no_due_date' ELSE 'upcoming' END`;
 
+const SECTIONS: DashSection[] = ["rush_today", "upcoming", "new_orders", "no_due_date", "daily_complete"];
+
+/** Matches the expression index idx_dockets_wo_num (migration 0015): History walks it instead of sorting. */
 const WO_DESC = "CAST(work_order AS INTEGER) DESC";
-const NEWEST_FIRST = `ORDER BY date_iso IS NULL, date_iso DESC, ${WO_DESC}`;
+// SQLite sorts NULL lowest, so DESC already puts dockets without a date last. This exact order
+// matches idx_dockets_status_date (migration 0015): the page walks the index instead of sorting.
+const NEWEST_FIRST = `ORDER BY date_iso DESC, ${WO_DESC}`;
 const SECTION_ORDER: Record<DashSection | "all", string> = {
   all: NEWEST_FIRST,
   rush_today: `ORDER BY due_rush DESC, due_iso ASC, ${WO_DESC}`,
@@ -192,7 +197,10 @@ export async function listDockets(db: D1Database, p: DocketQuery, now: Date): Pr
   // History has no sections: it skips the per-docket subqueries (D1 rows read).
   const flags =
     p.view === "history" ? "0 AS new_order_flag, NULL AS ready_since" : `${NEW_ORDER_SQL} AS new_order_flag, ${READY_SINCE_SQL} AS ready_since`;
-  const withSections = `WITH base AS (SELECT *, ${flags} FROM dockets WHERE ${where.join(" AND ")}),
+  // D1 rows read: sections, counts and the page order only use columns of the covering indexes
+  // (migration 0015), so they read one index entry per docket. Full rows and the per-docket extras
+  // are read for the page alone (CROSS JOIN keeps the page as the outer loop: SQLite never reorders it).
+  const withSections = `WITH base AS (SELECT work_order, date_iso, due_iso, due_rush, ${flags} FROM dockets WHERE ${where.join(" AND ")}),
     sec AS (SELECT *, ${SECTION_SQL} AS section FROM base)`;
   const listWhere = p.bucket ? "section = :section" : "1";
   named.section = p.bucket ?? null;
@@ -201,21 +209,33 @@ export async function listDockets(db: D1Database, p: DocketQuery, now: Date): Pr
   named.offset = (page - 1) * PAGE_SIZE;
   const order = p.view === "history" ? HISTORY_ORDER : SECTION_ORDER[p.bucket ?? "all"];
 
+  // Plain History (most dockets): walk the work-order index from the newest and stop after one page,
+  // instead of sorting every closed docket. A narrowing filter keeps the default plan.
+  const plainHistory = p.view === "history" && !p.am && !p.q?.trim() && !p.codes && !p.followed && !p.focus;
+  const pgSql = plainHistory
+    ? `pg AS (SELECT work_order, 0 AS new_order_flag, NULL AS ready_since FROM dockets INDEXED BY idx_dockets_wo_num
+         WHERE ${where.join(" AND ")} ${HISTORY_ORDER} LIMIT :limit OFFSET :offset)`
+    : `pg AS (SELECT work_order, new_order_flag, ready_since FROM sec WHERE ${listWhere} ${order} LIMIT :limit OFFSET :offset)`;
+
   const sql = new Sql(named);
-  const [countsRes, totalRes, listRes] = await db.batch([
-    sql.bind(db, `${withSections} SELECT section, count(*) AS n FROM sec GROUP BY section`),
-    sql.bind(db, `${withSections} SELECT count(*) AS n FROM sec WHERE ${listWhere}`),
+  const [countsRes, listRes] = await db.batch([
+    // Sums, not GROUP BY: a GROUP BY sorts every docket in a temp table, and D1 counts those rows too.
+    sql.bind(db, `${withSections} SELECT ${SECTIONS.map((s) => `coalesce(sum(section = '${s}'), 0) AS ${s}`).join(", ")} FROM sec`),
     sql.bind(
       db,
-      `${withSections} SELECT *, ${VENDOR_PICKUP_SQL} AS vendor_pickup, ${AREAS_SQL} AS areas, ${HOLDERS_SQL} AS holders,
-         ${PRODUCTION_DONE_SQL} AS production_done${p.viewerId === undefined ? "" : `, ${MARKS_SQL}`} FROM sec AS dockets WHERE ${listWhere} ${order} LIMIT :limit OFFSET :offset`,
+      `${withSections}, ${pgSql}
+       SELECT *, ${VENDOR_PICKUP_SQL} AS vendor_pickup, ${AREAS_SQL} AS areas, ${HOLDERS_SQL} AS holders,
+         ${PRODUCTION_DONE_SQL} AS production_done${p.viewerId === undefined ? "" : `, ${MARKS_SQL}`}
+       FROM (SELECT d.*, pg.new_order_flag, pg.ready_since FROM pg CROSS JOIN dockets d ON d.work_order = pg.work_order) AS dockets ${order}`,
     ),
   ]);
-  const counts: Record<DashSection, number> = { rush_today: 0, upcoming: 0, new_orders: 0, no_due_date: 0, daily_complete: 0 };
-  for (const r of countsRes.results as { section: DashSection; n: number }[]) counts[r.section] = Number(r.n);
+  const sums = countsRes.results[0] as Record<DashSection, number>;
+  const counts = Object.fromEntries(SECTIONS.map((s) => [s, Number(sums[s])])) as Record<DashSection, number>;
+  // The counts already hold the total: no third statement.
+  const total = p.bucket ? counts[p.bucket] : Object.values(counts).reduce((a, b) => a + b, 0);
   return {
     items: (listRes.results as Row[]).map((r) => toSummary(r, today)),
-    total: Number((totalRes.results[0] as { n: number }).n),
+    total,
     page,
     pageSize: PAGE_SIZE,
     counts,
@@ -298,12 +318,48 @@ export async function listReview(db: D1Database): Promise<ReviewItemDTO[]> {
   return [...groups.values()];
 }
 
-export async function listAccountManagers(db: D1Database): Promise<AccountManagerCount[]> {
+/**
+ * The account-manager filter counts every docket (about 12k rows read), so the result is kept in
+ * app_settings for a day. A sync that brings a code the cache has not seen drops it
+ * (forgetAccountManagersIfNew); counts of known codes may lag by up to a day.
+ */
+const AM_CACHE_KEY = "account_managers";
+const AM_CACHE_MS = 24 * 3_600_000;
+
+type AmCache = { at: string; list: AccountManagerCount[] };
+
+async function readAmCache(db: D1Database): Promise<AmCache | null> {
+  const r = await db.prepare("SELECT value FROM app_settings WHERE key = ?").bind(AM_CACHE_KEY).first<{ value: string }>();
+  try {
+    return r ? (JSON.parse(r.value) as AmCache) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function listAccountManagers(db: D1Database, now = new Date()): Promise<AccountManagerCount[]> {
+  const cached = await readAmCache(db);
+  if (cached && now.getTime() - Date.parse(cached.at) < AM_CACHE_MS) return cached.list;
   const { results } = await db
     .prepare(
       `SELECT account_manager, count(*) AS n FROM dockets WHERE account_manager IS NOT NULL
        GROUP BY account_manager ORDER BY n DESC, account_manager`,
     )
     .all<{ account_manager: string; n: number }>();
-  return results.map((r) => ({ accountManager: r.account_manager, count: Number(r.n) }));
+  const list = results.map((r) => ({ accountManager: r.account_manager, count: Number(r.n) }));
+  await db
+    .prepare("INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value")
+    .bind(AM_CACHE_KEY, JSON.stringify({ at: now.toISOString(), list } satisfies AmCache))
+    .run();
+  return list;
+}
+
+/** Called by the syncs with the account managers of the rows they write: a new code drops the cache. */
+export async function forgetAccountManagersIfNew(db: D1Database, written: (string | null)[]): Promise<void> {
+  const codes = new Set(written.filter((c): c is string => !!c));
+  if (codes.size === 0) return;
+  const cached = await readAmCache(db);
+  if (!cached) return;
+  const known = new Set(cached.list.map((a) => a.accountManager));
+  if ([...codes].some((c) => !known.has(c))) await db.prepare("DELETE FROM app_settings WHERE key = ?").bind(AM_CACHE_KEY).run();
 }

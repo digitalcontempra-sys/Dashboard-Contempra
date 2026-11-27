@@ -8,4 +8,6 @@ export interface Env {
   DOCKETS_BUCKET: R2Bucket;
   SETUP_TOKEN: string;
   ENVIRONMENT: "development" | "production";
+  /** Deploy id (wrangler `version_metadata`): part of the polled responses' ETag. Absent in tests. */
+  CF_VERSION_METADATA?: { id: string };
 }

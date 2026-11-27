@@ -5,6 +5,13 @@ import { api } from "../api";
 import { armChime, isAudioReady, onAudioReady, playChime } from "./chime";
 
 export const POLL_MS = 20_000;
+export const HIDDEN_POLL_MS = 60_000;
+
+/**
+ * Alerts keep polling in a hidden tab (the tab title and the chime announce new cards there),
+ * but slower: D1 rows read. TanStack re-reads the interval after each fetch, and refetches on return.
+ */
+export const alertsInterval = () => (document.visibilityState === "hidden" ? HIDDEN_POLL_MS : POLL_MS);
 
 /** Polls for new cards; rings and retitles the tab when more arrive. */
 /** badge = new cards and tasks (they ring) + tasks you sent that were just finished (no chime). */
@@ -20,7 +27,7 @@ export function useCardAlerts(enabled: boolean): {
   const { data } = useQuery({
     queryKey: ["my-cards-summary"],
     queryFn: () => api<MyCardsSummary>("/api/my-cards/summary"),
-    refetchInterval: POLL_MS,
+    refetchInterval: alertsInterval,
     refetchIntervalInBackground: true,
     enabled,
   });

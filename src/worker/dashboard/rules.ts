@@ -33,9 +33,11 @@ const NAMES_ME = `EXISTS (SELECT 1 FROM json_each(c.assignee_ids) WHERE value = 
 export const AT_RISK_DUE = `(due_rush = 1 OR due_iso <= :today)`;
 
 /** Waiting (a): my New Orders nobody has touched since :staleBefore. Rows of virtual_dockets `v`. */
-export const STALE_NEW_ORDERS_FROM = `virtual_dockets v JOIN dockets d ON d.work_order = v.work_order
+// EXISTS, not a join: a join lets the planner walk every active docket (D1 rows read).
+export const STALE_NEW_ORDERS_FROM = `virtual_dockets v
   WHERE v.new_order = 1 AND v.created_by = :me AND v.state = 'saved' AND v.deleted_at IS NULL
-    AND d.status = 'active' AND v.updated_at < :staleBefore`;
+    AND v.updated_at < :staleBefore
+    AND EXISTS (SELECT 1 FROM dockets d WHERE d.work_order = v.work_order AND d.status = 'active')`;
 
 /** Waiting (b): my creator card waits for the client's approval of a proof or a sample. */
 export const APPROVAL_CARDS_FROM = `cards c WHERE c.status = 'active' AND c.stage IN ('waiting_design', 'waiting_sample')

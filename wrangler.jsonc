@@ -17,6 +17,7 @@
     }
   ],
   "r2_buckets": [{ "binding": "DOCKETS_BUCKET", "bucket_name": "contempra-dockets" }],
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "triggers": { "crons": ["*/5 * * * *", "0 8 * * *"] },
   "vars": { "ENVIRONMENT": "production" }
 }

@@ -1,3 +1,4 @@
+import { cachedJson } from "../http/etag";
 import { Hono, type Context } from "hono";
 import { TIME_BUCKETS, type TimeBucket } from "../../shared/rules";
 import type { CardDTO } from "../../shared/types";
@@ -36,7 +37,8 @@ const managers = requireLevel("admin", "manager");
 const BUCKETS: TimeBucket[] = TIME_BUCKETS;
 
 cardRoutes.get("/my-cards", requireAuth, async (c) => c.json(await listMyCards(c.env, c.get("user"))));
-cardRoutes.get("/my-cards/summary", requireAuth, async (c) => c.json(await myCardsSummary(c.env, c.get("user"))));
+// Polled every 20 s by every signed-in user (alerts): 304 while nothing changed.
+cardRoutes.get("/my-cards/summary", requireAuth, async (c) => cachedJson(c, [], () => myCardsSummary(c.env, c.get("user"))));
 
 cardRoutes.put("/me/sound", requireAuth, async (c) => {
   const b = await c.req.json<{ on?: unknown }>().catch(() => ({}) as { on?: unknown });

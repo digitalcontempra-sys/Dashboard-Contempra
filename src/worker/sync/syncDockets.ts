@@ -1,3 +1,4 @@
+import { forgetAccountManagersIfNew } from "../db/dockets";
 import type { Env } from "../env";
 import { isSheetConfigured } from "../google/oauth";
 import { fetchContempraValues } from "../sheet/googleClient";
@@ -85,16 +86,19 @@ async function writeSync(
   const seen = new Set<string>();
   const stmts: D1PreparedStatement[] = [];
   let rowsChanged = 0;
+  const writtenAms: (string | null)[] = [];
   for (const d of dockets) {
     seen.add(d.workOrder);
     if (known.get(d.workOrder) === d.rowHash) continue;
     rowsChanged++;
+    writtenAms.push(d.accountManager);
     stmts.push(db.prepare(UPSERT_SQL).bind(...upsertParams(d, now)));
   }
   const gone = existing.filter((r) => !seen.has(r.work_order));
   for (const r of gone) stmts.push(db.prepare("DELETE FROM dockets WHERE work_order = ?").bind(r.work_order));
 
   await runBatches(db, stmts);
+  await forgetAccountManagersIfNew(db, writtenAms);
 
   // Review items are replaced in one atomic batch so Needs Review is never left half-empty.
   // The success marker goes in the same batch, after every docket write committed.

@@ -12,7 +12,7 @@ import {
   type ProductionJob,
 } from "../../shared/docketForm";
 import type { SessionUser, VirtualDocketDTO } from "../../shared/types";
-import { getDocket } from "../db/dockets";
+import { forgetAccountManagersIfNew, getDocket } from "../db/dockets";
 import type { Env } from "../env";
 import { getGateways } from "../google/gateways";
 import { GoogleDisconnectedError } from "../google/oauth";
@@ -66,7 +66,9 @@ const toCells = (values: unknown[]): RowCells => Object.fromEntries(COLUMNS.map(
 export async function upsertMirror(db: D1Database, values: unknown[], sheetRow: number): Promise<void> {
   const { dockets } = await mapSheet([EXPECTED_HEADERS, values], sheetRow);
   const d = dockets[0];
-  if (d) await db.prepare(UPSERT_SQL).bind(...upsertParams(d, new Date().toISOString())).run();
+  if (!d) return;
+  await db.prepare(UPSERT_SQL).bind(...upsertParams(d, new Date().toISOString())).run();
+  await forgetAccountManagersIfNew(db, [d.accountManager]);
 }
 
 export async function readRow(env: Env, row: number): Promise<unknown[]> {

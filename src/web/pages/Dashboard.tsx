@@ -19,6 +19,12 @@ import { PageHeader } from "../components/Layout";
 import { SyncBadge } from "../components/SyncBadge";
 import { useParam, useSetParams } from "../hooks";
 
+/**
+ * D1 rows read: History counts every closed docket, so it refreshes every 5 min, not every 30 s.
+ * Like every interval here, it pauses while the tab is hidden (TanStack's default) and refetches on return.
+ */
+export const docketListInterval = (view: DocketView) => (view === "history" ? 300_000 : 30_000);
+
 const VIEWS: SegmentItem<DocketView>[] = [
   { id: "active", label: "Active", icon: "activity" },
   { id: "on_hold", label: "On Hold", icon: "pause" },
@@ -103,7 +109,7 @@ export function Dashboard() {
     queryFn: ({ pageParam }) => api<DocketListResponse>(withQuery("/api/dockets", { ...params, page: pageParam })),
     initialPageParam: 1,
     getNextPageParam: (last) => (last.page * last.pageSize < last.total ? last.page + 1 : undefined),
-    refetchInterval: 30_000,
+    refetchInterval: docketListInterval(v),
     enabled: !blocked,
   });
   // Same 30 s rhythm as the list: no extra polling loop.

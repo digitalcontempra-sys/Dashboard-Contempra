@@ -135,7 +135,7 @@ src/web/
   tasks/               NewTaskCard, TaskCards (tile, view, Sent by me)
   components/          Layout (nav, badge, sound toggle), DocketList, DocketDetail (tabs), DocketHistory, AreaChip/AreaLegend, BucketChip
   docket/              DocketPaper (paper replica), ProductionPanel (route editor), DocketPdf, afterSave
-migrations/            0001–0014 (D1). Add new ones as 0015_*.sql; never edit an applied one
+migrations/            0001–0015 (D1). Add new ones as 0016_*.sql; never edit an applied one
 data/catalogs/         material lists: roll-print, flatbed (Print FB), laminate (Laminate Roll)
 scripts/               publish.ps1, set-google-secrets.ps1, dev-setup.mjs, create-admin.mjs, import-fixture.mjs, xlsx_to_values.py
 test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), web/ (jsdom + mockApi)
@@ -194,7 +194,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
    5. Have a fresh reviewer check the whole branch, and fix what it finds that matters.
    6. Ask "¿Hago merge a main y publico?"
 3. **Verification before saying "done":**
-   - `npx vitest run` passes (today 574 tests).
+   - `npx vitest run` passes (today 593 tests).
    - `npm run typecheck` is clean.
    - For UI changes, check the page in the local preview, including phone width 375 px: no horizontal scroll.
 4. **Commit messages:**
@@ -295,7 +295,12 @@ git push origin main
 - **Cards stay white in dark mode.** They carry the `.force-light` class, which reapplies the light tokens.
 - **Area chip text uses per-area `--area-*-ink` tokens.** A test enforces AA contrast in both themes.
 - **Modals keep `onClose` in a ref.** A parent refresh (the dashboard refetches every 30 s, the alerts poll every 20 s) must not steal focus or repeat side effects.
-- **Polling:** the summary poll runs every 20 s for every signed-in user (anyone can receive Task Cards). The dashboard list refetches every 30 s.
+- **Polling:** the alerts poll (`/api/my-cards/summary`) runs every 20 s for every signed-in user (anyone can receive Task Cards), every 60 s in a hidden tab. The dashboard list and header refetch every 30 s (History every 5 min) and pause in a hidden tab (TanStack default).
+- **D1 rows read (free plan: 5M/day).** Spec `2026-11-27-d1-rows-read-design.md`. D1 counts every index entry, table row and temp-table (sort, GROUP BY) row visited. Rules:
+  - Polled routes go through `cachedJson` (`src/worker/http/etag.ts`): ETag from `data_version` (bumped by triggers, migration 0015) → 304 while nothing changed. A new table a polled view reads needs the same three triggers; a new card column a tile shows goes in the `cards` UPDATE trigger's WHEN.
+  - Hot-path queries must use the covering indexes (`idx_dockets_status_cover`, `_status_date`, `_am_cover`, `_wo_num`): select only their columns before the page, full rows for the page alone. `test/worker/rowsRead.test.ts` measures them on a production-sized seed and fails on `SCAN dockets`.
+  - No `GROUP BY` / `IN (SELECT value FROM json_each(?))` over dockets on hot paths: use `sum(x = …)` and `json_each(?) j CROSS JOIN dockets d`.
+  - The incremental sync skips unchanged work-order blocks (`sync_blocks`); account managers are cached a day in `app_settings`.
 
 ---
 
@@ -348,7 +353,7 @@ Everything below is live and pushed to `main`:
   - There is an import cycle `dockets/service ↔ cards/service ↔ cards/sheetSync`.
   - A cancelled New Order keeps `new_order = 1` and its sheet K / STATUS (`Waiting for more info`); History hides the section, and Inv/Date says CANCEL.
   - Daily Complete "waiting since" restarts when another branch finishes later (`activated_at` of the creator's card).
-- **Check D1 `rows_read`** of the Main Dashboard list in production (area subqueries) and of `GET /api/dashboard/summary` (5 statements every 30 s per open dashboard). If high: indexes on `cards (status, role_id)` and `dockets (status, account_manager)`.
+- **D1 rows read, still open:** History counts every closed docket (~11k rows) on each refresh while it is open and data changed; any data change invalidates every viewer's ETag.
 - My Cards reads `?show=` only on mount (a link to it from My Cards itself would keep the old filter; no such link today).
 - **Optional:** auto-deploy from GitHub through Cloudflare.
 

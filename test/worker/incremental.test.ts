@@ -1,8 +1,9 @@
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { runIncrementalSync, type SheetReader } from "../../src/worker/sync/incremental";
+import { LOOKUP_SQL, runIncrementalSync, type SheetReader } from "../../src/worker/sync/incremental";
 import { runNightlyReconcile } from "../../src/worker/sync/nightly";
 import { runSync } from "../../src/worker/sync/syncDockets";
+import { meter, queryPlan } from "./d1Meter";
 import { HEADER, row } from "./fixtures";
 
 /** A fake Google Sheet answering A1 ranges like the Sheets API (trailing empty rows dropped). */
@@ -169,5 +170,70 @@ describe("sheet reads and the sheet lock", () => {
     await runNightlyReconcile(env, watched);
     expect(held.length).toBeGreaterThan(0);
     expect(held.every(Boolean)).toBe(true);
+  });
+});
+
+describe("incremental sync: D1 rows read", () => {
+  // 200 data rows, work orders 5099 down to 4900 (blocks of 50 work orders: 101, 100 on top; 99, 98 in the page).
+  const big = () => [HEADER, ...Array.from({ length: 200 }, (_, i) => row(5099 - i, { 6: `Customer ${5099 - i}` }))];
+  const bigOpts = { topRows: 100, pageRows: 100 };
+  /** Runs until every block has been seen whole once: top + page, then top alone (the page wraps). */
+  const warm = async (reader: SheetReader) => {
+    await runIncrementalSync(env, reader, bigOpts);
+    await runIncrementalSync(env, reader, bigOpts);
+  };
+
+  it("skips the docket lookup for blocks that did not change", async () => {
+    const sheet = big();
+    await runSync(env, sheet);
+    const { reader } = fakeSheet(sheet);
+    await warm(reader);
+    const m = meter(env.DB);
+    const r = await runIncrementalSync({ ...env, DB: m.db }, reader, bigOpts);
+    expect(r).toMatchObject({ ok: true, rowsChanged: 0 });
+    expect(m.sqls.some((q) => /FROM dockets|JOIN dockets/.test(q))).toBe(false);
+    expect(m.read()).toBeLessThan(30); // was about 3 rows per docket seen (600)
+  });
+
+  it("still writes a changed row, and only looks up its block", async () => {
+    const sheet = big();
+    await runSync(env, sheet);
+    const { reader } = fakeSheet(sheet);
+    await warm(reader);
+    sheet[5] = row(5095, { 6: "Changed Co" });
+    const m = meter(env.DB);
+    const r = await runIncrementalSync({ ...env, DB: m.db }, reader, bigOpts);
+    expect(r.rowsChanged).toBe(1);
+    expect((await docket("5095"))?.customer).toBe("Changed Co");
+    expect(m.read()).toBeLessThan(150); // one block of 50 (2 rows each), not 200 dockets
+  });
+
+  it("a new docket on top (every row shifts down) only looks up its own block", async () => {
+    const sheet = big();
+    await runSync(env, sheet);
+    const { reader } = fakeSheet(sheet);
+    await warm(reader);
+    sheet.splice(1, 0, row(5100, { 6: "Brand New" }));
+    const m = meter(env.DB);
+    const r = await runIncrementalSync({ ...env, DB: m.db }, reader, bigOpts);
+    expect((await docket("5100"))?.customer).toBe("Brand New");
+    expect(r.rowsChanged).toBe(1);
+    expect(m.read()).toBeLessThan(150); // the new block, plus the block now cut by the edge of the top rows
+  });
+
+  it("a docket deleted from D1 behind the sync's back comes back on the next run", async () => {
+    const sheet = big();
+    await runSync(env, sheet);
+    const { reader } = fakeSheet(sheet);
+    await warm(reader);
+    await env.DB.prepare("DELETE FROM dockets WHERE work_order = '5090'").run();
+    await runIncrementalSync(env, reader, bigOpts);
+    expect(await docket("5090")).not.toBeNull();
+  });
+
+  it("the docket lookup searches the primary key, never scans dockets", async () => {
+    const plan = await queryPlan(LOOKUP_SQL);
+    expect(plan).toMatch(/SEARCH d USING INDEX sqlite_autoindex_dockets_1 \(work_order=\?\)/);
+    expect(plan).not.toMatch(/SCAN d/);
   });
 });
