@@ -210,8 +210,10 @@ export async function listDockets(db: D1Database, p: DocketQuery, now: Date): Pr
   const order = p.view === "history" ? HISTORY_ORDER : SECTION_ORDER[p.bucket ?? "all"];
 
   // Plain History (most dockets): walk the work-order index from the newest and stop after one page,
-  // instead of sorting every closed docket. A narrowing filter keeps the default plan.
-  const plainHistory = p.view === "history" && !p.am && !p.q?.trim() && !p.codes && !p.followed && !p.focus;
+  // instead of sorting every closed docket. A narrowing filter (Completed / Cancelled too: few
+  // cancelled ones would mean walking most of the index) keeps the default plan.
+  const plainHistory =
+    p.view === "history" && (p.history ?? "all") === "all" && !p.bucket && !p.am && !p.q?.trim() && !p.codes && !p.followed && !p.focus;
   const pgSql = plainHistory
     ? `pg AS (SELECT work_order, 0 AS new_order_flag, NULL AS ready_since FROM dockets INDEXED BY idx_dockets_wo_num
          WHERE ${where.join(" AND ")} ${HISTORY_ORDER} LIMIT :limit OFFSET :offset)`

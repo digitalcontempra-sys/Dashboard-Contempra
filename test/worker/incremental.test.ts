@@ -231,6 +231,20 @@ describe("incremental sync: D1 rows read", () => {
     expect(await docket("5090")).not.toBeNull();
   });
 
+  it("a row written to D1 outside the incremental sync is checked again, even if the sheet goes back", async () => {
+    const sheet = big();
+    await runSync(env, sheet);
+    const { reader } = fakeSheet(sheet);
+    await warm(reader);
+    // A full sync (or a dashboard save) writes S2 to D1; then someone puts the sheet back to S1.
+    const changed = sheet.map((r) => [...r]);
+    changed[3] = row(5097, { 6: "Temporary" });
+    await runSync(env, changed);
+    expect((await docket("5097"))?.customer).toBe("Temporary");
+    await runIncrementalSync(env, reader, bigOpts);
+    expect((await docket("5097"))?.customer).toBe("Customer 5097");
+  });
+
   it("the docket lookup searches the primary key, never scans dockets", async () => {
     const plan = await queryPlan(LOOKUP_SQL);
     expect(plan).toMatch(/SEARCH d USING INDEX sqlite_autoindex_dockets_1 \(work_order=\?\)/);

@@ -67,6 +67,9 @@ describe("listDockets", () => {
     expect(ids((await listDockets(env.DB, { view: "history", history: "completed" }, NOW)).items)).toEqual([
       "106", "107", "108",
     ]);
+    // A section filter on History (API only) keeps items and total consistent.
+    const sec = await listDockets(env.DB, { view: "history", bucket: "upcoming" }, NOW);
+    expect(sec.items).toHaveLength(sec.total);
     const all = await listDockets(env.DB, { view: "history" }, NOW);
     expect(all.items.map((i) => i.workOrder)).toEqual(["109", "108", "107", "106"]); // WO desc
   });

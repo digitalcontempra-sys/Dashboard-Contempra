@@ -135,7 +135,7 @@ src/web/
   tasks/               NewTaskCard, TaskCards (tile, view, Sent by me)
   components/          Layout (nav, badge, sound toggle), DocketList, DocketDetail (tabs), DocketHistory, AreaChip/AreaLegend, BucketChip
   docket/              DocketPaper (paper replica), ProductionPanel (route editor), DocketPdf, afterSave
-migrations/            0001–0015 (D1). Add new ones as 0016_*.sql; never edit an applied one
+migrations/            0001–0016 (D1). Add new ones as 0017_*.sql; never edit an applied one
 data/catalogs/         material lists: roll-print, flatbed (Print FB), laminate (Laminate Roll)
 scripts/               publish.ps1, set-google-secrets.ps1, dev-setup.mjs, create-admin.mjs, import-fixture.mjs, xlsx_to_values.py
 test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), web/ (jsdom + mockApi)
@@ -194,7 +194,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
    5. Have a fresh reviewer check the whole branch, and fix what it finds that matters.
    6. Ask "¿Hago merge a main y publico?"
 3. **Verification before saying "done":**
-   - `npx vitest run` passes (today 595 tests).
+   - `npx vitest run` passes (today 596 tests).
    - `npm run typecheck` is clean.
    - For UI changes, check the page in the local preview, including phone width 375 px: no horizontal scroll.
 4. **Commit messages:**
@@ -300,7 +300,7 @@ git push origin main
   - Polled routes go through `cachedJson` (`src/worker/http/etag.ts`): ETag from `data_version` (bumped by triggers, migration 0015) → 304 while nothing changed. A new table a polled view reads needs the same three triggers; a new card column a tile shows goes in the `cards` UPDATE trigger's WHEN.
   - Hot-path queries must use the covering indexes (`idx_dockets_status_cover`, `_status_date`, `_am_cover`, `_wo_num`): select only their columns before the page, full rows for the page alone. `test/worker/rowsRead.test.ts` measures them on a production-sized seed and fails on `SCAN dockets`.
   - No `GROUP BY` / `IN (SELECT value FROM json_each(?))` over dockets on hot paths: use `sum(x = …)` and `json_each(?) j CROSS JOIN dockets d`.
-  - The incremental sync skips unchanged work-order blocks (`sync_blocks`); account managers are cached a day in `app_settings`.
+  - The incremental sync skips unchanged work-order blocks (`sync_blocks`); account managers are cached a day in `app_settings`. Any write to `dockets` forgets its block (triggers, migration 0016), so only the incremental sync may stamp `sync_blocks`.
 
 ---
 
@@ -353,7 +353,7 @@ Everything below is live and pushed to `main`:
   - There is an import cycle `dockets/service ↔ cards/service ↔ cards/sheetSync`.
   - A cancelled New Order keeps `new_order = 1` and its sheet K / STATUS (`Waiting for more info`); History hides the section, and Inv/Date says CANCEL.
   - Daily Complete "waiting since" restarts when another branch finishes later (`activated_at` of the creator's card).
-- **D1 rows read, still open:** History counts every closed docket (~11k rows) on each refresh while it is open and data changed; any data change invalidates every viewer's ETag.
+- **D1 rows read, still open:** History counts every closed docket (~11k rows) on each refresh while it is open and data changed; any data change invalidates every viewer's ETag. Race: the account-manager cache can be rewritten stale right after a sync dropped it (a new code then shows up to a day late).
 - My Cards reads `?show=` only on mount (a link to it from My Cards itself would keep the old filter; no such link today).
 - **Optional:** auto-deploy from GitHub through Cloudflare.
 
