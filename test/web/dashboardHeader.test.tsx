@@ -16,7 +16,7 @@ afterEach(() => {
 const summary = (over: Partial<DashboardSummary> = {}): DashboardSummary => ({
   overdueTasks: { count: 3, oldestDays: 4, oldestFrom: "Jeff" },
   atRisk: { overdue: 5, dueToday: 2 },
-  waiting: { newOrders: 2, approvals: 1, sentBack: 1 },
+  waiting: { newOrders: 2, approvals: 1, sentBack: 1, dockets: 4 },
   areas: ROLE_ORDER.map((roleId, i) => ({ roleId, count: i })),
   ...over,
 });

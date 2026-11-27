@@ -54,7 +54,7 @@ export function DashboardHeader({
           title="Waiting on you"
           icon="squareCheck"
           hue="blue"
-          value={w ? w.newOrders + w.approvals + w.sentBack : null}
+          value={w ? w.dockets : null}
           detail={w ? waitingDetail(w) : " "}
           to={{ search: "?focus=waiting" }}
         />

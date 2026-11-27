@@ -121,7 +121,8 @@ export type UserDTO = {
 export type DashboardSummary = {
   overdueTasks: { count: number; oldestDays: number | null; oldestFrom: string | null };
   atRisk: { overdue: number; dueToday: number };
-  waiting: { newOrders: number; approvals: number; sentBack: number };
+  /** Items per kind for the detail line; `dockets` = distinct dockets waiting (the card's number, = the list total). */
+  waiting: { newOrders: number; approvals: number; sentBack: number; dockets: number };
   areas: { roleId: string; count: number }[];
 };
 

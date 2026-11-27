@@ -32,7 +32,7 @@ export function riskDetail(s: DashboardSummary["atRisk"]): string {
   return `${s.overdue} overdue · ${s.dueToday} due today`;
 }
 
-export function waitingDetail(s: DashboardSummary["waiting"]): string {
+export function waitingDetail(s: Pick<DashboardSummary["waiting"], "newOrders" | "approvals" | "sentBack">): string {
   const parts = [
     s.newOrders ? plural(s.newOrders, "new order") : "",
     s.approvals ? plural(s.approvals, "approval") : "",

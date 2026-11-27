@@ -40,6 +40,7 @@ A production dashboard for **Contempra Signs** (a sign shop in Winnipeg). It sit
   - **All dockets | My Dockets** (selector above the views, remembered per user in `localStorage` `dashboard.scope.<id>`): My Dockets = dockets whose J (Account Manager) is one of my codes (`GET /api/dockets?mine=1`). Same sections, orders and counts. Without codes: "Ask an admin to set your initials." Spec `2026-11-26-my-dockets-design.md`.
   - **My List** (third scope, `GET /api/dockets?list=1`): dockets I follow (table `docket_follows`). Bookmark button on each tile and in the docket header (`PUT`/`DELETE /api/dockets/:wo/follow`, one tap, `Add to My List` / `Remove from My List`). Personal, no alerts, no sheet writes; a closed docket stays and shows in History. List and detail carry `followed` + `myOpenNotes` for the viewer. Spec `2026-11-26-my-list-and-notes-design.md`.
   - **Docket notes:** the note button on a tile / docket header opens New Task Card as a note to self pinned to the docket (`task_cards.work_order`; server: self only, admin/manager only, docket must exist). Yellow mark with the count on the tile; the detail lists my open notes with Done (`GET /api/task-cards?workOrder=`). My Cards shows `#WO`; the opened note has `Docket #WO`. Staff have neither (no Main Dashboard).
+  - **Header** (spec `2026-11-27-dashboard-header-design.md`): Winnipeg clock, three personal cards (Overdue task cards → `/my-cards?show=task`; At risk and Waiting on you → `?focus=risk|waiting`, a personal filter that replaces the scope, with a dismissible chip) and **Areas · Open board** (open cards per area → `/production?area=<roleId>`, which scrolls to and flashes that column). Data: `GET /api/dashboard/summary` (30 s, with the list); rules in `src/worker/dashboard/rules.ts`, shared by the summary and `/api/dockets?focus=`. Grid `.dash-head` in `index.css`: 5 blocks from 1680 px, areas under the cards below that, collapsible areas on phones.
   - Each tile (and the docket header, "Now with") shows who has it now, per area. It also has On Hold and History views, an account-manager filter and search. The docket detail links to the editor with **Edit Docket** (pencil icon) and offers **Download PDF**; it has no Drive button (the Drive copy stays as a backup).
 - **Virtual Docket.** A replica of the paper docket form that writes the docket's row to the sheet, renders a PDF in the browser and stores it in R2 and Google Drive. Dockets can be cancelled, moved to Trash and restored.
 - **Production cards (hand to hand, like the paper docket).** The creator sends the new docket to one or more people, each with a `What to do` note. Each card belongs to one person, in one area (or `General` for people without one), with:
@@ -193,7 +194,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
    5. Have a fresh reviewer check the whole branch, and fix what it finds that matters.
    6. Ask "¿Hago merge a main y publico?"
 3. **Verification before saying "done":**
-   - `npx vitest run` passes (today 542 tests).
+   - `npx vitest run` passes (today 574 tests).
    - `npm run typecheck` is clean.
    - For UI changes, check the page in the local preview, including phone width 375 px: no horizontal scroll.
 4. **Commit messages:**
@@ -347,7 +348,8 @@ Everything below is live and pushed to `main`:
   - There is an import cycle `dockets/service ↔ cards/service ↔ cards/sheetSync`.
   - A cancelled New Order keeps `new_order = 1` and its sheet K / STATUS (`Waiting for more info`); History hides the section, and Inv/Date says CANCEL.
   - Daily Complete "waiting since" restarts when another branch finishes later (`activated_at` of the creator's card).
-- **Check D1 `rows_read`** of the Main Dashboard list in production (area subqueries).
+- **Check D1 `rows_read`** of the Main Dashboard list in production (area subqueries) and of `GET /api/dashboard/summary` (5 statements every 30 s per open dashboard). If high: indexes on `cards (status, role_id)` and `dockets (status, account_manager)`.
+- My Cards reads `?show=` only on mount (a link to it from My Cards itself would keep the old filter; no such link today).
 - **Optional:** auto-deploy from GitHub through Cloudflare.
 
 ---

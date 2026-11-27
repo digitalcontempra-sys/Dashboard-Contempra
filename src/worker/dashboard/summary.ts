@@ -12,6 +12,7 @@ import {
   OVERDUE_TASKS_WHERE,
   SENT_BACK_CARDS_FROM,
   STALE_NEW_ORDERS_FROM,
+  WAITING_WORK_ORDERS,
 } from "./rules";
 
 /** The signed-in user's three personal cards and the shop's open cards per area: one D1 batch. */
@@ -35,14 +36,15 @@ export async function dashboardSummary(db: D1Database, userId: number, now: Date
       db,
       `SELECT (SELECT count(*) FROM ${STALE_NEW_ORDERS_FROM}) AS new_orders,
               (SELECT count(*) FROM ${APPROVAL_CARDS_FROM}) AS approvals,
-              (SELECT count(*) FROM ${SENT_BACK_CARDS_FROM}) AS sent_back`,
+              (SELECT count(*) FROM ${SENT_BACK_CARDS_FROM}) AS sent_back,
+              (SELECT count(*) FROM (${WAITING_WORK_ORDERS})) AS dockets`,
     ),
     db.prepare(`SELECT c.role_id, count(*) AS n FROM cards c WHERE c.status = 'active' AND ${LIVE_CARD} GROUP BY c.role_id`),
   ]);
   const count = Number((tasks.results[0] as { n: number }).n);
   const first = oldest.results[0] as { created_at: string; full_name: string | null; username: string | null } | undefined;
   const r = risk.results[0] as { n: number; overdue: number };
-  const w = waiting.results[0] as { new_orders: number; approvals: number; sent_back: number };
+  const w = waiting.results[0] as { new_orders: number; approvals: number; sent_back: number; dockets: number };
   const byArea = new Map((areas.results as { role_id: string; n: number }[]).map((a) => [a.role_id, Number(a.n)]));
   return {
     overdueTasks: {
@@ -51,7 +53,7 @@ export async function dashboardSummary(db: D1Database, userId: number, now: Date
       oldestFrom: first ? firstName(first.full_name || first.username) : null,
     },
     atRisk: { overdue: Number(r.overdue), dueToday: Number(r.n) - Number(r.overdue) },
-    waiting: { newOrders: Number(w.new_orders), approvals: Number(w.approvals), sentBack: Number(w.sent_back) },
+    waiting: { newOrders: Number(w.new_orders), approvals: Number(w.approvals), sentBack: Number(w.sent_back), dockets: Number(w.dockets) },
     areas: ROLE_ORDER.map((roleId) => ({ roleId, count: byArea.get(roleId) ?? 0 })),
   };
 }

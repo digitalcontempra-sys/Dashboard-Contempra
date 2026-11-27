@@ -108,17 +108,27 @@ describe("GET /api/dashboard/summary", () => {
     const back = await handDocket(s.manager, [{ userId: s.ids.ira, roleId: "designer", instruction: "Logo" }]);
     expect((await move(await cardOf(back.workOrder, s.ids.ira), "send-back", ira, { reason: "Need size" })).status).toBe(200);
 
-    expect((await summary()).waiting).toEqual({ newOrders: 1, approvals: 1, sentBack: 1 });
+    expect((await summary()).waiting).toEqual({ newOrders: 1, approvals: 1, sentBack: 1, dockets: 3 });
     expect(await focusWos("waiting", "&mine=1")).toEqual([stale.workOrder, proof.workOrder, back.workOrder].sort());
+
+    // Two waiting items on one docket: the card's number counts dockets, like the list.
+    await env.DB.prepare("UPDATE cards SET returned_reason = 'Again' WHERE work_order = ? AND status = 'active' AND stage = 'waiting_design'")
+      .bind(proof.workOrder)
+      .run();
+    const twice = await summary();
+    expect(twice.waiting).toEqual({ newOrders: 1, approvals: 1, sentBack: 2, dockets: 3 });
+    const list = (await (await api("/api/dockets?focus=waiting", { cookie: s.manager })).json()) as DocketListResponse;
+    expect(list.total).toBe(twice.waiting.dockets);
+    await env.DB.prepare("UPDATE cards SET returned_reason = NULL WHERE stage = 'waiting_design'").run();
     // Another manager has nothing waiting.
     await createUser("other", "manager");
-    expect((await summary(await login("other"))).waiting).toEqual({ newOrders: 0, approvals: 0, sentBack: 0 });
+    expect((await summary(await login("other"))).waiting).toEqual({ newOrders: 0, approvals: 0, sentBack: 0, dockets: 0 });
 
     // Trash hides them all.
     for (const wo of [stale.workOrder, proof.workOrder, back.workOrder]) {
       await env.DB.prepare("UPDATE virtual_dockets SET deleted_at = ? WHERE work_order = ?").bind(iso(0), wo).run();
     }
-    expect((await summary()).waiting).toEqual({ newOrders: 0, approvals: 0, sentBack: 0 });
+    expect((await summary()).waiting).toEqual({ newOrders: 0, approvals: 0, sentBack: 0, dockets: 0 });
     expect(await focusWos("waiting")).toEqual([]);
   });
 
