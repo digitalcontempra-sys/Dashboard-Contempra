@@ -117,6 +117,14 @@ export type UserDTO = {
   codes: string[];
 };
 
+/** GET /api/dashboard/summary: the signed-in user's personal cards and the shop's area counts. */
+export type DashboardSummary = {
+  overdueTasks: { count: number; oldestDays: number | null; oldestFrom: string | null };
+  atRisk: { overdue: number; dueToday: number };
+  waiting: { newOrders: number; approvals: number; sentBack: number };
+  areas: { roleId: string; count: number }[];
+};
+
 export type SessionUser = {
   id: number;
   username: string;
