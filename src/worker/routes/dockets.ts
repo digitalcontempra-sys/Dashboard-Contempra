@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { DASH_FOCUS } from "../../shared/dashboard";
 import { DASH_SECTIONS } from "../../shared/rules";
 import type { DocketView, HistoryFilter, NonBilledTab } from "../../shared/types";
 import type { AppEnv } from "../app";
@@ -25,16 +26,18 @@ docketRoutes.get("/dockets", async (c) => {
   const view = pick(q.view, VIEWS, "active");
   const history = pick(q.history, HISTORY, "all");
   const bucket = pick(q.bucket, DASH_SECTIONS);
-  if (view === null || history === null || bucket === null) return c.json({ error: "Invalid filter" }, 400);
-  // My Dockets: the dockets whose J is one of my codes.
+  const focus = pick(q.focus, DASH_FOCUS);
+  if (view === null || history === null || bucket === null || focus === null) return c.json({ error: "Invalid filter" }, 400);
   const me = c.get("user").id;
-  const codes = q.mine === "1" ? await userCodes(c.env.DB, me) : undefined;
-  // My List: the dockets I follow.
-  const followed = q.list === "1";
+  // A header card's filter (At risk / Waiting on you) is personal: it replaces the scope and shows active dockets.
+  // At risk = my dockets (J is one of my codes); Waiting on you is not tied to J.
+  // Otherwise My Dockets = the dockets whose J is one of my codes, My List = the dockets I follow.
+  const codes = focus === "risk" || (!focus && q.mine === "1") ? await userCodes(c.env.DB, me) : undefined;
+  const followed = !focus && q.list === "1";
   return c.json(
     await listDockets(
       c.env.DB,
-      { view: view!, history, bucket, am: q.am, q: q.q, page: Number(q.page) || 1, codes, viewerId: me, followed },
+      { view: focus ? "active" : view!, history, bucket, am: q.am, q: q.q, page: Number(q.page) || 1, codes, viewerId: me, followed, focus },
       new Date(),
     ),
   );

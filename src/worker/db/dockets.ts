@@ -1,4 +1,6 @@
 import { ROLE_ORDER } from "../../shared/cards";
+import type { DashFocus } from "../../shared/dashboard";
+import { AT_RISK_DUE, codesIn, personalParams, WAITING_WORK_ORDERS } from "../dashboard/rules";
 import { deriveTimeBucket, todayInBusinessTz, type DashSection } from "../../shared/rules";
 import {
   PAGE_SIZE,
@@ -28,6 +30,11 @@ export type DocketQuery = {
   viewerId?: number;
   /** My List: only dockets the viewer follows. */
   followed?: boolean;
+  /**
+   * Personal header filters (need `viewerId`): `risk` = my dockets (`codes`) overdue or due today;
+   * `waiting` = dockets waiting on me. Same rules as GET /api/dashboard/summary.
+   */
+  focus?: DashFocus;
 };
 
 export type NonBilledQuery = { tab: NonBilledTab; am?: string; q?: string; page?: number };
@@ -89,7 +96,7 @@ const MARKS_SQL = `EXISTS (SELECT 1 FROM docket_follows f WHERE f.user_id = :me 
 const HISTORY_ORDER = `ORDER BY ${WO_DESC}`;
 
 /** Tiny named-parameter builder: D1 only supports positional `?`. */
-class Sql {
+export class Sql {
   private params: unknown[] = [];
   constructor(private named: Record<string, unknown>) {}
   render(sql: string): string {
@@ -173,13 +180,14 @@ export async function listDockets(db: D1Database, p: DocketQuery, now: Date): Pr
   if (p.view === "history" && p.history === "completed") where.push("status = 'completed'");
   if (p.view === "history" && p.history === "cancelled") where.push("status = 'cancelled'");
   commonFilters(where, named, p.am, p.q);
-  if (p.codes) {
-    // J is stored trimmed and upper case by the sync (normalizeAccountManager).
-    p.codes.forEach((c, i) => (named[`code${i}`] = c.toUpperCase()));
-    where.push(p.codes.length ? `account_manager IN (${p.codes.map((_, i) => `:code${i}`).join(", ")})` : "0");
-  }
+  // J is stored trimmed and upper case by the sync (normalizeAccountManager).
+  if (p.codes) where.push(codesIn(p.codes, named));
   named.me = p.viewerId ?? null;
   if (p.followed) where.push("work_order IN (SELECT work_order FROM docket_follows WHERE user_id = :me)");
+  if (p.focus && p.viewerId !== undefined) {
+    Object.assign(named, personalParams(p.viewerId, now));
+    where.push(p.focus === "risk" ? AT_RISK_DUE : `work_order IN (${WAITING_WORK_ORDERS})`);
+  }
   // Each docket's section is computed once; the outer queries read it like a column.
   // History has no sections: it skips the per-docket subqueries (D1 rows read).
   const flags =

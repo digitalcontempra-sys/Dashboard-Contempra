@@ -1,4 +1,5 @@
 import { statusColumnOn } from "../sheet/layout";
+import { LIVE_CARD } from "../dashboard/rules";
 import { AREA_LABEL, CARD_FIELDS, ROLE_ORDER } from "../../shared/cards";
 import { GENERAL_ROLE } from "../../shared/handoff";
 import type { TimeBucket } from "../../shared/rules";
@@ -11,9 +12,7 @@ import { PRODUCTION_COLUMNS_VERSION } from "./sheetSync";
 import type { CardRow } from "./service";
 
 /** Cards of live dockets only: not in the Trash and not cancelled. */
-const LIVE = `EXISTS (
-  SELECT 1 FROM virtual_dockets v LEFT JOIN dockets d ON d.work_order = v.work_order
-  WHERE v.work_order = c.work_order AND v.state = 'saved' AND v.deleted_at IS NULL AND coalesce(d.status, '') != 'cancelled')`;
+const LIVE = LIVE_CARD;
 
 /** The card names the user, or it is a team card of one of the user's areas (same rule as canAct). */
 const visibleTo = (p: string) => `(EXISTS (SELECT 1 FROM json_each(c.assignee_ids) WHERE value = ${p})
