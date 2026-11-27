@@ -150,12 +150,23 @@ export function Layout() {
   );
 }
 
-export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: React.ReactNode }) {
+export function PageHeader({
+  title,
+  subtitle,
+  actions,
+  large = false,
+}: {
+  title: string;
+  subtitle?: string;
+  actions?: React.ReactNode;
+  /** The Main Dashboard: a bigger title, the page everyone starts from. */
+  large?: boolean;
+}) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-3 px-4 pt-6 pb-4 md:px-6 md:pt-5">
       <div className="min-w-0">
-        <h1 className="text-[28px] leading-tight font-bold tracking-tight">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-sm text-text-2">{subtitle}</p>}
+        <h1 className={`${large ? "text-[32px] md:text-[40px]" : "text-[28px]"} leading-tight font-bold tracking-tight`}>{title}</h1>
+        {subtitle && <p className={`mt-0.5 text-text-2 ${large ? "text-[15px] font-medium md:text-base" : "text-sm"}`}>{subtitle}</p>}
       </div>
       {actions}
     </div>

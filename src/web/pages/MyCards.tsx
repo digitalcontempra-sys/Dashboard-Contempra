@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ROLE_LABEL, ROLE_ORDER } from "../../shared/cards";
 import type { CardDTO, TaskCardDTO } from "../../shared/types";
 import { api } from "../api";
@@ -52,7 +53,9 @@ function Tabs<T extends string | null>({ label, items, value, onChange }: { labe
 
 export function MyCards() {
   const { user } = useAuth();
-  const [show, setShow] = useState<Show>("all");
+  // ?show=task opens on that filter (the dashboard's "Overdue task cards").
+  const [params] = useSearchParams();
+  const [show, setShow] = useState<Show>(() => SHOW.find((s) => s.id === params.get("show"))?.id ?? "all");
   const [role, setRole] = useState<string | null>(null);
   const [open, setOpen] = useState<CardDTO | null>(null);
   const [openTask, setOpenTask] = useState<TaskCardDTO | null>(null);

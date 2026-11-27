@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { AREA_LABEL, ROLE_ORDER } from "../../shared/cards";
 import type { TimeBucket } from "../../shared/rules";
 import type { AssigneeDTO, BoardDTO, CardDTO } from "../../shared/types";
@@ -55,6 +55,26 @@ export function ProductionBoard() {
     const names = new Map((people.data ?? []).map((p) => [p.id, p.fullName]));
     return (data?.columns ?? []).map((col) => ({ ...col, cards: col.cards.filter((c) => matches(c, query, names)) }));
   }, [data, people.data, query]);
+
+  // ?area=<roleId> (the dashboard's Areas menu): bring that column into view and flash it once.
+  const [params] = useSearchParams();
+  const target = params.get("area");
+  const [highlight, setHighlight] = useState<string | null>(null);
+  const shown = useRef<string | null>(null);
+  useEffect(() => {
+    if (!target || shown.current === target || !data) return;
+    const col = scroller.current?.querySelector<HTMLElement>(`[data-role="${CSS.escape(target)}"]`);
+    if (!col) return;
+    shown.current = target;
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    col.scrollIntoView?.({ behavior: still ? "auto" : "smooth", block: "nearest", inline: "center" });
+    setHighlight(target);
+  }, [target, data]);
+  useEffect(() => {
+    if (!highlight) return;
+    const t = setTimeout(() => setHighlight(null), 1600);
+    return () => clearTimeout(t);
+  }, [highlight]);
 
   return (
     <>
@@ -114,7 +134,13 @@ export function ProductionBoard() {
         <div id="board-columns" ref={scroller} className="-mx-4 overflow-x-auto px-4 pb-4 md:mx-0 md:px-0">
           <div className="flex gap-3">
             {columns.map((col) => (
-              <section key={col.roleId} aria-label={col.area} className="card flex w-64 shrink-0 flex-col gap-2.5 p-3">
+              <section
+                key={col.roleId}
+                aria-label={col.area}
+                data-role={col.roleId}
+                data-highlight={highlight === col.roleId ? "true" : undefined}
+                className="card flex w-64 shrink-0 flex-col gap-2.5 p-3 transition-shadow duration-500 data-[highlight=true]:ring-2 data-[highlight=true]:ring-accent"
+              >
                 <h2 className="flex items-center gap-2 text-sm font-bold">
                   <span className="size-2.5 shrink-0 rounded-full" style={{ background: areaColor(col.roleId) }} aria-hidden="true" />
                   {col.area} ({col.cards.length})

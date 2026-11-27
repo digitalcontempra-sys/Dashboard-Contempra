@@ -26,6 +26,8 @@ const PATHS = {
   send: "M22 2 11 13M22 2l-7 20-4-9-9-4z",
   bookmark: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z",
   note: "M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8zM15 3v4a2 2 0 0 0 2 2h4",
+  alertSquare: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM12 7.5v5.5M12 16.5h.01",
+  squareCheck: "M9 11.5l2.5 2.5L21 4.5M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11",
 } as const;
 
 export type IconName = keyof typeof PATHS;

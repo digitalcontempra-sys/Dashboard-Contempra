@@ -218,6 +218,8 @@ describe("areas on the Main Dashboard", () => {
     // Who has it in that area.
     expect(within(tile).getByText("Cory")).toBeInTheDocument();
     expect(within(screen.getByRole("button", { name: /Work order 91480/ })).getByText("Done")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Areas" })).toBeInTheDocument();
+    // The legend is the Areas menu: each area's name on its own color.
+    const legend = screen.getByRole("region", { name: "Areas · Open board" });
+    expect(within(legend).getByRole("link", { name: /^Laminate/ })).toHaveAttribute("data-area", "laminate_roll");
   });
 });

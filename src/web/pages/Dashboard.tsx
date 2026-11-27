@@ -1,10 +1,12 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon";
+import { DASH_FOCUS, type DashFocus } from "../../shared/dashboard";
 import { DASH_SECTIONS, type DashSection } from "../../shared/rules";
 import { SECTIONS } from "../format";
-import type { DocketListResponse, DocketView, HistoryFilter } from "../../shared/types";
+import type { DashboardSummary, DocketListResponse, DocketView, HistoryFilter } from "../../shared/types";
+import { DashboardHeader } from "../dashboard/DashboardHeader";
 import { api, withQuery } from "../api";
 import { useAuth } from "../auth";
 import { BucketFilter } from "../components/BucketChip";
@@ -12,7 +14,6 @@ import { DocketDetail } from "../components/DocketDetail";
 import { DocketList, EmptyState, ListSkeleton } from "../components/DocketList";
 import { AccountManagerSelect, SearchBox, Tabs } from "../components/Filters";
 import type { SegmentItem } from "../components/Segmented";
-import { AreaLegend } from "../components/AreaChip";
 import { NewTaskCardButton } from "../tasks/NewTaskCard";
 import { PageHeader } from "../components/Layout";
 import { SyncBadge } from "../components/SyncBadge";
@@ -52,6 +53,9 @@ function useScope(userId: number | undefined): [Scope, (s: Scope) => void] {
   return [scope, change];
 }
 
+const FOCUS_LABEL: Record<DashFocus, string> = { risk: "At risk", waiting: "Waiting on you" };
+const FOCUS_EMPTY: Record<DashFocus, string> = { risk: "Nothing at risk. Nice work.", waiting: "Nothing is waiting on you." };
+
 const HISTORY: SegmentItem<HistoryFilter>[] = [
   { id: "all", label: "All", icon: "layers" },
   { id: "completed", label: "Completed", icon: "check" },
@@ -64,6 +68,7 @@ export function Dashboard() {
   const [bucket, setBucket] = useParam("bucket");
   const [am, setAm] = useParam("am");
   const [q, setQ] = useParam("q");
+  const [focusParam] = useParam("focus");
   const setParams = useSetParams();
   const { user } = useAuth();
   const [scope, setScope] = useScope(user?.id);
@@ -81,12 +86,17 @@ export function Dashboard() {
   }, [saved]);
 
   const navigate = useNavigate();
-  const v = (view || "active") as DocketView;
+  // A header card's filter (At risk / Waiting on you): personal, active dockets only, replaces the scope.
+  const focus = DASH_FOCUS.includes(focusParam as DashFocus) ? (focusParam as DashFocus) : undefined;
+  const v = focus ? "active" : ((view || "active") as DocketView);
   // An old or unknown section in the URL (e.g. "coming") shows All.
   const section = DASH_SECTIONS.includes(bucket as DashSection) ? (bucket as DashSection) : undefined;
   const h = (history || "all") as HistoryFilter;
   const isHistory = v === "history";
-  const params = { view: v, history: isHistory ? h : undefined, bucket: isHistory ? undefined : section, am, q, mine: scope === "mine" ? "1" : undefined, list: scope === "list" ? "1" : undefined };
+  const params = focus
+    ? { view: v, bucket: section, am, q, focus }
+    : { view: v, history: isHistory ? h : undefined, bucket: isHistory ? undefined : section, am, q, mine: scope === "mine" ? "1" : undefined, list: scope === "list" ? "1" : undefined };
+  const blocked = noCodes && !focus;
 
   const list = useInfiniteQuery({
     queryKey: ["dockets", params],
@@ -94,29 +104,36 @@ export function Dashboard() {
     initialPageParam: 1,
     getNextPageParam: (last) => (last.page * last.pageSize < last.total ? last.page + 1 : undefined),
     refetchInterval: 30_000,
-    enabled: !noCodes,
+    enabled: !blocked,
+  });
+  // Same 30 s rhythm as the list: no extra polling loop.
+  const summary = useQuery({
+    queryKey: ["dashboard-summary"],
+    queryFn: () => api<DashboardSummary>("/api/dashboard/summary"),
+    refetchInterval: 30_000,
   });
 
   const first = list.data?.pages[0];
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
+  const changeScope = (s: typeof scope) => {
+    setScope(s);
+    if (focus) setParams({ focus: null });
+  };
 
   return (
     <>
-      <PageHeader title="Main Dashboard" subtitle={first && !noCodes ? `${first.total} work orders` : undefined} actions={
-          <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:items-end">
-            <div className="flex items-center gap-3 md:justify-end">
-              <SyncBadge />
-              <Link to="/dockets/new" className="btn-primary">
-                <Icon name="plus" className="size-4" />
-                New Docket
-              </Link>
-            </div>
-            <div className="flex flex-col items-stretch gap-1 md:items-end">
-              <NewTaskCardButton />
-            </div>
-            <div className="md:max-w-sm">
-              <AreaLegend />
-            </div>
+      <PageHeader
+        large
+        title="Main Dashboard"
+        subtitle={first && !blocked ? `${first.total} work orders` : undefined}
+        actions={
+          <div className="flex w-full flex-wrap items-center gap-3 md:w-auto md:justify-end">
+            <SyncBadge />
+            <Link to="/dockets/new" className="btn-primary">
+              <Icon name="plus" className="size-4" />
+              New Docket
+            </Link>
+            <NewTaskCardButton />
           </div>
         }
       />
@@ -126,30 +143,53 @@ export function Dashboard() {
             Docket #{saved} saved.
           </p>
         )}
-        <div className="max-w-md">
-          <Tabs label="Whose dockets" tone="brand" compact tabs={SCOPES} value={scope} onChange={setScope} />
-        </div>
-        <div className="max-w-md">
-          <Tabs
-            label="View"
-            tabs={VIEWS}
-            value={v}
-            onChange={(id) => setParams({ view: id === "active" ? null : id, bucket: null, history: null })}
-          />
-        </div>
-        {isHistory ? (
-          <div className="max-w-sm">
-            <Tabs label="History filter" tabs={HISTORY} value={h} onChange={(id) => setHistory(id === "all" ? null : id)} />
-          </div>
-        ) : (
-          <BucketFilter options={SECTIONS} value={section ?? null} counts={first?.counts} onChange={(b) => setBucket(b)} />
-        )}
+        <DashboardHeader
+          summary={summary.data}
+          onRisk={() => {
+            if (user?.codes?.length) setScope("mine");
+          }}
+          selectors={
+            <>
+              <Tabs label="Whose dockets" tone="brand" compact tabs={SCOPES} value={scope} onChange={changeScope} />
+              <Tabs
+                label="View"
+                tabs={VIEWS}
+                value={v}
+                onChange={(id) => setParams({ view: id === "active" ? null : id, bucket: null, history: null, focus: null })}
+              />
+            </>
+          }
+          chips={
+            <div className="flex flex-wrap items-center gap-2">
+              {focus && (
+                <button
+                  type="button"
+                  onClick={() => setParams({ focus: null })}
+                  aria-label={`Clear filter: ${FOCUS_LABEL[focus]}`}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-text px-3.5 text-sm font-semibold text-bg shadow-card"
+                >
+                  {FOCUS_LABEL[focus]}
+                  <Icon name="close" className="size-3.5" />
+                </button>
+              )}
+              <div className="min-w-0 flex-1">
+                {isHistory ? (
+                  <div className="max-w-sm">
+                    <Tabs label="History filter" tabs={HISTORY} value={h} onChange={(id) => setHistory(id === "all" ? null : id)} />
+                  </div>
+                ) : (
+                  <BucketFilter options={SECTIONS} value={section ?? null} counts={first?.counts} onChange={(b) => setBucket(b)} />
+                )}
+              </div>
+            </div>
+          }
+        />
         <div className="flex flex-col gap-2 sm:flex-row">
           <SearchBox value={q} onChange={(t) => setQ(t || null)} />
           <AccountManagerSelect value={am} onChange={(a) => setAm(a || null)} />
         </div>
 
-        {noCodes ? (
+        {blocked ? (
           <EmptyState text="Ask an admin to set your initials." />
         ) : list.isPending ? (
           <ListSkeleton />
@@ -158,9 +198,11 @@ export function Dashboard() {
         ) : items.length === 0 ? (
           <EmptyState
             text={
-              scope === "list" && !q && !am && !section && !isHistory
-                ? "Your list is empty. Tap the bookmark on a docket to add it."
-                : "No work orders match these filters."
+              focus && !q && !am && !section
+                ? FOCUS_EMPTY[focus]
+                : !focus && scope === "list" && !q && !am && !section && !isHistory
+                  ? "Your list is empty. Tap the bookmark on a docket to add it."
+                  : "No work orders match these filters."
             }
           />
         ) : (
