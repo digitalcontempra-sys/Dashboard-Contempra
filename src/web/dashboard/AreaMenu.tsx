@@ -44,7 +44,7 @@ export function AreaMenu({ counts }: { counts?: { roleId: string; count: number 
         {TITLE}
         <Icon name="chevron" className={`size-4 transition-transform ${open ? "rotate-90" : ""}`} />
       </button>
-      <ul id={listId} className={`${open ? "grid" : "hidden"} mt-2 grid-cols-2 gap-1.5 sm:grid-cols-3 md:mt-0 md:grid md:grid-cols-6 min-[1400px]:grid-cols-3`}>
+      <ul id={listId} className={`${open ? "grid" : "hidden"} mt-2 grid-cols-2 gap-1.5 sm:grid-cols-3 md:mt-0 md:grid md:grid-cols-4 xl:grid-cols-6 min-[105rem]:grid-cols-3`}>
         {ROLE_ORDER.map((roleId) => {
           const color = areaColor(roleId);
           const count = byArea.get(roleId);

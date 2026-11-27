@@ -9,16 +9,23 @@ export function Clock() {
     return () => clearTimeout(t);
   }, [now]);
   const p = clockParts(now);
+  // Sized by its own box (container query): one line when it fits, else the date drops below the time.
   return (
-    <div role="group" aria-label={p.label} className="glass flex h-full flex-wrap items-baseline gap-x-3 gap-y-1 rounded-[20px] px-5 py-4">
-      <span aria-hidden="true" className="text-[28px] leading-none font-bold tracking-tight whitespace-nowrap md:text-[34px]">
-        {p.time}
-      </span>
-      <span aria-hidden="true" className="flex items-baseline gap-3 whitespace-nowrap">
-        <span className="text-[22px] leading-none font-light text-text-3 md:text-[26px]">|</span>
-        <span className="text-[15px] font-bold tracking-wide text-accent md:text-[17px]">{p.weekday}</span>
-        <span className="text-[15px] text-text-2 md:text-[17px]">{p.date}</span>
-      </span>
+    <div className="@container h-full">
+      <div
+        role="group"
+        aria-label={p.label}
+        className="glass flex h-full flex-wrap items-baseline gap-x-3 gap-y-1 rounded-[20px] px-5 py-4 @[22rem]:items-center"
+      >
+        <span aria-hidden="true" className="text-[30px] leading-none font-bold tracking-tight whitespace-nowrap @[24rem]:text-[34px]">
+          {p.time}
+        </span>
+        <span aria-hidden="true" className="flex items-baseline gap-3 whitespace-nowrap">
+          <span className="hidden text-[24px] leading-none font-light text-text-3 @[22rem]:inline">|</span>
+          <span className="text-[15px] font-bold tracking-wide text-accent @[24rem]:text-[17px]">{p.weekday}</span>
+          <span className="text-[15px] text-text-2 @[24rem]:text-[17px]">{p.date}</span>
+        </span>
+      </div>
     </div>
   );
 }

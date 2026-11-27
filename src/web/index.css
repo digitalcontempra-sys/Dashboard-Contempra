@@ -427,7 +427,8 @@ body {
 /*
  * Main Dashboard header: one grid, the owner's composition.
  * Phone: clock, cards, selectors, section chips, areas. Tablet: clock + selectors, cards, areas, chips.
- * Wide (sidebar + 5 blocks need ~1400px): clock/selectors | 3 cards | areas, then the chips.
+ * Laptop (1280+): clock/selectors | 3 cards, areas below. Wide (1680+, the composition's own width;
+ * the sidebar takes 256px): clock/selectors | 3 cards | areas, then the chips.
  */
 .dash-head {
   display: grid;
@@ -450,11 +451,23 @@ body {
     grid-template-areas: "clock sel" "cards cards" "areas areas" "chips chips";
   }
 }
-@media (min-width: 1400px) {
+@media (min-width: 1280px) {
   .dash-head {
     gap: 16px;
+    grid-template-columns: minmax(19rem, 1fr) minmax(0, 2fr);
+    grid-template-areas: "clock cards" "sel cards" "areas areas" "chips chips";
+  }
+}
+@media (min-width: 1680px) {
+  .dash-head {
     grid-template-columns: minmax(0, 1.12fr) minmax(0, 2.05fr) minmax(0, 1.18fr);
     grid-template-areas: "clock cards areas" "sel cards areas" "chips chips chips";
+  }
+}
+/* Beside the clock the selectors are narrow: labels only, so none is cut. */
+@media (min-width: 768px) and (max-width: 1679px) {
+  .dash-head > [data-slot="sel"] .seg svg {
+    display: none;
   }
 }
 
