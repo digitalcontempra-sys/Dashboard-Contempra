@@ -38,6 +38,8 @@ A production dashboard for **Contempra Signs** (a sign shop in Winnipeg). It sit
   - **Daily Complete:** the creator's card is `Ready to close` with nobody else on the docket (done, waiting for delivery). `Close docket` (= delivered) moves it to History.
   - Order: All by creation date (newest first); Rush and Upcoming by Due Date (soonest first); New Orders and No Due Date newest first; Daily Complete longest waiting first. Coming no longer exists anywhere (`TimeBucket` = `rush_today | upcoming | no_due_date`).
   - **All dockets | My Dockets** (selector above the views, remembered per user in `localStorage` `dashboard.scope.<id>`): My Dockets = dockets whose J (Account Manager) is one of my codes (`GET /api/dockets?mine=1`). Same sections, orders and counts. Without codes: "Ask an admin to set your initials." Spec `2026-11-26-my-dockets-design.md`.
+  - **My List** (third scope, `GET /api/dockets?list=1`): dockets I follow (table `docket_follows`). Bookmark button on each tile and in the docket header (`PUT`/`DELETE /api/dockets/:wo/follow`, one tap, `Add to My List` / `Remove from My List`). Personal, no alerts, no sheet writes; a closed docket stays and shows in History. List and detail carry `followed` + `myOpenNotes` for the viewer. Spec `2026-11-26-my-list-and-notes-design.md`.
+  - **Docket notes:** the note button on a tile / docket header opens New Task Card as a note to self pinned to the docket (`task_cards.work_order`; server: self only, admin/manager only, docket must exist). Yellow mark with the count on the tile; the detail lists my open notes with Done (`GET /api/task-cards?workOrder=`). My Cards shows `#WO`; the opened note has `Docket #WO`. Staff have neither (no Main Dashboard).
   - Each tile (and the docket header, "Now with") shows who has it now, per area. It also has On Hold and History views, an account-manager filter and search. The docket detail links to the editor with **Edit Docket** (pencil icon) and offers **Download PDF**; it has no Drive button (the Drive copy stays as a backup).
 - **Virtual Docket.** A replica of the paper docket form that writes the docket's row to the sheet, renders a PDF in the browser and stores it in R2 and Google Drive. Dockets can be cancelled, moved to Trash and restored.
 - **Production cards (hand to hand, like the paper docket).** The creator sends the new docket to one or more people, each with a `What to do` note. Each card belongs to one person, in one area (or `General` for people without one), with:
@@ -132,7 +134,7 @@ src/web/
   tasks/               NewTaskCard, TaskCards (tile, view, Sent by me)
   components/          Layout (nav, badge, sound toggle), DocketList, DocketDetail (tabs), DocketHistory, AreaChip/AreaLegend, BucketChip
   docket/              DocketPaper (paper replica), ProductionPanel (route editor), DocketPdf, afterSave
-migrations/            0001–0013 (D1). Add new ones as 0014_*.sql; never edit an applied one
+migrations/            0001–0014 (D1). Add new ones as 0015_*.sql; never edit an applied one
 data/catalogs/         material lists: roll-print, flatbed (Print FB), laminate (Laminate Roll)
 scripts/               publish.ps1, set-google-secrets.ps1, dev-setup.mjs, create-admin.mjs, import-fixture.mjs, xlsx_to_values.py
 test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), web/ (jsdom + mockApi)
@@ -191,7 +193,7 @@ test/                  shared/ (pure), worker/ (vitest-pool-workers + fakes), we
    5. Have a fresh reviewer check the whole branch, and fix what it finds that matters.
    6. Ask "¿Hago merge a main y publico?"
 3. **Verification before saying "done":**
-   - `npx vitest run` passes (today 523 tests).
+   - `npx vitest run` passes (today 542 tests).
    - `npm run typecheck` is clean.
    - For UI changes, check the page in the local preview, including phone width 375 px: no horizontal scroll.
 4. **Commit messages:**

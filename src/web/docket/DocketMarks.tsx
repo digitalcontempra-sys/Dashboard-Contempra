@@ -41,7 +41,6 @@ export function FollowButton({ workOrder, followed, size = "sm" }: { workOrder: 
   return (
     <button
       type="button"
-      aria-pressed={on}
       aria-label={label}
       title={label}
       onClick={() => void toggle()}

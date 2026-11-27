@@ -99,10 +99,8 @@ describe("My List", () => {
     });
     renderApp("/dashboard");
     const add = await screen.findByRole("button", { name: "Add to My List" });
-    expect(add).toHaveAttribute("aria-pressed", "false");
     await userEvent.click(add);
     const remove = await screen.findByRole("button", { name: "Remove from My List" });
-    expect(remove).toHaveAttribute("aria-pressed", "true");
     expect(calls.some((c) => c.method === "PUT" && c.url.pathname === "/api/dockets/91487/follow")).toBe(true);
     await userEvent.click(remove);
     await screen.findByRole("button", { name: "Add to My List" });

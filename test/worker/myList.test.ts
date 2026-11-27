@@ -111,6 +111,19 @@ describe("Notes pinned to a docket", () => {
     expect(await errorOf(res)).toBe("Only managers can add notes to a docket.");
   });
 
+  it("reject a work order that is not text", async () => {
+    const res = await note(s.manager, { toUserId: s.ids.mgr, workOrder: 401 });
+    expect(res.status).toBe(400);
+    expect(await errorOf(res)).toBe("Invalid work order.");
+  });
+
+  it("lose the docket link if the owner becomes Staff", async () => {
+    const t = await json<TaskCardDTO>(await note(s.manager, { toUserId: s.ids.mgr, workOrder: "401" }));
+    await env.DB.prepare("UPDATE users SET access_level = 'staff' WHERE id = ?").bind(s.ids.mgr).run();
+    const inbox = await json<TaskCardDTO[]>(await api("/api/task-cards", { cookie: s.manager }));
+    expect(inbox.find((x) => x.id === t.id)?.workOrder).toBeNull();
+  });
+
   it("other people's notes are never listed for me", async () => {
     await note(s.admin, { toUserId: s.ids.boss, workOrder: "401" });
     expect(await json(await api("/api/task-cards?workOrder=401", { cookie: s.manager }))).toEqual([]);

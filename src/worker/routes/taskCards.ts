@@ -28,9 +28,11 @@ const SENT_DAYS = 30;
 const HISTORY_PAGE = 50;
 const KINDS: TaskDueKind[] = ["none", "rush", "today", "date"];
 
-function toDto(r: Row, viewerId: number, today: string): TaskCardDTO {
+function toDto(r: Row, viewer: { id: number; accessLevel: string }, today: string): TaskCardDTO {
   const due: TaskDue = r.due_kind === "date" ? { kind: "date", date: r.due_date ?? undefined } : { kind: r.due_kind };
-  const inbox = r.to_user === viewerId;
+  const inbox = r.to_user === viewer.id;
+  // Only people who can open a docket get the link (a manager moved to Staff keeps the note, not the link).
+  const seesDockets = viewer.accessLevel === "admin" || viewer.accessLevel === "manager";
   return {
     id: r.id,
     from: { id: r.from_user, name: r.from_name },
@@ -42,7 +44,7 @@ function toDto(r: Row, viewerId: number, today: string): TaskCardDTO {
     createdAt: r.created_at,
     doneAt: r.done_at,
     isNew: inbox ? r.status === "open" && !r.seen_at : r.status === "done" && !r.done_seen_at,
-    workOrder: r.work_order ?? null,
+    workOrder: seesDockets ? (r.work_order ?? null) : null,
   };
 }
 
@@ -69,7 +71,10 @@ taskCardRoutes.post("/task-cards", async (c) => {
   const kind = KINDS.includes(b.due?.kind as TaskDueKind) ? (b.due!.kind as TaskDueKind) : "none";
   if (kind === "date" && !isIsoDate(b.due?.date)) return bad(c, "Choose a valid date.");
   // A note pinned to a docket: only to self, only for people who see the Main Dashboard.
-  const workOrder = typeof b.workOrder === "string" && b.workOrder.trim() ? b.workOrder.trim() : null;
+  if (b.workOrder !== undefined && b.workOrder !== null && (typeof b.workOrder !== "string" || !b.workOrder.trim())) {
+    return bad(c, "Invalid work order.");
+  }
+  const workOrder = typeof b.workOrder === "string" ? b.workOrder.trim() : null;
   if (workOrder) {
     if (to.id !== me.id) return bad(c, "A docket note is a note to self.");
     if (me.accessLevel !== "admin" && me.accessLevel !== "manager") return c.json({ error: "Only managers can add notes to a docket." }, 403);
@@ -84,7 +89,7 @@ taskCardRoutes.post("/task-cards", async (c) => {
     .bind(me.id, to.id, note, kind, kind === "date" ? b.due!.date : null, now, to.id === me.id ? now : null, workOrder)
     .first<{ id: number }>();
   const full = await c.env.DB.prepare(`${SELECT} WHERE t.id = ?`).bind(row!.id).first<Row>();
-  return c.json(toDto(full!, me.id, todayInBusinessTz(new Date())));
+  return c.json(toDto(full!, me, todayInBusinessTz(new Date())));
 });
 
 taskCardRoutes.get("/task-cards", async (c) => {
@@ -96,7 +101,7 @@ taskCardRoutes.get("/task-cards", async (c) => {
     const { results } = await c.env.DB.prepare(`${SELECT} WHERE t.to_user = ? AND t.work_order = ? AND t.status = 'open' ORDER BY t.created_at`)
       .bind(me.id, wo)
       .all<Row>();
-    return c.json(results.map((r) => toDto(r, me.id, today)));
+    return c.json(results.map((r) => toDto(r, me, today)));
   }
   if (c.req.query("box") === "sent") {
     const since = new Date(Date.now() - SENT_DAYS * 86_400_000).toISOString();
@@ -105,7 +110,7 @@ taskCardRoutes.get("/task-cards", async (c) => {
     )
       .bind(me.id, since)
       .all<Row>();
-    return c.json(results.map((r) => toDto(r, me.id, today)));
+    return c.json(results.map((r) => toDto(r, me, today)));
   }
   if (c.req.query("box") === "history") {
     const asked = Number(c.req.query("page"));
@@ -116,7 +121,7 @@ taskCardRoutes.get("/task-cards", async (c) => {
       .bind(me.id, HISTORY_PAGE + 1, (page - 1) * HISTORY_PAGE)
       .all<Row>();
     const page_: TaskHistoryPage = {
-      items: results.slice(0, HISTORY_PAGE).map((r) => toDto(r, me.id, today)),
+      items: results.slice(0, HISTORY_PAGE).map((r) => toDto(r, me, today)),
       hasMore: results.length > HISTORY_PAGE,
     };
     return c.json(page_);
@@ -124,7 +129,7 @@ taskCardRoutes.get("/task-cards", async (c) => {
   const { results } = await c.env.DB.prepare(`${SELECT} WHERE t.to_user = ? AND t.status = 'open' ORDER BY t.created_at`)
     .bind(me.id)
     .all<Row>();
-  return c.json(results.map((r) => toDto(r, me.id, today)));
+  return c.json(results.map((r) => toDto(r, me, today)));
 });
 
 // Registered before /:id routes so "sent" is never read as an id.

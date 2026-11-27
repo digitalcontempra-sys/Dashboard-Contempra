@@ -75,14 +75,22 @@ export function TaskView({ task, onClose }: { task: TaskCardDTO; onClose: () => 
   async function done(remove = false) {
     if (remove && !window.confirm("Delete this note?")) return;
     setBusy(true);
+    // A pinned note also changes the docket's yellow mark and its notes.
+    const refreshDocket = () => {
+      if (!task.workOrder) return;
+      void qc.invalidateQueries({ queryKey: ["dockets"] });
+      void qc.invalidateQueries({ queryKey: ["docket", task.workOrder] });
+    };
     try {
       await api(remove ? `/api/task-cards/${task.id}` : `/api/task-cards/${task.id}/done`, { method: remove ? "DELETE" : "POST" });
       void qc.invalidateQueries({ queryKey: ["tasks"] });
       void qc.invalidateQueries({ queryKey: ["my-cards-summary"] });
+      refreshDocket();
       onClose();
     } catch (e) {
       setError((e as Error).message);
       void qc.invalidateQueries({ queryKey: ["tasks"] });
+      refreshDocket();
     } finally {
       setBusy(false);
     }
